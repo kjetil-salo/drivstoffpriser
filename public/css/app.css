@@ -227,6 +227,32 @@ html, body {
   margin-bottom: var(--space-md);
 }
 
+#sort-label {
+  display: block;
+  margin-bottom: var(--space-sm);
+}
+
+#sort-knapper {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.sort-btn {
+  min-height: 34px;
+  padding: 0 var(--space-md);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  background: transparent;
+  color: var(--color-muted);
+  font-size: var(--font-sm);
+}
+
+.sort-btn.aktiv {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #fff;
+}
+
 .stasjon-kort {
   background: var(--color-card-bg);
   border: 1px solid var(--border-color);

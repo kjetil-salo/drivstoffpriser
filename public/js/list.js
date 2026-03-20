@@ -1,4 +1,11 @@
+let aktivSort = 'avstand';
+let sisteStasjoner = [];
+let sisteOnKlikk = null;
+
 export function visListe(stasjoner, onKlikk) {
+    sisteStasjoner = stasjoner;
+    sisteOnKlikk = onKlikk;
+
     const container = document.getElementById('liste');
     const info = document.getElementById('liste-info');
 
@@ -8,8 +15,23 @@ export function visListe(stasjoner, onKlikk) {
         return;
     }
 
-    info.textContent = `${stasjoner.length} stasjoner i nærheten, sortert på avstand`;
-    container.innerHTML = stasjoner.map(s => kortHtml(s)).join('');
+    info.innerHTML = `
+        <span id="sort-label">${stasjoner.length} stasjoner – sorter:</span>
+        <div id="sort-knapper">
+            <button class="sort-btn ${aktivSort === 'avstand' ? 'aktiv' : ''}" data-sort="avstand">Avstand</button>
+            <button class="sort-btn ${aktivSort === 'bensin' ? 'aktiv' : ''}" data-sort="bensin">95 oktan</button>
+            <button class="sort-btn ${aktivSort === 'diesel' ? 'aktiv' : ''}" data-sort="diesel">Diesel</button>
+        </div>`;
+
+    info.querySelectorAll('.sort-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            aktivSort = btn.dataset.sort;
+            visListe(sisteStasjoner, sisteOnKlikk);
+        });
+    });
+
+    const sortert = sorter(stasjoner, aktivSort);
+    container.innerHTML = sortert.map(s => kortHtml(s)).join('');
 
     container.querySelectorAll('.stasjon-kort').forEach(kort => {
         const id = parseInt(kort.dataset.id, 10);
@@ -28,6 +50,15 @@ export function oppdaterKort(stasjon, onKlikk) {
     const nyttKort = nytt.firstElementChild;
     nyttKort.addEventListener('click', () => onKlikk(stasjon));
     kort.replaceWith(nyttKort);
+}
+
+function sorter(stasjoner, felt) {
+    return [...stasjoner].sort((a, b) => {
+        if (felt === 'avstand') return (a.avstand_m ?? Infinity) - (b.avstand_m ?? Infinity);
+        const av = a[felt] ?? Infinity;
+        const bv = b[felt] ?? Infinity;
+        return av - bv;
+    });
 }
 
 function formatPris(v) {
