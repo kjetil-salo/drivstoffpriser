@@ -5,7 +5,14 @@ const stasjonData = new Map();     // id → stasjon
 
 export function initMap(containerId, startPos) {
     const senter = startPos ? [startPos.lat, startPos.lon] : [59.91, 10.75];
-    map = L.map(containerId, { zoomControl: true, tap: false }).setView(senter, 13);
+    const norgeBounds = L.latLngBounds([57.0, 4.0], [71.5, 31.5]);
+    map = L.map(containerId, {
+        zoomControl: true,
+        tap: false,
+        maxBounds: norgeBounds,
+        maxBoundsViscosity: 1.0,
+        minZoom: 5,
+    }).setView(senter, 13);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
         maxZoom: 19,
