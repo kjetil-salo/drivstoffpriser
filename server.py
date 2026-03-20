@@ -186,18 +186,22 @@ Du er invitert! Velg brukernavn og passord.</p>
 @krever_admin
 def admin():
     brukere = hent_alle_brukere()
-    bruker_rader = ''.join(
-        f'''<tr>
-          <td>{b["brukernavn"]}{"&nbsp;👑" if b["er_admin"] else ""}</td>
-          <td style="color:#94a3b8;font-size:0.78rem">{b["opprettet"][:10]}</td>
-          <td>{"" if b["er_admin"] else f\'<form method="post" action="/admin/slett-bruker" style="margin:0">\'
-               + f\'<input type="hidden" name="bruker_id" value="{b["id"]}">\'
-               + \'<button style="background:transparent;border:1px solid #ef4444;color:#ef4444;\'
-               + \'font-size:0.75rem;padding:3px 8px;border-radius:4px;cursor:pointer;width:auto">\'
-               + \'Slett</button></form>\'}</td>
-        </tr>'''
-        for b in brukere
-    )
+    rader = []
+    for b in brukere:
+        navn = b['brukernavn'] + ('&nbsp;👑' if b['er_admin'] else '')
+        dato = b['opprettet'][:10]
+        if b['er_admin']:
+            slett_td = '<td></td>'
+        else:
+            slett_td = (
+                f'<td><form method="post" action="/admin/slett-bruker" style="margin:0">'
+                f'<input type="hidden" name="bruker_id" value="{b["id"]}">'
+                '<button style="background:transparent;border:1px solid #ef4444;color:#ef4444;'
+                'font-size:0.75rem;padding:3px 8px;border-radius:4px;cursor:pointer;width:auto">'
+                'Slett</button></form></td>'
+            )
+        rader.append(f'<tr><td>{navn}</td><td style="color:#94a3b8;font-size:0.78rem">{dato}</td>{slett_td}</tr>')
+    bruker_rader = ''.join(rader)
     base_url = request.host_url.rstrip('/')
     return f'''<!DOCTYPE html><html lang="no"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
