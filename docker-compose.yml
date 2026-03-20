@@ -11,6 +11,8 @@ services:
       STATS_KEY: "${STATS_KEY:-salo}"
       BASE_URL: "https://drivstoff.ksalo.no"
       DATA_DIR: "/app/data"
+      RESEND_API_KEY: "${RESEND_API_KEY:-}"
+      REGISTRER_KODE: "${REGISTRER_KODE:-}"
     volumes:
       - drivstoff-data:/app/data
     logging:

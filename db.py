@@ -53,6 +53,14 @@ def init_db():
                 utloper   TEXT NOT NULL,
                 brukt     INTEGER NOT NULL DEFAULT 0
             );
+            CREATE TABLE IF NOT EXISTS tilbakestilling (
+                id        INTEGER PRIMARY KEY AUTOINCREMENT,
+                token     TEXT NOT NULL UNIQUE,
+                epost     TEXT NOT NULL,
+                opprettet TEXT DEFAULT (datetime('now')),
+                utloper   TEXT NOT NULL,
+                brukt     INTEGER NOT NULL DEFAULT 0
+            );
         ''')
 
 
@@ -198,6 +206,34 @@ def hent_invitasjon(token: str) -> dict | None:
 def merk_invitasjon_brukt(token: str):
     with get_conn() as conn:
         conn.execute("UPDATE invitasjoner SET brukt = 1 WHERE token = ?", (token,))
+
+
+def opprett_tilbakestilling(token: str, epost: str, utloper: str):
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT INTO tilbakestilling (token, epost, utloper) VALUES (?, ?, ?)",
+            (token, epost, utloper)
+        )
+
+
+def hent_tilbakestilling(token: str) -> dict | None:
+    with get_conn() as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT * FROM tilbakestilling WHERE token = ? AND brukt = 0 AND utloper > datetime('now')",
+            (token,)
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def merk_tilbakestilling_brukt(token: str):
+    with get_conn() as conn:
+        conn.execute("UPDATE tilbakestilling SET brukt = 1 WHERE token = ?", (token,))
+
+
+def oppdater_passord(epost: str, passord_hash: str):
+    with get_conn() as conn:
+        conn.execute("UPDATE brukere SET passord_hash = ? WHERE brukernavn = ?", (passord_hash, epost))
 
 
 def logg_visning(ip: str, device_id: str, user_agent: str):

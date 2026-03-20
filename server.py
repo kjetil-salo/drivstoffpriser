@@ -15,14 +15,17 @@ import uuid
 import secrets
 from datetime import datetime, timedelta
 from functools import wraps
+import re
 import httpx
+import resend
 from flask import Flask, request, jsonify, send_from_directory, make_response, session, redirect, url_for
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from db import (init_db, get_stasjoner_med_priser, lagre_pris, logg_visning, get_statistikk,
                 antall_brukere, opprett_bruker, finn_bruker, finn_bruker_id,
                 hent_alle_brukere, slett_bruker,
-                opprett_invitasjon, hent_invitasjon, merk_invitasjon_brukt)
+                opprett_invitasjon, hent_invitasjon, merk_invitasjon_brukt,
+                opprett_tilbakestilling, hent_tilbakestilling, merk_tilbakestilling_brukt, oppdater_passord)
 from osm import hent_stasjoner_fra_osm
 
 logging.basicConfig(
@@ -49,6 +52,9 @@ PUBLIC_DIR = os.path.join(BASE_DIR, 'public')
 
 app = Flask(__name__, static_folder=PUBLIC_DIR, static_url_path='')
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-nøkkel-bytt-i-prod')
+resend.api_key = os.environ.get('RESEND_API_KEY', '')
+FRA_EPOST = 'Drivstoffpriser <noreply@ksalo.no>'
+REGISTRER_KODE = os.environ.get('REGISTRER_KODE', '')
 
 
 def _auth_side(tittel, innhold, feil=''):
@@ -130,16 +136,18 @@ def logg_inn():
 
 def _login_form():
     return '''<form method="post">
-<label>Brukernavn</label><input name="brukernavn" autofocus autocomplete="username">
+<label>E-post</label><input name="brukernavn" type="email" autofocus autocomplete="username">
 <label>Passord</label><input name="passord" type="password" autocomplete="current-password">
-<button>Logg inn</button></form>'''
+<button>Logg inn</button></form>
+<a href="/auth/tilbakestill">Glemt passord?</a>
+<a href="/registrer">Ny bruker? Registrer deg</a>'''
 
 
 def _admin_form():
     return '''<p style="color:#94a3b8;font-size:0.85rem;margin-bottom:1rem">
 Ingen brukere finnes. Opprett admin-konto.</p>
 <form method="post">
-<label>Brukernavn</label><input name="brukernavn" autofocus autocomplete="username">
+<label>E-post</label><input name="brukernavn" type="email" autofocus autocomplete="username">
 <label>Passord</label><input name="passord" type="password" autocomplete="new-password">
 <button>Opprett admin</button></form>'''
 
@@ -148,6 +156,106 @@ Ingen brukere finnes. Opprett admin-konto.</p>
 def logg_ut():
     session.clear()
     return redirect('/')
+
+
+_EPOST_RE = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
+
+
+@app.route('/registrer', methods=['GET', 'POST'])
+def registrer():
+    if not REGISTRER_KODE:
+        return _auth_side('Registrering', '<p style="color:#94a3b8">Registrering er ikke aktivert.</p><a href="/">← Tilbake</a>')
+
+    if request.method == 'POST':
+        epost = request.form.get('epost', '').strip().lower()
+        passord = request.form.get('passord', '').strip()
+        kode = request.form.get('kode', '').strip()
+
+        if not _EPOST_RE.match(epost):
+            return _auth_side('Registrer deg', _registrer_form(), 'Ugyldig e-postadresse.')
+        if len(passord) < 6:
+            return _auth_side('Registrer deg', _registrer_form(), 'Passordet må være minst 6 tegn.')
+        if kode != REGISTRER_KODE:
+            return _auth_side('Registrer deg', _registrer_form(), 'Feil tilgangskode.')
+        if finn_bruker(epost):
+            return _auth_side('Registrer deg', _registrer_form(), 'E-postadressen er allerede i bruk.')
+
+        opprett_bruker(epost, generate_password_hash(passord))
+        bruker = finn_bruker(epost)
+        session['bruker_id'] = bruker['id']
+        return redirect('/')
+
+    return _auth_side('Registrer deg', _registrer_form())
+
+
+def _registrer_form():
+    return '''<form method="post">
+<label>E-post</label><input name="epost" type="email" autofocus autocomplete="email">
+<label>Passord</label><input name="passord" type="password" autocomplete="new-password">
+<label>Tilgangskode</label><input name="kode" type="text" autocomplete="off">
+<button>Registrer deg</button></form>
+<a href="/auth/logg-inn">Har du konto? Logg inn</a>'''
+
+
+@app.route('/auth/tilbakestill', methods=['GET', 'POST'])
+def tilbakestill():
+    if request.method == 'POST':
+        epost = request.form.get('epost', '').strip().lower()
+        bruker = finn_bruker(epost)
+        if bruker:
+            token = secrets.token_urlsafe(32)
+            utloper = (datetime.utcnow() + timedelta(hours=1)).strftime('%Y-%m-%d %H:%M:%S')
+            opprett_tilbakestilling(token, epost, utloper)
+            base_url = os.environ.get('BASE_URL', request.host_url.rstrip('/'))
+            lenke = f'{base_url}/auth/nytt-passord?token={token}'
+            try:
+                resend.Emails.send({
+                    'from': FRA_EPOST,
+                    'to': epost,
+                    'subject': 'Tilbakestill passord – Drivstoffpriser',
+                    'html': f'<p>Klikk på lenken for å sette nytt passord (gyldig 1 time):</p>'
+                            f'<p><a href="{lenke}">{lenke}</a></p>'
+                            f'<p>Hvis du ikke ba om dette kan du ignorere denne e-posten.</p>',
+                })
+            except Exception as e:
+                logger.error(f'E-postsending feilet: {e}')
+        # Alltid samme melding for å ikke avsløre om e-post finnes
+        return _auth_side('Tilbakestill passord',
+            '<p style="color:#94a3b8">Hvis e-postadressen finnes i systemet har du nå fått en lenke. Sjekk innboksen.</p>'
+            '<a href="/auth/logg-inn">← Tilbake</a>')
+
+    return _auth_side('Tilbakestill passord', '''<form method="post">
+<label>E-post</label><input name="epost" type="email" autofocus autocomplete="email">
+<button>Send tilbakestillingslenke</button></form>
+<a href="/auth/logg-inn">← Tilbake</a>''')
+
+
+@app.route('/auth/nytt-passord', methods=['GET', 'POST'])
+def nytt_passord():
+    token = request.args.get('token') or request.form.get('token', '')
+    ts = hent_tilbakestilling(token)
+    if not ts:
+        return _auth_side('Ugyldig lenke', '<p style="color:#94a3b8">Lenken er ugyldig eller utløpt.</p><a href="/auth/logg-inn">← Logg inn</a>')
+
+    if request.method == 'POST':
+        passord = request.form.get('passord', '').strip()
+        if len(passord) < 6:
+            return _auth_side('Nytt passord', _nytt_passord_form(token), 'Passordet må være minst 6 tegn.')
+        oppdater_passord(ts['epost'], generate_password_hash(passord))
+        merk_tilbakestilling_brukt(token)
+        bruker = finn_bruker(ts['epost'])
+        if bruker:
+            session['bruker_id'] = bruker['id']
+        return redirect('/')
+
+    return _auth_side('Nytt passord', _nytt_passord_form(token))
+
+
+def _nytt_passord_form(token):
+    return f'''<form method="post">
+<input type="hidden" name="token" value="{token}">
+<label>Nytt passord</label><input name="passord" type="password" autofocus autocomplete="new-password">
+<button>Sett nytt passord</button></form>'''
 
 
 @app.route('/api/meg')
