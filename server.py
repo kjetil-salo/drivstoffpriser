@@ -9,6 +9,7 @@ except ImportError:
     pass
 
 import logging
+import logging.handlers
 import os
 import uuid
 import secrets
@@ -29,6 +30,19 @@ logging.basicConfig(
     format='%(asctime)s [%(levelname)s] %(message)s'
 )
 logger = logging.getLogger('drivstoff')
+
+# Fil-logging: buffret i RAM, skrives til disk kun ved ERROR eller når bufferet er fullt (100 meldinger).
+# Maks 500 KB × 2 filer = 1 MB totalt på SD-kortet.
+_log_path = os.path.join(os.environ.get('DATA_DIR', '.'), 'app.log')
+_fil_handler = logging.handlers.RotatingFileHandler(
+    _log_path, maxBytes=500_000, backupCount=2, encoding='utf-8'
+)
+_fil_handler.setLevel(logging.WARNING)
+_fil_handler.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] %(message)s'))
+_buffer_handler = logging.handlers.MemoryHandler(
+    capacity=100, flushLevel=logging.ERROR, target=_fil_handler
+)
+logger.addHandler(_buffer_handler)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PUBLIC_DIR = os.path.join(BASE_DIR, 'public')
