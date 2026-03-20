@@ -2,7 +2,7 @@
 
 Mobilapp for å se og oppdatere bensinpriser på stasjoner i nærheten. Viser stasjoner fra OpenStreetMap på et interaktivt kart, sortert etter avstand. Alle kan rapportere priser – appen er laget for å holde lokale priser oppdatert på dugnad.
 
-Tilgjengelig på [drivstoff.efugl.no](https://drivstoff.efugl.no)
+Tilgjengelig på [drivstoff.ksalo.no](https://drivstoff.ksalo.no)
 
 ---
 
