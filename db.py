@@ -39,6 +39,20 @@ def init_db():
             );
             CREATE INDEX IF NOT EXISTS idx_visninger_device ON visninger(device_id);
             CREATE INDEX IF NOT EXISTS idx_visninger_ts ON visninger(ts);
+            CREATE TABLE IF NOT EXISTS brukere (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                brukernavn TEXT NOT NULL UNIQUE,
+                passord_hash TEXT NOT NULL,
+                er_admin   INTEGER NOT NULL DEFAULT 0,
+                opprettet  TEXT DEFAULT (datetime('now'))
+            );
+            CREATE TABLE IF NOT EXISTS invitasjoner (
+                id        INTEGER PRIMARY KEY AUTOINCREMENT,
+                token     TEXT NOT NULL UNIQUE,
+                opprettet TEXT DEFAULT (datetime('now')),
+                utloper   TEXT NOT NULL,
+                brukt     INTEGER NOT NULL DEFAULT 0
+            );
         ''')
 
 
@@ -116,6 +130,74 @@ def get_statistikk() -> dict:
         'trend_30d': list(trend_map.items()),
         'siste_besok': [dict(r) for r in siste_besok],
     }
+
+
+def antall_brukere() -> int:
+    with get_conn() as conn:
+        return conn.execute("SELECT COUNT(*) FROM brukere").fetchone()[0]
+
+
+def opprett_bruker(brukernavn: str, passord_hash: str, er_admin: bool = False):
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT INTO brukere (brukernavn, passord_hash, er_admin) VALUES (?, ?, ?)",
+            (brukernavn, passord_hash, 1 if er_admin else 0)
+        )
+
+
+def finn_bruker(brukernavn: str) -> dict | None:
+    with get_conn() as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT * FROM brukere WHERE brukernavn = ?", (brukernavn,)
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def finn_bruker_id(bruker_id: int) -> dict | None:
+    with get_conn() as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT * FROM brukere WHERE id = ?", (bruker_id,)
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def hent_alle_brukere() -> list:
+    with get_conn() as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT id, brukernavn, er_admin, opprettet FROM brukere ORDER BY opprettet"
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def slett_bruker(bruker_id: int):
+    with get_conn() as conn:
+        conn.execute("DELETE FROM brukere WHERE id = ?", (bruker_id,))
+
+
+def opprett_invitasjon(token: str, utloper: str):
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT INTO invitasjoner (token, utloper) VALUES (?, ?)",
+            (token, utloper)
+        )
+
+
+def hent_invitasjon(token: str) -> dict | None:
+    with get_conn() as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT * FROM invitasjoner WHERE token = ? AND brukt = 0 AND utloper > datetime('now')",
+            (token,)
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def merk_invitasjon_brukt(token: str):
+    with get_conn() as conn:
+        conn.execute("UPDATE invitasjoner SET brukt = 1 WHERE token = ?", (token,))
 
 
 def logg_visning(ip: str, device_id: str, user_agent: str):

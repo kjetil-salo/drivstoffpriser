@@ -36,6 +36,12 @@ const viewListe = document.getElementById('view-liste');
 // ── Statistikk ────────────────────────────────────
 fetch('/api/logview', { method: 'POST' }).catch(() => {});
 
+// ── Auth-status ───────────────────────────────────
+let innlogget = false;
+const meg = await fetch('/api/meg').then(r => r.json()).catch(() => ({}));
+innlogget = meg.innlogget || false;
+window.__innlogget = innlogget;
+
 // ── Init kart med siste kjente posisjon ───────────
 const lagretPos = hentLagretPos();
 initMap('map', lagretPos);

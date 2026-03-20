@@ -38,6 +38,7 @@ export function visStasjonSheet(stasjon) {
     aktivStasjon = stasjon;
     fyllVisning(stasjon);
     visVisModus();
+    endreBtnEl.style.display = window.__innlogget ? '' : 'none';
     sheet.classList.add('open');
     backdrop.classList.add('open');
 }
