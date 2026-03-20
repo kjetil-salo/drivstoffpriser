@@ -13,7 +13,7 @@ Tilgjengelig på [drivstoff.efugl.no](https://drivstoff.efugl.no)
 1. Åpne siden i nettleseren på mobilen
 2. Trykk **Hent posisjon** – appen finner bensinstasjoner innen 20 km
 3. Trykk på en stasjon på kartet (pin eller navn) for å se priser
-4. Vil du rapportere en pris? Trykk **Endre pris** i stasjonskort-et
+4. Vil du rapportere en pris? Logg inn og trykk **Endre pris** i stasjonskort-et
 
 **Tips:** Legg siden til på hjemskjermen for best opplevelse (iOS: Del → Legg til på hjem-skjerm).
 
@@ -24,6 +24,13 @@ Ikke på stedet du vil sjekke? Trykk 🔍 øverst og søk etter en by eller et s
 ### Liste vs. kart
 
 Bruk fanen **Liste** nederst for å se stasjonene sortert etter avstand med priser – nyttig når du vil sammenligne raskt uten å navigere i kartet.
+
+### Innlogging og tilgang
+
+Alle kan se priser. For å rapportere priser må du ha en konto. Nye brukere inviteres av administrator via en engangslenke (gyldig 24 timer). Lenken genereres i admin-panelet og deles manuelt (f.eks. via SMS).
+
+- **Logg inn:** Trykk *Logg inn* øverst til høyre
+- **Admin-panel:** `/admin` (kun for admin-brukere) – inviter nye brukere, slett brukere
 
 ---
 
@@ -92,11 +99,20 @@ drivstoffpriser/
 
 | Metode | Endepunkt | Beskrivelse |
 |--------|-----------|-------------|
+| Metode | Endepunkt | Beskrivelse |
+|--------|-----------|-------------|
 | `GET` | `/api/stasjoner?lat=&lon=` | Stasjoner innen 20 km, maks 15 stk |
-| `POST` | `/api/pris` | Rapporter ny pris (`stasjon_id`, `bensin`, `diesel`) |
+| `POST` | `/api/pris` | Rapporter ny pris – krever innlogging (`stasjon_id`, `bensin`, `diesel`) |
 | `GET` | `/api/stedssok?q=` | Geocoding via Nominatim |
+| `GET` | `/api/meg` | Innlogget bruker (`{ innlogget, brukernavn }`) |
 | `POST` | `/api/logview` | Logg sidevisning (statistikk) |
-| `GET` | `/oversikt?key=` | Statistikk-side |
+| `POST` | `/auth/logg-inn` | Logg inn med brukernavn/passord |
+| `GET` | `/auth/logg-ut` | Logg ut |
+| `GET/POST` | `/invitasjon?token=` | Opprett bruker via invitasjonslenke |
+| `GET` | `/admin` | Admin-panel – inviter og slett brukere (krever admin) |
+| `POST` | `/admin/invitasjon` | Generer ny invitasjonslenke |
+| `POST` | `/admin/slett-bruker` | Slett bruker |
+| `GET` | `/oversikt?key=` | Statistikk-side (IP-lenker til ipinfo.io) |
 
 ### Dataflyt – stasjoner
 
@@ -108,12 +124,16 @@ drivstoffpriser/
 ### Database
 
 ```sql
-stasjoner  -- navn, kjede, koordinater, osm_id (UNIQUE)
-priser     -- stasjon_id, bensin, diesel, tidspunkt
-visninger  -- ip, device_id, user_agent, ts (statistikk)
+stasjoner   -- navn, kjede, koordinater, osm_id (UNIQUE)
+priser      -- stasjon_id, bensin, diesel, tidspunkt (historikk)
+brukere     -- brukernavn, passord_hash, er_admin, opprettet
+invitasjoner -- token (UUID), opprettet, utloper, brukt
+visninger   -- ip, device_id, user_agent, ts (statistikk)
 ```
 
 Priser lagres som historikk – siste pris hentes med `MAX(id) GROUP BY stasjon_id`.
+
+Passord hashes med `werkzeug.security` (pbkdf2:sha256). Sesjoner via signerte Flask-cookies (`SECRET_KEY`).
 
 ### iOS-spesifikke hensyn
 
@@ -155,4 +175,6 @@ Krever SSH-tilgang til `kjetil@<pi-ip>` og Docker på Pi-en. Cloudflare Tunnel k
 | `PORT` | `7342` | HTTP-port |
 | `DB_PATH` | `./drivstoff.db` | Sti til SQLite-database |
 | `STATS_KEY` | `salo` | Nøkkel for `/oversikt` |
-| `SECRET_KEY` | — | Flask session-nøkkel (settes i prod) |
+| `SECRET_KEY` | — | Flask session-nøkkel – **sett en sterk verdi i prod** |
+
+> **Produksjon:** Sett `SECRET_KEY` til en lang tilfeldig streng, f.eks. `python3 -c "import secrets; print(secrets.token_hex(32))"`. Uten denne vil alle sesjoner ugyldiggjøres ved omstart.
