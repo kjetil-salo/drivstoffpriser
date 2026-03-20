@@ -109,7 +109,12 @@ async function lagrePris() {
     visPrisStatus('Lagrer …', false);
 
     try {
-        await oppdaterPris(aktivStasjon.id, bensin, diesel);
+        const resultat = await oppdaterPris(aktivStasjon.id, bensin, diesel);
+        if (resultat?.status === 401) {
+            visPrisStatus('Du må logge inn for å endre priser. <a href="/auth/logg-inn">Logg inn</a>', true);
+            editLagreBtn.disabled = false;
+            return;
+        }
         const oppdatert = {
             ...aktivStasjon,
             bensin,
@@ -129,7 +134,7 @@ async function lagrePris() {
 
 function visPrisStatus(melding, erFeil) {
     if (!melding) { editStatus.style.display = 'none'; return; }
-    editStatus.textContent = melding;
+    editStatus.innerHTML = melding;
     editStatus.style.display = 'block';
     editStatus.style.background = erFeil ? 'rgba(239,68,68,0.2)' : 'rgba(34,197,94,0.2)';
     editStatus.style.color = erFeil ? '#ef4444' : '#22c55e';

@@ -47,6 +47,15 @@ html, body {
 #loc-btn:hover { background: rgba(59, 130, 246, 0.25); }
 #loc-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
+#auth-lenke {
+  font-size: var(--font-xs);
+  color: var(--color-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+  text-decoration: none;
+}
+#auth-lenke:hover { color: var(--color-text); }
+
 #loc-status {
   font-size: var(--font-xs);
   color: var(--color-muted);

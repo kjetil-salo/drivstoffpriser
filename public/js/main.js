@@ -37,10 +37,19 @@ const viewListe = document.getElementById('view-liste');
 fetch('/api/logview', { method: 'POST' }).catch(() => {});
 
 // ── Auth-status ───────────────────────────────────
-let innlogget = false;
 const meg = await fetch('/api/meg').then(r => r.json()).catch(() => ({}));
-innlogget = meg.innlogget || false;
-window.__innlogget = innlogget;
+window.__innlogget = meg.innlogget || false;
+
+const authLenke = document.getElementById('auth-lenke');
+if (window.__innlogget) {
+    authLenke.textContent = meg.brukernavn;
+    authLenke.href = '/auth/logg-ut';
+    authLenke.removeAttribute('hidden');
+} else {
+    authLenke.textContent = 'Logg inn';
+    authLenke.href = '/auth/logg-inn';
+    authLenke.removeAttribute('hidden');
+}
 
 // ── Init kart med siste kjente posisjon ───────────
 const lagretPos = hentLagretPos();
