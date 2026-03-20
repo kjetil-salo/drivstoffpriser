@@ -222,21 +222,31 @@ html, body {
 
 /* ── Stasjonsliste ───────────────────────────────── */
 #donasjon {
-  text-align: center;
-  padding: var(--space-lg) var(--space-md);
-  margin-top: var(--space-md);
-}
-
-#donasjon a {
-  font-size: var(--font-sm);
-  color: var(--color-muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin: var(--space-lg) var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  background: #ff5b24;
+  border-radius: var(--radius-md);
   text-decoration: none;
-  opacity: 0.7;
+  transition: opacity 0.15s ease;
 }
 
-#donasjon a:hover {
-  opacity: 1;
-  color: var(--color-text);
+#donasjon:hover, #donasjon:active {
+  opacity: 0.88;
+}
+
+#donasjon-tekst {
+  font-size: var(--font-sm);
+  color: white;
+  font-weight: 600;
+}
+
+#vipps-logo {
+  width: 96px;
+  height: auto;
 }
 
 #liste-info {
