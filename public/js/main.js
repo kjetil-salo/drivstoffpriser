@@ -32,6 +32,7 @@ const tabKart = document.getElementById('tab-kart');
 const tabListe = document.getElementById('tab-liste');
 const viewKart = document.getElementById('view-kart');
 const viewListe = document.getElementById('view-liste');
+const velkomst = document.getElementById('velkomst');
 
 // ── Statistikk ────────────────────────────────────
 fetch('/api/logview', { method: 'POST' }).catch(() => {});
@@ -54,6 +55,19 @@ if (window.__innlogget) {
 // ── Init kart med siste kjente posisjon ───────────
 const lagretPos = hentLagretPos();
 initMap('map', lagretPos);
+
+// ── Velkomst-overlay ──────────────────────────────
+if (!lagretPos) {
+    velkomst.removeAttribute('hidden');
+    document.getElementById('velkomst-posisjon-btn').addEventListener('click', () => {
+        velkomst.setAttribute('hidden', '');
+        locBtn.click();
+    });
+    document.getElementById('velkomst-sok-btn').addEventListener('click', () => {
+        velkomst.setAttribute('hidden', '');
+        document.getElementById('search-toggle').click();
+    });
+}
 
 // ── Sheet + search init ───────────────────────────
 initSheet(prisOppdatert);
