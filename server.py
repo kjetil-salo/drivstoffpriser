@@ -333,7 +333,7 @@ button{padding:10px;background:#3b82f6;color:white;border:none;border-radius:6px
     labels = [d for d, _ in stats['trend_30d']]
     values = [c for _, c in stats['trend_30d']]
     siste_rader = ''.join(
-        f'<tr><td>{r["ts"][:16]}</td><td>{r["ip"]}</td><td style="font-size:0.75rem;color:#94a3b8">{r["device_id"][:8]}…</td></tr>'
+        f'<tr><td>{r["ts"][:16]}</td><td><a href="https://ipinfo.io/{r["ip"]}" target="_blank" rel="noopener" style="color:#3b82f6">{r["ip"]}</a></td><td style="font-size:0.75rem;color:#94a3b8">{r["device_id"][:8]}…</td></tr>'
         for r in stats['siste_besok']
     )
     return f'''<!DOCTYPE html>
