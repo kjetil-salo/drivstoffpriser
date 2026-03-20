@@ -49,19 +49,27 @@ export function oppdaterStasjonPriser(stasjon, onKlikk) {
     const marker = stasjonMarkorer.get(stasjon.id);
     if (!marker) return;
     marker.setTooltipContent(byggTooltip(stasjon));
-    // Bytt til grønn hvis priser nå finnes
-    if (stasjon.bensin != null || stasjon.diesel != null) {
-        marker.setIcon(fargeIkon('green'));
-    }
+    marker.setIcon(prisIkon(stasjon));
     // Re-bind click med oppdatert data
     marker.off('click');
     marker.on('click', () => onKlikk(stasjon));
 }
 
+function prisIkon(s) {
+    if (s.bensin == null && s.diesel == null) return fargeIkon('grey');
+    if (prisErGammel(s.pris_tidspunkt)) return fargeIkon('red');
+    return fargeIkon('green');
+}
+
+function prisErGammel(tidspunkt) {
+    if (!tidspunkt) return true;
+    const ts = new Date(tidspunkt.replace(' ', 'T'));
+    return (Date.now() - ts.getTime()) > 24 * 60 * 60 * 1000;
+}
+
 function lagMarker(s) {
-    const harPriser = s.bensin != null || s.diesel != null;
     const marker = L.marker([s.lat, s.lon], {
-        icon: fargeIkon(harPriser ? 'green' : 'grey'),
+        icon: prisIkon(s),
     }).addTo(map);
 
     marker.bindTooltip(byggTooltip(s), {
