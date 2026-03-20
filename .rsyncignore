@@ -1,6 +1,7 @@
-node_modules/
+.git/
 .venv/
 __pycache__/
-*.pyc
-drivstoff.db
-test-results/
+*.db
+.env
+node_modules/
+tests/
