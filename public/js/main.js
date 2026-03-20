@@ -1,6 +1,6 @@
 import { hentStasjoner } from './api.js';
 import { hentPosisjon } from './location.js';
-import { initMap, sentrerKart, visUserPosisjon, visStasjoner, oppdaterStasjonPriser } from './map.js';
+import { initMap, sentrerKart, visUserPosisjon, visStasjoner, oppdaterStasjonPriser, initKartBevegelse } from './map.js';
 import { visListe, oppdaterKort } from './list.js';
 import { initSheet, visStasjonSheet, oppdaterSheetStasjon, lukkSheet } from './station-sheet.js';
 import { initSearch } from './search.js';
@@ -71,6 +71,16 @@ if (!lagretPos) {
 
 // ── Sheet + search init ───────────────────────────
 initSheet(prisOppdatert);
+
+initKartBevegelse(async (lat, lon) => {
+    try {
+        const nye = await hentStasjoner(lat, lon);
+        stasjoner = nye;
+        locStatus.textContent = `${nye.length} stasjoner`;
+        visStasjoner(stasjoner, visStasjonSheet);
+        if (viewListe.style.display !== 'none') visListe(stasjoner, visStasjonSheet);
+    } catch {}
+});
 
 initSearch(async (sted) => {
     lukkSheet();

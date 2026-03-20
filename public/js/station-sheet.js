@@ -32,6 +32,10 @@ export function initSheet(onOppdatert) {
     endreBtnEl.addEventListener('click', visEditModus);
     editAvbrytBtn.addEventListener('click', visVisModus);
     editLagreBtn.addEventListener('click', lagrePris);
+
+    const enterLagre = (e) => { if (e.key === 'Enter') lagrePris(); };
+    bensinInput.addEventListener('keydown', enterLagre);
+    dieselInput.addEventListener('keydown', enterLagre);
 }
 
 export function visStasjonSheet(stasjon) {

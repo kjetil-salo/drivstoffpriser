@@ -17,6 +17,30 @@ export function sentrerKart(lat, lon, zoom = 13) {
     if (map) map.setView([lat, lon], zoom);
 }
 
+export function initKartBevegelse(onBevegelse) {
+    if (!map) return;
+    let sisteHentPos = null;
+    let timer = null;
+
+    map.on('moveend', () => {
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+            const senter = map.getCenter();
+            const lat = senter.lat;
+            const lon = senter.lng;
+            if (sisteHentPos && kmMellom(lat, lon, sisteHentPos.lat, sisteHentPos.lon) < 3) return;
+            sisteHentPos = { lat, lon };
+            onBevegelse(lat, lon);
+        }, 600);
+    });
+}
+
+function kmMellom(lat1, lon1, lat2, lon2) {
+    const dlat = (lat2 - lat1) * 111;
+    const dlon = (lon2 - lon1) * 111 * Math.cos(lat1 * Math.PI / 180);
+    return Math.sqrt(dlat * dlat + dlon * dlon);
+}
+
 export function visUserPosisjon(pos) {
     if (!map) return;
     if (userMarker) userMarker.remove();
