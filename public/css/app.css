@@ -221,6 +221,24 @@ html, body {
 .station-popup .btn-endre:hover { background: #2563eb; }
 
 /* ── Stasjonsliste ───────────────────────────────── */
+#donasjon {
+  text-align: center;
+  padding: var(--space-lg) var(--space-md);
+  margin-top: var(--space-md);
+}
+
+#donasjon a {
+  font-size: var(--font-sm);
+  color: var(--color-muted);
+  text-decoration: none;
+  opacity: 0.7;
+}
+
+#donasjon a:hover {
+  opacity: 1;
+  color: var(--color-text);
+}
+
 #liste-info {
   font-size: var(--font-sm);
   color: var(--color-muted);
