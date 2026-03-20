@@ -1,6 +1,10 @@
 export async function hentStasjoner(lat, lon) {
     const resp = await fetch(`/api/stasjoner?lat=${lat}&lon=${lon}`);
-    if (!resp.ok) throw new Error('Feil ved henting av stasjoner');
+    if (!resp.ok) {
+        const data = await resp.json().catch(() => ({}));
+        if (data.utenfor) throw Object.assign(new Error('utenfor'), { utenfor: true });
+        throw new Error('Feil ved henting av stasjoner');
+    }
     const data = await resp.json();
     return data.stasjoner || [];
 }

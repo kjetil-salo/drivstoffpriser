@@ -9,6 +9,7 @@ services:
       DB_PATH: "/app/data/drivstoff.db"
       SECRET_KEY: "${SECRET_KEY:-bytt-meg-i-prod}"
       STATS_KEY: "${STATS_KEY:-salo}"
+      BASE_URL: "https://drivstoff.ksalo.no"
     volumes:
       - drivstoff-data:/app/data
     logging:

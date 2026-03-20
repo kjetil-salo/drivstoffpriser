@@ -257,7 +257,7 @@ def generer_invitasjon():
     token = secrets.token_urlsafe(32)
     utloper = (datetime.utcnow() + timedelta(hours=24)).strftime('%Y-%m-%d %H:%M:%S')
     opprett_invitasjon(token, utloper)
-    base_url = request.host_url.rstrip('/')
+    base_url = os.environ.get('BASE_URL', request.host_url.rstrip('/'))
     return jsonify({'url': f'{base_url}/invitasjon?token={token}'})
 
 
@@ -276,12 +276,20 @@ def index():
     return app.send_static_file('index.html')
 
 
+NORGE_BBOX = {'lat_min': 57.0, 'lat_max': 71.5, 'lon_min': 4.0, 'lon_max': 31.5}
+
+def er_i_norge(lat, lon):
+    return (NORGE_BBOX['lat_min'] <= lat <= NORGE_BBOX['lat_max'] and
+            NORGE_BBOX['lon_min'] <= lon <= NORGE_BBOX['lon_max'])
+
 @app.route('/api/stasjoner')
 def stasjoner():
     lat = request.args.get('lat', type=float)
     lon = request.args.get('lon', type=float)
     if lat is None or lon is None:
         return jsonify({'error': 'lat og lon er påkrevd'}), 400
+    if not er_i_norge(lat, lon):
+        return jsonify({'error': 'Kun tilgjengelig i Norge', 'utenfor': True}), 400
 
     try:
         hent_stasjoner_fra_osm(lat, lon)

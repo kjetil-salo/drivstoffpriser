@@ -79,7 +79,9 @@ initKartBevegelse(async (lat, lon) => {
         locStatus.textContent = `${nye.length} stasjoner`;
         visStasjoner(stasjoner, visStasjonSheet);
         if (viewListe.style.display !== 'none') visListe(stasjoner, visStasjonSheet);
-    } catch {}
+    } catch (e) {
+        if (e.utenfor) locStatus.textContent = 'Kun tilgjengelig i Norge';
+    }
 });
 
 initSearch(async (sted) => {
@@ -91,8 +93,8 @@ initSearch(async (sted) => {
         locStatus.textContent = `${stasjoner.length} stasjoner funnet`;
         visStasjoner(stasjoner, visStasjonSheet);
         if (viewListe.style.display !== 'none') visListe(stasjoner, visStasjonSheet);
-    } catch {
-        locStatus.textContent = 'Feil ved henting av stasjoner';
+    } catch (e) {
+        locStatus.textContent = e.utenfor ? 'Kun tilgjengelig i Norge' : 'Feil ved henting av stasjoner';
     }
 });
 
@@ -147,8 +149,8 @@ function startLokasjon() {
                 locStatus.textContent = `${stasjoner.length} stasjoner funnet`;
                 visStasjoner(stasjoner, visStasjonSheet);
                 if (viewListe.style.display !== 'none') visListe(stasjoner, visStasjonSheet);
-            } catch {
-                locStatus.textContent = 'Feil ved henting av stasjoner';
+            } catch (e) {
+                locStatus.textContent = e.utenfor ? 'Kun tilgjengelig i Norge' : 'Feil ved henting av stasjoner';
             }
         },
         (feil) => {
