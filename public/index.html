@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Drivstoffpriser</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="/css/tokens.css">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+
+  <!-- Topbar -->
+  <header id="topbar">
+    <button id="loc-btn">📍 Hent posisjon</button>
+    <div id="search-wrap">
+      <button id="search-toggle" title="Søk sted">🔍</button>
+      <div id="search-box" hidden>
+        <input id="search-input" type="search" placeholder="Søk sted, by …" autocomplete="off">
+        <div id="search-results"></div>
+      </div>
+    </div>
+    <span id="loc-status"></span>
+  </header>
+
+  <!-- Kartvisning -->
+  <main id="view-kart" class="view">
+    <div id="map"></div>
+  </main>
+
+  <!-- Listevisning -->
+  <main id="view-liste" class="view">
+    <p id="liste-info">Hent posisjon for å se bensinstasjoner i nærheten.</p>
+    <div id="liste"></div>
+  </main>
+
+  <!-- Bunntabs -->
+  <nav id="tabs">
+    <button id="tab-kart" class="tab active">
+      <span class="tab-icon">🗺️</span>
+      Kart
+    </button>
+    <button id="tab-liste" class="tab">
+      <span class="tab-icon">☰</span>
+      Liste
+    </button>
+  </nav>
+
+  <!-- Stasjon-sheet backdrop -->
+  <div id="sheet-backdrop"></div>
+
+  <!-- Stasjon-sheet -->
+  <div id="stasjon-sheet">
+    <div class="sheet-handle"></div>
+    <div id="sheet-scroll">
+    <div id="sheet-content">
+
+      <!-- Visning -->
+      <div id="sheet-view">
+        <div class="sheet-header">
+          <div id="sheet-badge" class="sheet-badge"></div>
+          <div class="sheet-tittel">
+            <h2 id="sheet-navn"></h2>
+            <div id="sheet-kjede" class="sheet-kjede"></div>
+          </div>
+          <div id="sheet-avstand" class="sheet-avstand"></div>
+        </div>
+
+        <div class="sheet-priser">
+          <div class="sheet-pris-blokk">
+            <div class="sheet-pris-label">95 oktan</div>
+            <div id="sheet-bensin" class="sheet-pris-verdi"></div>
+          </div>
+          <div class="sheet-divider"></div>
+          <div class="sheet-pris-blokk">
+            <div class="sheet-pris-label">Diesel</div>
+            <div id="sheet-diesel" class="sheet-pris-verdi"></div>
+          </div>
+        </div>
+
+        <div id="sheet-tid" class="sheet-tid"></div>
+
+        <button id="sheet-endre-btn" class="btn-lagre">Endre pris</button>
+      </div>
+
+      <!-- Redigering (inline) -->
+      <div id="sheet-edit" hidden>
+        <h3 class="sheet-edit-tittel">Endre pris</h3>
+        <div class="pris-input-gruppe">
+          <label for="sheet-bensin-input">95 oktan (kr/liter)</label>
+          <input id="sheet-bensin-input" type="text" inputmode="decimal" placeholder="f.eks. 21,35" autocomplete="off">
+        </div>
+        <div class="pris-input-gruppe">
+          <label for="sheet-diesel-input">Diesel (kr/liter)</label>
+          <input id="sheet-diesel-input" type="text" inputmode="decimal" placeholder="f.eks. 20,50" autocomplete="off">
+        </div>
+        <div id="sheet-edit-status"></div>
+        <div class="modal-btns">
+          <button id="sheet-edit-avbryt" class="btn-avbryt">Avbryt</button>
+          <button id="sheet-edit-lagre" class="btn-lagre">Lagre pris</button>
+        </div>
+      </div>
+
+    </div>
+    </div><!-- sheet-scroll -->
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script type="module" src="/js/main.js"></script>
+</body>
+</html>

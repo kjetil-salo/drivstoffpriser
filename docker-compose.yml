@@ -1,0 +1,19 @@
+services:
+  drivstoffpriser:
+    build: .
+    restart: always
+    ports:
+      - "3002:3002"
+    environment:
+      PORT: "3002"
+      DB_PATH: "/app/data/drivstoff.db"
+    volumes:
+      - drivstoff-data:/app/data
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  drivstoff-data:
