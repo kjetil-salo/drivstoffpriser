@@ -13,7 +13,8 @@ import logging.handlers
 import os
 import uuid
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from functools import wraps
 import re
 import httpx
@@ -21,11 +22,13 @@ import resend
 from flask import Flask, request, jsonify, send_from_directory, make_response, session, redirect, url_for
 from werkzeug.security import generate_password_hash, check_password_hash
 
-from db import (init_db, get_stasjoner_med_priser, lagre_pris, logg_visning, get_statistikk,
+from db import (init_db, _migrer_db, get_stasjoner_med_priser, lagre_pris, logg_visning, get_statistikk,
+                antall_stasjoner_med_pris,
                 antall_brukere, opprett_bruker, finn_bruker, finn_bruker_id,
                 hent_alle_brukere, slett_bruker,
                 opprett_invitasjon, hent_invitasjon, merk_invitasjon_brukt,
-                opprett_tilbakestilling, hent_tilbakestilling, merk_tilbakestilling_brukt, oppdater_passord)
+                opprett_tilbakestilling, hent_tilbakestilling, merk_tilbakestilling_brukt, oppdater_passord,
+                hent_siste_prisoppdateringer)
 from osm import hent_stasjoner_fra_osm
 
 logging.basicConfig(
@@ -346,7 +349,7 @@ def admin():
   nav{{margin-bottom:1.5rem;font-size:0.85rem}}
   nav a{{color:#94a3b8}}
 </style></head><body><div class="container">
-<nav><a href="/">← Appen</a> &nbsp;·&nbsp; <a href="/oversikt?key={os.environ.get("STATS_KEY","salo")}">Statistikk</a></nav>
+<nav><a href="/">← Appen</a> &nbsp;·&nbsp; <a href="/oversikt?key={os.environ.get("STATS_KEY","salo")}">Statistikk</a> &nbsp;·&nbsp; <a href="/admin/prislogg">Prislogg</a></nav>
 <h1>Admin</h1>
 <div class="kort">
   <h2>Brukere</h2>
@@ -370,6 +373,55 @@ document.querySelector('form[action="/admin/invitasjon"]').addEventListener('sub
 }});
 </script>
 </body></html>'''
+
+
+@app.route('/admin/prislogg')
+@krever_innlogging
+@krever_admin
+def prislogg():
+    oppdateringer = hent_siste_prisoppdateringer(limit=200)
+    rader = []
+    for p in oppdateringer:
+        def fmt(v):
+            return f'{v:.2f}' if v is not None else '–'
+        tidspunkt = p['tidspunkt'][:16].replace('T', ' ') if p['tidspunkt'] else '–'
+        bruker = p['brukernavn'] or '<ukjent>'
+        stasjon = p['navn'] + (f' ({p["kjede"]})' if p['kjede'] else '')
+        rader.append(
+            f'<tr>'
+            f'<td style="color:#94a3b8;font-size:0.78rem">{tidspunkt}</td>'
+            f'<td>{stasjon}</td>'
+            f'<td style="color:#93c5fd">{bruker}</td>'
+            f'<td style="text-align:right">{fmt(p["bensin"])}</td>'
+            f'<td style="text-align:right">{fmt(p["bensin98"])}</td>'
+            f'<td style="text-align:right">{fmt(p["diesel"])}</td>'
+            f'</tr>'
+        )
+    rader_html = ''.join(rader) or '<tr><td colspan="6" style="color:#94a3b8;text-align:center">Ingen prisoppdateringer</td></tr>'
+    return f'''<!DOCTYPE html><html lang="no"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Prislogg – Drivstoffpriser</title>
+<style>
+  *{{box-sizing:border-box;margin:0;padding:0}}
+  body{{font-family:system-ui,sans-serif;background:#0f172a;color:#e5e7eb;padding:2rem 1rem}}
+  .container{{max-width:900px;margin:0 auto}}
+  h1{{font-size:1.3rem;margin-bottom:2rem;color:#f1f5f9}}
+  .kort{{background:#111827;border:1px solid #1f2937;border-radius:10px;padding:1.5rem;margin-bottom:1.5rem;overflow-x:auto}}
+  table{{width:100%;border-collapse:collapse;font-size:0.85rem}}
+  td,th{{padding:7px 10px;border-bottom:1px solid #1f2937;text-align:left}}
+  th{{color:#94a3b8;font-weight:500}}
+  nav{{margin-bottom:1.5rem;font-size:0.85rem}}
+  nav a{{color:#94a3b8}}
+</style></head><body><div class="container">
+<nav><a href="/">← Appen</a> &nbsp;·&nbsp; <a href="/admin">Admin</a></nav>
+<h1>Prislogg (siste 200)</h1>
+<div class="kort">
+  <table>
+    <tr><th>Tidspunkt</th><th>Stasjon</th><th>Bruker</th><th style="text-align:right">95</th><th style="text-align:right">98</th><th style="text-align:right">Diesel</th></tr>
+    {rader_html}
+  </table>
+</div>
+</div></body></html>'''
 
 
 @app.route('/admin/invitasjon', methods=['POST'])
@@ -460,10 +512,14 @@ button{padding:10px;background:#3b82f6;color:white;border:none;border-radius:6px
 <button>Vis statistikk</button></form></body></html>''', 401
 
     stats = get_statistikk()
+    med_pris = antall_stasjoner_med_pris()
     labels = [d for d, _ in stats['trend_30d']]
     values = [c for _, c in stats['trend_30d']]
+    _oslo = ZoneInfo('Europe/Oslo')
+    def _lokal_tid(ts_str):
+        return datetime.fromisoformat(ts_str).replace(tzinfo=timezone.utc).astimezone(_oslo).strftime('%Y-%m-%d %H:%M')
     siste_rader = ''.join(
-        f'<tr><td>{r["ts"][:16]}</td><td><a href="https://ipinfo.io/{r["ip"]}" target="_blank" rel="noopener" style="color:#3b82f6">{r["ip"]}</a></td><td style="font-size:0.75rem;color:#94a3b8">{r["device_id"][:8]}…</td></tr>'
+        f'<tr><td>{_lokal_tid(r["ts"])}</td><td><a href="https://ipinfo.io/{r["ip"]}" target="_blank" rel="noopener" style="color:#3b82f6">{r["ip"]}</a></td><td style="font-size:0.75rem;color:#94a3b8">{r["device_id"][:8]}…</td></tr>'
         for r in stats['siste_besok']
     )
     return f'''<!DOCTYPE html>
@@ -495,6 +551,8 @@ button{padding:10px;background:#3b82f6;color:white;border:none;border-radius:6px
 <div class="container">
   <h1>Drivstoffpriser – statistikk</h1>
   <div class="kort-rad">
+    <div class="kort"><div class="kort-tal">{med_pris}</div><div class="kort-label">Stasjoner med pris</div></div>
+    <div class="kort"><div class="kort-tal">{stats['prisendringer']}</div><div class="kort-label">Prisregistreringer totalt</div></div>
     <div class="kort"><div class="kort-tal">{stats['totalt']}</div><div class="kort-label">Sidevisninger totalt</div></div>
     <div class="kort"><div class="kort-tal">{stats['unike_enheter']}</div><div class="kort-label">Unike enheter</div></div>
     <div class="kort"><div class="kort-tal">{stats['unike_ips']}</div><div class="kort-label">Unike IP-adresser</div></div>
@@ -557,6 +615,11 @@ def logview():
     return resp
 
 
+@app.route('/api/totalt-med-pris')
+def totalt_med_pris():
+    return jsonify({'totalt': antall_stasjoner_med_pris()})
+
+
 @app.route('/api/pris', methods=['POST'])
 @krever_innlogging
 def oppdater_pris():
@@ -568,27 +631,32 @@ def oppdater_pris():
 
     bensin_raw = data.get('bensin')
     diesel_raw = data.get('diesel')
+    bensin98_raw = data.get('bensin98')
 
     def til_float(v):
         if v is None or v == '':
             return None
         try:
-            return float(str(v).replace(',', '.'))
+            f = float(str(v).replace(',', '.'))
+            return None if f == 0 else f
         except ValueError:
             return None
 
     bensin = til_float(bensin_raw)
     diesel = til_float(diesel_raw)
+    bensin98 = til_float(bensin98_raw)
 
-    if bensin is None and diesel is None:
+    if bensin_raw is None and diesel_raw is None and bensin98_raw is None:
         return jsonify({'error': 'Minst én pris må oppgis'}), 400
 
-    lagre_pris(stasjon_id, bensin, diesel)
-    logger.info(f'Pris lagret: stasjon={stasjon_id} bensin={bensin} diesel={diesel}')
+    bruker_id = session.get('bruker_id')
+    lagre_pris(stasjon_id, bensin, diesel, bensin98, bruker_id=bruker_id)
+    logger.info(f'Pris lagret: stasjon={stasjon_id} bensin={bensin} diesel={diesel} bensin98={bensin98} bruker={bruker_id}')
     return jsonify({'ok': True})
 
 
 if __name__ == '__main__':
     init_db()
+    _migrer_db()
     port = int(os.environ.get('PORT', 7342))
     app.run(host='0.0.0.0', port=port, debug=True)

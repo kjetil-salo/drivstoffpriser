@@ -27,6 +27,7 @@ def init_db():
                 stasjon_id INTEGER NOT NULL,
                 bensin REAL,
                 diesel REAL,
+                bensin98 REAL,
                 tidspunkt TEXT DEFAULT (datetime('now')),
                 FOREIGN KEY (stasjon_id) REFERENCES stasjoner(id)
             );
@@ -62,6 +63,15 @@ def init_db():
                 brukt     INTEGER NOT NULL DEFAULT 0
             );
         ''')
+
+
+def _migrer_db():
+    with get_conn() as conn:
+        kolonner = [r[1] for r in conn.execute("PRAGMA table_info(priser)").fetchall()]
+        if 'bensin98' not in kolonner:
+            conn.execute("ALTER TABLE priser ADD COLUMN bensin98 REAL")
+        if 'bruker_id' not in kolonner:
+            conn.execute("ALTER TABLE priser ADD COLUMN bruker_id INTEGER REFERENCES brukere(id)")
 
 
 def _haversine(lat1, lon1, lat2, lon2):
@@ -100,18 +110,36 @@ def lagre_stasjon(navn, kjede, lat, lon, osm_id):
         )
 
 
-def lagre_pris(stasjon_id, bensin, diesel):
+def lagre_pris(stasjon_id, bensin, diesel, bensin98=None, bruker_id=None):
     with get_conn() as conn:
         conn.execute(
-            'INSERT INTO priser (stasjon_id, bensin, diesel) VALUES (?, ?, ?)',
-            (stasjon_id, bensin, diesel)
+            'INSERT INTO priser (stasjon_id, bensin, diesel, bensin98, bruker_id) VALUES (?, ?, ?, ?, ?)',
+            (stasjon_id, bensin, diesel, bensin98, bruker_id)
         )
+
+
+def hent_siste_prisoppdateringer(limit=100) -> list:
+    with get_conn() as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            '''SELECT p.id, p.bensin, p.diesel, p.bensin98, p.tidspunkt,
+                      s.navn, s.kjede,
+                      b.brukernavn
+               FROM priser p
+               JOIN stasjoner s ON s.id = p.stasjon_id
+               LEFT JOIN brukere b ON b.id = p.bruker_id
+               ORDER BY p.id DESC
+               LIMIT ?''',
+            (limit,)
+        ).fetchall()
+        return [dict(r) for r in rows]
 
 
 def get_statistikk() -> dict:
     from datetime import date, timedelta
     with get_conn() as conn:
         conn.row_factory = sqlite3.Row
+        prisendringer = conn.execute("SELECT COUNT(*) FROM priser").fetchone()[0]
         totalt = conn.execute("SELECT COUNT(*) FROM visninger").fetchone()[0]
         unike_enheter = conn.execute(
             "SELECT COUNT(DISTINCT device_id) FROM visninger WHERE device_id != ''"
@@ -132,12 +160,21 @@ def get_statistikk() -> dict:
         ).fetchall()
 
     return {
+        'prisendringer': prisendringer,
         'totalt': totalt,
         'unike_enheter': unike_enheter,
         'unike_ips': unike_ips,
         'trend_30d': list(trend_map.items()),
         'siste_besok': [dict(r) for r in siste_besok],
     }
+
+
+def antall_stasjoner_med_pris() -> int:
+    with get_conn() as conn:
+        return conn.execute(
+            '''SELECT COUNT(DISTINCT stasjon_id) FROM priser
+               WHERE bensin IS NOT NULL OR diesel IS NOT NULL OR bensin98 IS NOT NULL'''
+        ).fetchone()[0]
 
 
 def antall_brukere() -> int:
@@ -249,10 +286,10 @@ def get_stasjoner_med_priser(user_lat, user_lon, radius_m=20000, limit=15):
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
             '''SELECT s.id, s.navn, s.kjede, s.lat, s.lon,
-                      p.bensin, p.diesel, p.tidspunkt
+                      p.bensin, p.diesel, p.bensin98, p.tidspunkt
                FROM stasjoner s
                LEFT JOIN (
-                   SELECT stasjon_id, bensin, diesel, tidspunkt
+                   SELECT stasjon_id, bensin, diesel, bensin98, tidspunkt
                    FROM priser
                    WHERE id IN (SELECT MAX(id) FROM priser GROUP BY stasjon_id)
                ) p ON p.stasjon_id = s.id'''
@@ -270,6 +307,7 @@ def get_stasjoner_med_priser(user_lat, user_lon, radius_m=20000, limit=15):
                 'lon': row['lon'],
                 'bensin': row['bensin'],
                 'diesel': row['diesel'],
+                'bensin98': row['bensin98'],
                 'pris_tidspunkt': row['tidspunkt'],
                 'avstand_m': round(dist),
             })
