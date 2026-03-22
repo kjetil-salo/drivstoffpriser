@@ -13,6 +13,7 @@ export function initSearch(onValg) {
         const lukket = searchBox.hasAttribute('hidden');
         if (lukket) {
             searchBox.removeAttribute('hidden');
+            toggleBtn.classList.add('aktiv');
             searchInput.focus();
         } else {
             lukkSearch();
@@ -66,6 +67,7 @@ function visResultater(resultater) {
 
 function lukkSearch() {
     searchBox.setAttribute('hidden', '');
+    toggleBtn.classList.remove('aktiv');
     searchInput.value = '';
     searchResults.innerHTML = '';
 }

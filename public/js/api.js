@@ -9,11 +9,17 @@ export async function hentStasjoner(lat, lon) {
     return data.stasjoner || [];
 }
 
-export async function oppdaterPris(stasjonId, bensin, diesel) {
+export async function hentTotaltMedPris() {
+    const resp = await fetch('/api/totalt-med-pris');
+    if (!resp.ok) return null;
+    return (await resp.json()).totalt;
+}
+
+export async function oppdaterPris(stasjonId, bensin, diesel, bensin98) {
     const resp = await fetch('/api/pris', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ stasjon_id: stasjonId, bensin, diesel }),
+        body: JSON.stringify({ stasjon_id: stasjonId, bensin, diesel, bensin98 }),
     });
     if (resp.status === 401) return { status: 401 };
     if (!resp.ok) throw new Error('Feil ved lagring av pris');

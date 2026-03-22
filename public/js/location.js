@@ -17,14 +17,14 @@ export function hentPosisjon(onSuccess, onError, onStatus) {
         if (!finished) finish();
     }, 10000);
 
-    function finish() {
+    function finish(nektet = false) {
         if (finished) return;
         finished = true;
         if (watchId !== null) navigator.geolocation.clearWatch(watchId);
         clearTimeout(timeoutId);
 
         if (!bestPosition) {
-            onError('Kunne ikke hente posisjon. Sjekk tillatelser og prøv igjen.');
+            onError({ nektet });
             return;
         }
         onSuccess(bestPosition);
@@ -42,9 +42,9 @@ export function hentPosisjon(onSuccess, onError, onStatus) {
             },
             (err) => {
                 if (!bestPosition) {
-                    onError('Kunne ikke hente posisjon. Sjekk tillatelser.');
                     finished = true;
                     clearTimeout(timeoutId);
+                    onError({ nektet: err.code === 1 });
                 } else {
                     finish();
                 }
@@ -61,8 +61,16 @@ export function hentPosisjon(onSuccess, onError, onStatus) {
             onStatus(`Henter posisjon … ±${Math.round(accuracy)} m`);
             startWatch();
         },
-        () => {
-            if (!finished) startWatch();
+        (err) => {
+            if (!finished) {
+                if (err.code === 1) {
+                    finished = true;
+                    clearTimeout(timeoutId);
+                    onError({ nektet: true });
+                } else {
+                    startWatch();
+                }
+            }
         },
         { enableHighAccuracy: false, maximumAge: 0, timeout: 5000 }
     );

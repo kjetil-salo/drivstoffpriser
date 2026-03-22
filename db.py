@@ -85,8 +85,8 @@ def _haversine(lat1, lon1, lat2, lon2):
 
 
 def har_ferske_stasjoner(lat, lon, max_alder_timer=24):
-    """Sjekk om det finnes ferske stasjoner nær denne posisjonen (bounding box ±0.15 grader ≈ ~15km)."""
-    delta = 0.15
+    """Sjekk om det finnes ferske stasjoner nær denne posisjonen (bounding box ±0.22 grader ≈ ~25km)."""
+    delta = 0.22
     with get_conn() as conn:
         row = conn.execute(
             '''SELECT COUNT(*) FROM stasjoner
@@ -281,7 +281,7 @@ def logg_visning(ip: str, device_id: str, user_agent: str):
         )
 
 
-def get_stasjoner_med_priser(user_lat, user_lon, radius_m=20000, limit=15):
+def get_stasjoner_med_priser(user_lat, user_lon, radius_m=30000, limit=30):
     with get_conn() as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute(

@@ -10,7 +10,7 @@ OVERPASS_URLS = [
 ]
 
 
-def hent_stasjoner_fra_osm(lat, lon, radius_m=20000):
+def hent_stasjoner_fra_osm(lat, lon, radius_m=30000):
     """Henter bensinstasjoner fra OSM og lagrer i SQLite. Hopper over hvis data er ferske."""
     if har_ferske_stasjoner(lat, lon):
         logger.debug('Ferske OSM-data finnes, hopper over henting')

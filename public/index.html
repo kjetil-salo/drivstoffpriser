@@ -9,12 +9,17 @@
   <link rel="icon" type="image/x-icon" href="/favicon.ico">
   <link rel="icon" type="image/svg+xml" href="/icon.svg">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#1a1a2e">
   <title>Drivstoffpriser</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <link rel="stylesheet" href="/css/tokens.css">
   <link rel="stylesheet" href="/css/app.css">
 </head>
 <body>
+
+  <!-- Offline-banner -->
+  <div id="offline-banner">Ingen nettforbindelse — viser lagrede data</div>
 
   <!-- Topbar -->
   <header id="topbar">
@@ -27,8 +32,17 @@
       </div>
     </div>
     <span id="loc-status"></span>
+    <button id="innstillinger-btn" title="Innstillinger">⚙️</button>
     <a id="auth-lenke" href="/auth/logg-inn" hidden></a>
   </header>
+
+  <!-- Innstillinger-panel -->
+  <div id="innstillinger-panel" hidden>
+    <div class="innstilling-tittel">Vis drivstoff</div>
+    <label class="innstilling-rad"><input type="checkbox" id="sett-bensin"> 95 oktan</label>
+    <label class="innstilling-rad"><input type="checkbox" id="sett-bensin98"> 98 oktan</label>
+    <label class="innstilling-rad"><input type="checkbox" id="sett-diesel"> Diesel</label>
+  </div>
 
   <!-- Kartvisning -->
   <main id="view-kart" class="view">
@@ -38,6 +52,7 @@
   <!-- Listevisning -->
   <main id="view-liste" class="view">
     <p id="liste-info">Hent posisjon for å se bensinstasjoner i nærheten.</p>
+    <p id="totalt-info"></p>
     <div id="liste"></div>
     <a id="donasjon" href="https://qr.vipps.no/box/4aa50659-cefa-415b-b638-fa1f73e65d1e/pay-in" target="_blank" rel="noopener">
       <span id="donasjon-tekst">Liker du appen? Støtt gjerne ☕</span>
@@ -72,6 +87,20 @@
     </div>
   </div>
 
+  <!-- Lokasjonsfeil-dialog -->
+  <div id="lok-feil-backdrop" hidden></div>
+  <div id="lok-feil-dialog" hidden>
+    <div id="lok-feil-ikon">📍</div>
+    <h2 id="lok-feil-tittel"></h2>
+    <p id="lok-feil-tekst"></p>
+    <div id="lok-feil-steg" hidden>
+      <div class="lok-steg"><span class="lok-steg-nr">1</span><span>Åpne <strong>Innstillinger</strong> på telefonen</span></div>
+      <div class="lok-steg"><span class="lok-steg-nr">2</span><span>Gå til <strong>Safari</strong> → <strong>Stedstjenester</strong></span></div>
+      <div class="lok-steg"><span class="lok-steg-nr">3</span><span>Velg <strong>Tillat</strong> og kom tilbake hit</span></div>
+    </div>
+    <button id="lok-feil-lukk">Lukk</button>
+  </div>
+
   <!-- Stasjon-sheet backdrop -->
   <div id="sheet-backdrop"></div>
 
@@ -92,10 +121,15 @@
           <div id="sheet-avstand" class="sheet-avstand"></div>
         </div>
 
-        <div class="sheet-priser">
+        <div id="sheet-priser" class="sheet-priser">
           <div class="sheet-pris-blokk">
             <div class="sheet-pris-label">95 oktan</div>
             <div id="sheet-bensin" class="sheet-pris-verdi"></div>
+          </div>
+          <div class="sheet-divider"></div>
+          <div class="sheet-pris-blokk">
+            <div class="sheet-pris-label">98 oktan</div>
+            <div id="sheet-bensin98" class="sheet-pris-verdi"></div>
           </div>
           <div class="sheet-divider"></div>
           <div class="sheet-pris-blokk">
@@ -106,7 +140,15 @@
 
         <div id="sheet-tid" class="sheet-tid"></div>
 
-        <button id="sheet-endre-btn" class="btn-lagre">Endre pris</button>
+        <a id="sheet-naviger-btn" class="btn-naviger" target="_blank" rel="noopener">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+          Naviger hit
+        </a>
+
+        <div class="modal-btns">
+          <button id="sheet-bekreft-btn" class="btn-avbryt">Bekreft priser</button>
+          <button id="sheet-endre-btn" class="btn-lagre">Endre pris</button>
+        </div>
       </div>
 
       <!-- Redigering (inline) -->
@@ -115,6 +157,10 @@
         <div class="pris-input-gruppe">
           <label for="sheet-bensin-input">95 oktan (kr/liter)</label>
           <input id="sheet-bensin-input" type="text" inputmode="decimal" placeholder="f.eks. 21,35" autocomplete="off">
+        </div>
+        <div class="pris-input-gruppe">
+          <label for="sheet-bensin98-input">98 oktan (kr/liter)</label>
+          <input id="sheet-bensin98-input" type="text" inputmode="decimal" placeholder="f.eks. 22,50" autocomplete="off">
         </div>
         <div class="pris-input-gruppe">
           <label for="sheet-diesel-input">Diesel (kr/liter)</label>
@@ -133,5 +179,17 @@
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script type="module" src="/js/main.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js');
+    }
+    (function() {
+      var banner = document.getElementById('offline-banner');
+      function oppdater() { banner.style.display = navigator.onLine ? 'none' : 'block'; }
+      window.addEventListener('online', oppdater);
+      window.addEventListener('offline', oppdater);
+      oppdater();
+    })();
+  </script>
 </body>
 </html>
