@@ -22,13 +22,15 @@ export function initInnstillinger(onChange) {
 
     btn.addEventListener('click', () => {
         panel.toggleAttribute('hidden');
+        btn.setAttribute('aria-expanded', panel.hasAttribute('hidden') ? 'false' : 'true');
     });
 
     // Ikke bruk stopPropagation – sjekk panel-state i stedet (iOS-kompatibelt)
     document.addEventListener('click', (e) => {
         if (panel.hasAttribute('hidden')) return;
-        if (!panel.contains(e.target) && e.target !== btn) {
+        if (!panel.contains(e.target) && !btn.contains(e.target)) {
             panel.setAttribute('hidden', '');
+            btn.setAttribute('aria-expanded', 'false');
         }
     });
 

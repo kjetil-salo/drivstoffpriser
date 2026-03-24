@@ -26,6 +26,7 @@ logging.basicConfig(
     format='%(asctime)s [%(levelname)s] %(message)s'
 )
 logger = logging.getLogger('drivstoff')
+logging.getLogger('werkzeug').setLevel(logging.WARNING)
 
 # Fil-logging: buffret i RAM, skrives til disk kun ved ERROR eller når bufferet er fullt (100 meldinger).
 # Maks 500 KB × 2 filer = 1 MB totalt på SD-kortet.
@@ -57,6 +58,13 @@ app.register_blueprint(api_bp)
 def tving_https():
     if request.headers.get('X-Forwarded-Proto') == 'http':
         return redirect(request.url.replace('http://', 'https://', 1), code=301)
+
+
+@app.after_request
+def cache_headers(response):
+    if request.path == '/sw.js':
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    return response
 
 
 @app.route('/')

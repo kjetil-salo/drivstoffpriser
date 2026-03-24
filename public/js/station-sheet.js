@@ -4,6 +4,7 @@ import { getKjedeFarge, getKjedeInitials, getKjedeLogo } from './kjede.js';
 
 let aktivStasjon = null;
 let onPrisOppdatert = null;
+let tidligereFokus = null;
 
 const backdrop = document.getElementById('sheet-backdrop');
 const sheet = document.getElementById('stasjon-sheet');
@@ -20,6 +21,7 @@ const tidEl = document.getElementById('sheet-tid');
 const endreBtnEl = document.getElementById('sheet-endre-btn');
 const bekreftBtnEl = document.getElementById('sheet-bekreft-btn');
 const navigerBtnEl = document.getElementById('sheet-naviger-btn');
+const kartBtnEl = document.getElementById('sheet-kart-btn');
 
 // Edit-elementer
 const bensinInput = document.getElementById('sheet-bensin-input');
@@ -33,6 +35,9 @@ export function initSheet(onOppdatert) {
     onPrisOppdatert = onOppdatert;
 
     backdrop.addEventListener('click', lukkSheet);
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && sheet.classList.contains('open')) lukkSheet();
+    });
     endreBtnEl.addEventListener('click', visEditModus);
     bekreftBtnEl.addEventListener('click', bekreftPris);
     editAvbrytBtn.addEventListener('click', visVisModus);
@@ -42,9 +47,14 @@ export function initSheet(onOppdatert) {
     bensinInput.addEventListener('keydown', enterLagre);
     bensin98Input.addEventListener('keydown', enterLagre);
     dieselInput.addEventListener('keydown', enterLagre);
+
+    bensinInput.addEventListener('input', autoKomma);
+    bensin98Input.addEventListener('input', autoKomma);
+    dieselInput.addEventListener('input', autoKomma);
 }
 
 export function visStasjonSheet(stasjon) {
+    tidligereFokus = document.activeElement;
     aktivStasjon = stasjon;
     fyllVisning(stasjon);
     visVisModus();
@@ -54,6 +64,7 @@ export function visStasjonSheet(stasjon) {
     bekreftBtnEl.style.display = innlogget && harPriser ? '' : 'none';
     sheet.classList.add('open');
     backdrop.classList.add('open');
+    setTimeout(() => navnEl.focus(), 100);
 }
 
 export function oppdaterSheetStasjon(stasjon) {
@@ -70,6 +81,7 @@ export function refreshSheetInnstillinger() {
 export function lukkSheet() {
     sheet.classList.remove('open');
     backdrop.classList.remove('open');
+    if (tidligereFokus) { tidligereFokus.focus(); tidligereFokus = null; }
 }
 
 function fyllVisning(s) {
@@ -91,6 +103,13 @@ function fyllVisning(s) {
 
     avstandEl.textContent = s.avstand_m != null ? avstandTekst(s.avstand_m) : '';
     navigerBtnEl.href = `https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lon}`;
+
+    if (s.brukeropprettet) {
+        kartBtnEl.href = `https://www.google.com/maps?q=${s.lat},${s.lon}`;
+        kartBtnEl.style.display = '';
+    } else {
+        kartBtnEl.style.display = 'none';
+    }
 
     const inn = getInnstillinger();
     const typer = [
@@ -168,6 +187,9 @@ async function lagrePris() {
     const noenFyltUt = bensinInput.value.trim() !== '' || bensin98Input.value.trim() !== '' || dieselInput.value.trim() !== '';
     if (!noenFyltUt && !confirm('Fjern alle priser på denne stasjonen?')) return;
 
+    const advarsler = sjekkPrisavvik(aktivStasjon, { bensin, bensin98, diesel });
+    if (advarsler.length > 0 && !confirm(advarsler.join('\n') + '\n\nVil du lagre likevel?')) return;
+
     editLagreBtn.disabled = true;
     visPrisStatus('Lagrer …', false);
 
@@ -209,7 +231,55 @@ function formatPris(v) {
 }
 
 function formatPrisInput(v) {
-    return v.toFixed(2);
+    return v.toFixed(2).replace('.', ',');
+}
+
+function sjekkPrisavvik(gammel, ny) {
+    const typer = [
+        { label: '95 oktan', nøkkel: 'bensin' },
+        { label: '98 oktan', nøkkel: 'bensin98' },
+        { label: 'Diesel', nøkkel: 'diesel' },
+    ];
+    const advarsler = [];
+    for (const { label, nøkkel } of typer) {
+        const gammelPris = gammel[nøkkel];
+        const nyPris = ny[nøkkel];
+        if (gammelPris != null && nyPris != null && gammelPris > 0) {
+            const avvik = Math.abs(nyPris - gammelPris) / gammelPris;
+            if (avvik > 0.3) {
+                advarsler.push(`${label}: ${formatPris(gammelPris)} → ${formatPris(nyPris)} kr (${Math.round(avvik * 100)}% endring)`);
+            }
+        }
+    }
+    return advarsler;
+}
+
+function autoKomma(e) {
+    const sletter = e.inputType === 'deleteContentBackward' || e.inputType === 'deleteContentForward';
+    const input = e.target;
+    let v = input.value;
+    // Fjern alt unntatt siffer og komma/punktum
+    v = v.replace(/[^\d,.]/g, '');
+    // Normaliser: erstatt punktum med komma
+    v = v.replace(/\./g, ',');
+    // Bare tillat ett komma
+    const deler = v.split(',');
+    if (deler.length > 2) {
+        v = deler[0] + ',' + deler.slice(1).join('');
+    }
+    if (v.includes(',')) {
+        // Har komma: maks to siffer før, maks to etter
+        const hel = deler[0].slice(0, 2);
+        const des = deler.slice(1).join('').slice(0, 2);
+        v = hel + ',' + des;
+    } else if (!sletter) {
+        // Ingen komma ennå: maks to siffer, legg til komma etter andre (bare ved inntasting)
+        v = v.slice(0, 2);
+        if (v.length === 2) {
+            v = v + ',';
+        }
+    }
+    input.value = v;
 }
 
 function parsePris(v) {

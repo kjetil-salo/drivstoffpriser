@@ -13,6 +13,7 @@ services:
       DATA_DIR: "/app/data"
       RESEND_API_KEY: "${RESEND_API_KEY:-}"
       REGISTRER_KODE: "${REGISTRER_KODE:-}"
+      LOG_LEVEL: "WARNING"
     volumes:
       - drivstoff-data:/app/data
     logging:

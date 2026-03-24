@@ -1,3 +1,5 @@
+export const KJEDE_NAVN = ['Circle K', 'Uno-X', 'YX', 'Esso', 'Shell', 'Preem', 'St1', 'Best'];
+
 const KJEDE_DOMENER = [
     { match: ['circle k', 'circlek'],          domene: 'circlek.no',  farge: '#f97316' },
     { match: ['uno-x', 'unox', 'uno x'],       domene: 'uno-x.no',   farge: '#16a34a' },

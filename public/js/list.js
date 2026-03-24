@@ -49,9 +49,13 @@ export function visListe(stasjoner, onKlikk) {
 
     container.querySelectorAll('.stasjon-kort').forEach(kort => {
         const id = parseInt(kort.dataset.id, 10);
-        kort.addEventListener('click', () => {
+        const handler = () => {
             const stasjon = stasjoner.find(s => s.id === id);
             if (stasjon) onKlikk(stasjon);
+        };
+        kort.addEventListener('click', handler);
+        kort.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handler(); }
         });
     });
 
@@ -166,7 +170,7 @@ function kortHtml(s, billigste = {}, erHovedBilligst = false) {
         : `<div class="sk-badge" style="background:${farge}">${getKjedeInitials(s.kjede || s.navn)}</div>`;
     const alderTekst = prisAlderTekst(s.pris_tidspunkt);
     const alderKlasse = prisAlderKlasse(s.pris_tidspunkt);
-    return `<div class="stasjon-kort${erHovedBilligst ? ' billigst-kort' : ''}" data-id="${s.id}">
+    return `<div class="stasjon-kort${erHovedBilligst ? ' billigst-kort' : ''}" role="listitem" tabindex="0" aria-label="${s.navn}${s.kjede ? ', ' + s.kjede : ''}" data-id="${s.id}">
         ${erHovedBilligst ? '<div class="sk-billigst-banner">★ billigste stasjon</div>' : ''}
         ${badgeHtml}
         <div class="sk-info">
@@ -182,8 +186,11 @@ function kortHtml(s, billigste = {}, erHovedBilligst = false) {
         </div>
         <div class="sk-hoyre">
             <span class="sk-avstand">${avstandTekst(s.avstand_m)}</span>
-            <button class="sk-kart-btn" title="Vis på kart" data-kart-id="${s.id}">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            ${s.brukeropprettet ? `<a class="sk-gmaps-btn" href="https://www.google.com/maps?q=${s.lat},${s.lon}" target="_blank" rel="noopener" aria-label="Åpne ${s.navn} i Google Maps" onclick="event.stopPropagation()">
+                <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            </a>` : ''}
+            <button class="sk-kart-btn" aria-label="Vis ${s.navn} på kart" data-kart-id="${s.id}">
+                <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
             </button>
         </div>
     </div>`;

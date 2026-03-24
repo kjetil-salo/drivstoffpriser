@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v10';
 const STATIC_CACHE = `drivstoff-static-${CACHE_VERSION}`;
 const DATA_CACHE = `drivstoff-data-${CACHE_VERSION}`;
 
@@ -16,6 +16,7 @@ const STATIC_ASSETS = [
   '/js/settings.js',
   '/js/station-sheet.js',
   '/js/kjede.js',
+  '/js/stats.js',
   '/icon.svg',
   '/apple-touch-icon.png',
   '/favicon.ico',
@@ -58,14 +59,20 @@ self.addEventListener('fetch', (e) => {
     return;
   }
 
+  // Server-rendrede sider (oversikt, admin, prislogg): network first
+  if (e.request.mode === 'navigate' && !STATIC_ASSETS.includes(url.pathname)) {
+    e.respondWith(networkFirstThenCache(e.request));
+    return;
+  }
+
   // Karttiles (OpenStreetMap): cache first med nettverksfallback
   if (url.hostname.includes('tile.openstreetmap.org')) {
     e.respondWith(cacheFirstThenNetwork(e.request, DATA_CACHE));
     return;
   }
 
-  // Statiske ressurser: cache first
-  e.respondWith(cacheFirstThenNetwork(e.request, STATIC_CACHE));
+  // Statiske ressurser: stale-while-revalidate (rask fra cache, oppdateres i bakgrunnen)
+  e.respondWith(staleWhileRevalidate(e.request, STATIC_CACHE));
 });
 
 // ── Cache-strategier ──────────────────────────────
@@ -85,6 +92,22 @@ async function networkFirstThenCache(request) {
       headers: { 'Content-Type': 'application/json' },
     });
   }
+}
+
+async function staleWhileRevalidate(request, cacheName) {
+  const cache = await caches.open(cacheName);
+  const cached = await caches.match(request);
+
+  // Hent fersk versjon i bakgrunnen uansett
+  const fetchPromise = fetch(request).then(response => {
+    if (response.ok) {
+      cache.put(request, response.clone());
+    }
+    return response;
+  }).catch(() => null);
+
+  // Returner cache umiddelbart hvis tilgjengelig, ellers vent på nettverket
+  return cached || await fetchPromise || new Response('Offline', { status: 503 });
 }
 
 async function cacheFirstThenNetwork(request, cacheName) {

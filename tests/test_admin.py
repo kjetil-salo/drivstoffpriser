@@ -20,9 +20,20 @@ class TestAdminTilgang:
         assert 'Admin' in resp.data.decode()
 
 
-class TestAdminPanel:
-    def test_viser_brukere(self, admin_client):
+class TestAdminDashboard:
+    def test_viser_tiles(self, admin_client):
         resp = admin_client.get('/admin')
+        html = resp.data.decode()
+        assert 'Brukere' in html
+        assert 'Steder' in html
+        assert 'Statistikk' in html
+        assert 'Prislogg' in html
+        assert 'Kart' in html
+
+
+class TestAdminBrukere:
+    def test_viser_brukere(self, admin_client):
+        resp = admin_client.get('/admin/brukere')
         assert 'admin@test.no' in resp.data.decode()
 
     def test_slett_bruker(self, admin_client):

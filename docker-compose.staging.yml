@@ -1,0 +1,24 @@
+services:
+  drivstoffpriser-staging:
+    build: .
+    restart: always
+    ports:
+      - "3004:3004"
+    environment:
+      PORT: "3004"
+      DB_PATH: "/app/data/drivstoff.db"
+      SECRET_KEY: "staging-nøkkel"
+      STATS_KEY: "staging"
+      BASE_URL: "http://100.76.35.106:3004"
+      DATA_DIR: "/app/data"
+      LOG_LEVEL: "DEBUG"
+    volumes:
+      - drivstoff-staging-data:/app/data
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+volumes:
+  drivstoff-staging-data:

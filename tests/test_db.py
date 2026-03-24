@@ -222,5 +222,5 @@ class TestVisninger:
         assert 'unike_enheter' in stats
         assert 'unike_ips' in stats
         assert 'trend_30d' in stats
-        assert 'siste_besok' in stats
+        assert 'besok_per_time' in stats
         assert len(stats['trend_30d']) == 30

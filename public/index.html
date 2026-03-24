@@ -2,7 +2,7 @@
 <html lang="no">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -17,27 +17,53 @@
   <link rel="stylesheet" href="/css/app.css">
 </head>
 <body>
+  <!--
+    Tilgjengelighet (UU / a11y):
+    - Skip-lenke for tastaturbrukere
+    - Alle ikon-knapper har aria-label, dekorative emojier har aria-hidden="true"
+    - Tabs: role="tablist/tab/tabpanel", aria-selected, aria-controls (piltaster i main.js)
+    - Dialoger: role="dialog/alertdialog", aria-modal, aria-labelledby, Escape-lukking, fokushåndtering
+    - Bannere: role="alert"
+    - Statuselementer: aria-live="polite"
+    - Søk: role="listbox/option", aria-expanded, aria-activedescendant, piltast-navigasjon
+    - Stasjonskort: role="listitem", tabindex="0", Enter/Space-aktivering
+    - Kart: aria-label, title/alt på markører. Listevisningen er tastaturalternativ til kartet.
+    - Fokus: :focus-visible outline, sr-only-klasse for skjermleser-labels
+    - Viewport tillater zoom (ingen user-scalable=no)
+  -->
+  <a href="#view-kart" class="skip-link">Hopp til hovedinnhold</a>
 
   <!-- Offline-banner -->
-  <div id="offline-banner">Ingen nettforbindelse — viser lagrede data</div>
+  <div id="offline-banner" role="alert">Ingen nettforbindelse — viser lagrede data</div>
+
+  <!-- Backup-banner -->
+  <div id="backup-banner" role="alert" hidden>
+    <span><span aria-hidden="true">⚠️</span> Reserveløsning — prisene kan være utdaterte</span>
+    <div id="backup-info" hidden>
+      Hovedserveren er midlertidig utilgjengelig. Prisene kan være inntil 6 timer gamle, og det er ikke mulig å registrere nye priser. Tjenesten er normalt tilbake i løpet av kort tid.
+    </div>
+  </div>
 
   <!-- Topbar -->
   <header id="topbar">
-    <button id="loc-btn">📍 Hent posisjon</button>
+    <button id="loc-btn"><span aria-hidden="true">📍</span> Hent posisjon</button>
     <div id="search-wrap">
-      <button id="search-toggle" title="Søk sted">🔍</button>
+      <button id="search-toggle" aria-label="Søk sted" aria-expanded="false"><span aria-hidden="true">🔍</span></button>
       <div id="search-box" hidden>
+        <label for="search-input" class="sr-only">Søk sted</label>
         <input id="search-input" type="search" placeholder="Søk sted, by …" autocomplete="off">
-        <div id="search-results"></div>
+        <div id="search-results" role="listbox" aria-label="Søkeresultater"></div>
       </div>
     </div>
-    <span id="loc-status"></span>
-    <button id="innstillinger-btn" title="Innstillinger">⚙️</button>
+    <span id="loc-status" aria-live="polite"></span>
+    <button id="add-station-btn" hidden aria-label="Legg til stasjon">+</button>
+    <button id="innstillinger-btn" aria-label="Innstillinger" aria-expanded="false"><span aria-hidden="true">⚙️</span></button>
+    <a id="info-btn" href="/om" aria-label="Om appen"><span aria-hidden="true">ℹ️</span></a>
     <a id="auth-lenke" href="/auth/logg-inn" hidden></a>
   </header>
 
   <!-- Innstillinger-panel -->
-  <div id="innstillinger-panel" hidden>
+  <div id="innstillinger-panel" hidden role="region" aria-label="Innstillinger">
     <div class="innstilling-tittel">Vis drivstoff</div>
     <label class="innstilling-rad"><input type="checkbox" id="sett-bensin"> 95 oktan</label>
     <label class="innstilling-rad"><input type="checkbox" id="sett-bensin98"> 98 oktan</label>
@@ -45,52 +71,95 @@
   </div>
 
   <!-- Kartvisning -->
-  <main id="view-kart" class="view">
+  <main id="view-kart" class="view" role="tabpanel" aria-labelledby="tab-kart">
     <div id="map"></div>
   </main>
 
   <!-- Listevisning -->
-  <main id="view-liste" class="view">
+  <main id="view-liste" class="view" role="tabpanel" aria-labelledby="tab-liste">
     <p id="liste-info">Hent posisjon for å se bensinstasjoner i nærheten.</p>
-    <p id="totalt-info"></p>
-    <div id="liste"></div>
-    <a id="donasjon" href="https://qr.vipps.no/box/4aa50659-cefa-415b-b638-fa1f73e65d1e/pay-in" target="_blank" rel="noopener">
-      <span id="donasjon-tekst">Liker du appen? Støtt gjerne ☕</span>
-      <svg viewBox="0 0 128 32" fill="none" xmlns="http://www.w3.org/2000/svg" id="vipps-logo">
-        <path fill-rule="evenodd" clip-rule="evenodd" d="M128 7.67678C126.56 2.18136 123.063 0 118.289 0C114.422 0 109.568 2.18136 109.568 7.43431C109.568 10.828 111.913 13.4952 115.739 14.1823L119.359 14.8284C121.828 15.2726 122.528 16.2022 122.528 17.4548C122.528 18.8689 121.005 19.6769 118.743 19.6769C115.781 19.6769 113.929 18.6265 113.641 15.6766L108.416 16.4849C109.239 22.1817 114.34 24.5259 118.948 24.5259C123.309 24.5259 127.958 22.0202 127.958 16.9699C127.958 13.535 125.86 11.0307 121.951 10.3024L117.961 9.57584C115.739 9.17187 114.999 8.08075 114.999 7.03034C114.999 5.69675 116.438 4.84898 118.413 4.84898C120.923 4.84898 122.692 5.69675 122.774 8.48472L128 7.67678ZM11.85 16.3226L17.2798 0.605739H23.6567L14.1937 23.9188H9.46293L0 0.606177H6.37685L11.85 16.3226ZM45.2167 7.27281C45.2167 9.13116 43.7356 10.424 42.0073 10.424C40.2795 10.424 38.7988 9.13116 38.7988 7.27281C38.7988 5.41401 40.2795 4.12156 42.0073 4.12156C43.7356 4.12156 45.2172 5.41401 45.2172 7.27281H45.2167ZM46.204 15.5155C44.0642 18.2622 41.8014 20.1613 37.8106 20.1614C33.7386 20.1614 30.5698 17.7371 28.1014 14.1819C27.1137 12.7271 25.5914 12.4041 24.4803 13.1718C23.452 13.8992 23.2057 15.4345 24.1514 16.7681C27.566 21.8994 32.2972 24.8887 37.8102 24.8887C42.8712 24.8887 46.8212 22.4649 49.9064 18.4243C51.0582 16.9296 51.017 15.3943 49.9064 14.5456C48.8776 13.7368 47.3553 14.0208 46.204 15.5155ZM60.3999 12.2019C60.3999 16.9699 63.1978 19.4751 66.3249 19.4751C69.2868 19.4751 72.3317 17.1314 72.3317 12.2019C72.3317 7.3529 69.2868 5.01004 66.3656 5.01004C63.1978 5.01004 60.3999 7.2321 60.3999 12.2019ZM60.3999 3.83883V0.646005H54.5992V32H60.3999V20.8481C62.3338 23.4343 64.8434 24.5259 67.6818 24.5259C72.9901 24.5259 78.1736 20.4043 78.1736 11.9196C78.1736 3.79769 72.784 0.000437673 68.1757 0.000437673C64.514 0.000437673 62.0049 1.65659 60.3999 3.83883ZM88.2551 12.2019C88.2551 16.9699 91.0524 19.4751 94.1796 19.4751C97.1415 19.4751 100.186 17.1314 100.186 12.2019C100.186 7.3529 97.1415 5.01004 94.2203 5.01004C91.0524 5.01004 88.2546 7.2321 88.2546 12.2019H88.2551ZM88.2551 3.83883V0.646005H88.2546H82.4539V32H88.2546V20.8481C90.1885 23.4343 92.6981 24.5259 95.5365 24.5259C100.844 24.5259 106.028 20.4043 106.028 11.9196C106.028 3.79769 100.639 0.000437673 96.0304 0.000437673C92.3687 0.000437673 89.8596 1.65659 88.2551 3.83883Z" fill="white"/>
-      </svg>
-    </a>
+    <div id="liste" role="list" aria-label="Bensinstasjoner"></div>
+  </main>
+
+  <!-- Statistikkvisning -->
+  <main id="view-statistikk" class="view" role="tabpanel" aria-labelledby="tab-statistikk">
+    <div id="statistikk-innhold" class="statistikk-container">
+      <h2 class="statistikk-tittel">Statistikk</h2>
+
+      <div class="stat-oppdateringer">
+        <span id="stat-antall" class="stat-tall">–</span>
+        <span class="stat-label">prisoppdateringer siste 24 timer</span>
+      </div>
+
+      <h3 class="stat-seksjon-tittel">Billigste priser siste 24 timer</h3>
+
+      <div id="stat-billigst-bensin" class="stat-pris-kort">
+        <div class="stat-pris-type">95 oktan</div>
+        <div class="stat-pris-loading">Laster …</div>
+      </div>
+
+      <div id="stat-billigst-bensin98" class="stat-pris-kort">
+        <div class="stat-pris-type">98 oktan</div>
+        <div class="stat-pris-loading">Laster …</div>
+      </div>
+
+      <div id="stat-billigst-diesel" class="stat-pris-kort">
+        <div class="stat-pris-type">Diesel</div>
+        <div class="stat-pris-loading">Laster …</div>
+      </div>
+
+      <h3 class="stat-seksjon-tittel">Dyreste priser siste 24 timer</h3>
+
+      <div id="stat-dyrest-bensin" class="stat-pris-kort stat-dyrest">
+        <div class="stat-pris-type">95 oktan</div>
+        <div class="stat-pris-loading">Laster …</div>
+      </div>
+
+      <div id="stat-dyrest-bensin98" class="stat-pris-kort stat-dyrest">
+        <div class="stat-pris-type">98 oktan</div>
+        <div class="stat-pris-loading">Laster …</div>
+      </div>
+
+      <div id="stat-dyrest-diesel" class="stat-pris-kort stat-dyrest">
+        <div class="stat-pris-type">Diesel</div>
+        <div class="stat-pris-loading">Laster …</div>
+      </div>
+    </div>
   </main>
 
   <!-- Bunntabs -->
-  <nav id="tabs">
-    <button id="tab-kart" class="tab active">
-      <span class="tab-icon">🗺️</span>
+  <nav id="tabs" role="tablist" aria-label="Hovednavigasjon">
+    <button id="tab-kart" class="tab active" role="tab" aria-selected="true" aria-controls="view-kart">
+      <span class="tab-icon" aria-hidden="true">🗺️</span>
       Kart
     </button>
-    <button id="tab-liste" class="tab">
-      <span class="tab-icon">☰</span>
+    <button id="tab-liste" class="tab" role="tab" aria-selected="false" aria-controls="view-liste">
+      <span class="tab-icon" aria-hidden="true">☰</span>
       Liste
+    </button>
+    <button id="tab-statistikk" class="tab" role="tab" aria-selected="false" aria-controls="view-statistikk">
+      <span class="tab-icon" aria-hidden="true">📊</span>
+      Statistikk
     </button>
   </nav>
 
   <!-- Velkomst-overlay (vises kun uten lagret posisjon) -->
-  <div id="velkomst" hidden>
+  <div id="velkomst" hidden role="dialog" aria-labelledby="velkomst-tittel">
     <div id="velkomst-kort">
-      <div id="velkomst-ikon">⛽</div>
-      <h2>Drivstoffpriser i nærheten</h2>
+      <div id="velkomst-ikon" aria-hidden="true">⛽</div>
+      <h2 id="velkomst-tittel">Drivstoffpriser i nærheten</h2>
       <p>Hent posisjon eller søk etter et sted for å se bensinstasjoner og priser.</p>
       <div id="velkomst-btns">
-        <button id="velkomst-posisjon-btn">📍 Hent posisjon</button>
-        <button id="velkomst-sok-btn">🔍 Søk etter sted</button>
+        <button id="velkomst-posisjon-btn"><span aria-hidden="true">📍</span> Hent posisjon</button>
+        <button id="velkomst-sok-btn"><span aria-hidden="true">🔍</span> Søk etter sted</button>
       </div>
     </div>
   </div>
 
   <!-- Lokasjonsfeil-dialog -->
   <div id="lok-feil-backdrop" hidden></div>
-  <div id="lok-feil-dialog" hidden>
-    <div id="lok-feil-ikon">📍</div>
+  <div id="lok-feil-dialog" hidden role="alertdialog" aria-modal="true" aria-labelledby="lok-feil-tittel" aria-describedby="lok-feil-tekst">
+    <div id="lok-feil-ikon" aria-hidden="true">📍</div>
     <h2 id="lok-feil-tittel"></h2>
     <p id="lok-feil-tekst"></p>
     <div id="lok-feil-steg" hidden>
@@ -101,11 +170,45 @@
     <button id="lok-feil-lukk">Lukk</button>
   </div>
 
+  <!-- Legg til stasjon -->
+  <div id="add-station-backdrop"></div>
+  <div id="add-station-sheet" role="dialog" aria-modal="true" aria-labelledby="add-station-tittel">
+    <div class="sheet-handle"></div>
+    <div id="add-station-content">
+      <h3 id="add-station-tittel">Legg til stasjon</h3>
+      <p class="add-station-hint">Dra markøren til riktig posisjon</p>
+      <div id="add-station-map"></div>
+      <div class="pris-input-gruppe">
+        <label for="add-station-navn">Navn</label>
+        <input id="add-station-navn" type="text" placeholder="f.eks. Shell Storo" maxlength="100" autocomplete="off">
+      </div>
+      <div class="pris-input-gruppe">
+        <label for="add-station-kjede">Kjede (valgfritt)</label>
+        <select id="add-station-kjede">
+          <option value="">— Velg kjede —</option>
+          <option value="Circle K">Circle K</option>
+          <option value="Uno-X">Uno-X</option>
+          <option value="YX">YX</option>
+          <option value="Esso">Esso</option>
+          <option value="Shell">Shell</option>
+          <option value="Preem">Preem</option>
+          <option value="St1">St1</option>
+          <option value="Best">Best</option>
+        </select>
+      </div>
+      <div id="add-station-status" class="add-station-status" role="status" aria-live="polite"></div>
+      <div class="modal-btns">
+        <button id="add-station-avbryt" class="btn-avbryt">Avbryt</button>
+        <button id="add-station-opprett" class="btn-lagre">Opprett</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Stasjon-sheet backdrop -->
   <div id="sheet-backdrop"></div>
 
   <!-- Stasjon-sheet -->
-  <div id="stasjon-sheet">
+  <div id="stasjon-sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-navn">
     <div class="sheet-handle"></div>
     <div id="sheet-scroll">
     <div id="sheet-content">
@@ -115,7 +218,7 @@
         <div class="sheet-header">
           <div id="sheet-badge" class="sheet-badge"></div>
           <div class="sheet-tittel">
-            <h2 id="sheet-navn"></h2>
+            <h2 id="sheet-navn" tabindex="-1"></h2>
             <div id="sheet-kjede" class="sheet-kjede"></div>
           </div>
           <div id="sheet-avstand" class="sheet-avstand"></div>
@@ -140,10 +243,16 @@
 
         <div id="sheet-tid" class="sheet-tid"></div>
 
-        <a id="sheet-naviger-btn" class="btn-naviger" target="_blank" rel="noopener">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
-          Naviger hit
-        </a>
+        <div class="sheet-nav-lenker">
+          <a id="sheet-naviger-btn" class="btn-naviger" target="_blank" rel="noopener">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+            Naviger hit
+          </a>
+          <a id="sheet-kart-btn" class="btn-naviger btn-kart" target="_blank" rel="noopener" style="display:none">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            Vis i kart
+          </a>
+        </div>
 
         <div class="modal-btns">
           <button id="sheet-bekreft-btn" class="btn-avbryt">Bekreft priser</button>
@@ -166,7 +275,7 @@
           <label for="sheet-diesel-input">Diesel (kr/liter)</label>
           <input id="sheet-diesel-input" type="text" inputmode="decimal" placeholder="f.eks. 20,50" autocomplete="off">
         </div>
-        <div id="sheet-edit-status"></div>
+        <div id="sheet-edit-status" role="status" aria-live="polite"></div>
         <div class="modal-btns">
           <button id="sheet-edit-avbryt" class="btn-avbryt">Avbryt</button>
           <button id="sheet-edit-lagre" class="btn-lagre">Lagre pris</button>

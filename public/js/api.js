@@ -15,6 +15,17 @@ export async function hentTotaltMedPris() {
     return (await resp.json()).totalt;
 }
 
+export async function opprettStasjon(navn, kjede, lat, lon) {
+    const resp = await fetch('/api/stasjon', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ navn, kjede, lat, lon }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw Object.assign(new Error(data.error || 'Feil ved opprettelse'), { status: resp.status, data });
+    return data;
+}
+
 export async function oppdaterPris(stasjonId, bensin, diesel, bensin98) {
     const resp = await fetch('/api/pris', {
         method: 'POST',

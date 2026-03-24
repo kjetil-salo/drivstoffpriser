@@ -10,7 +10,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 from db import (antall_brukere, opprett_bruker, finn_bruker, finn_bruker_id,
                 opprett_invitasjon, hent_invitasjon, merk_invitasjon_brukt,
-                opprett_tilbakestilling, hent_tilbakestilling, merk_tilbakestilling_brukt, oppdater_passord)
+                opprett_tilbakestilling, hent_tilbakestilling, merk_tilbakestilling_brukt, oppdater_passord,
+                slett_bruker)
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -229,6 +230,58 @@ def invitasjon():
         return redirect('/')
 
     return _auth_side('Opprett konto', _invitasjon_form(token))
+
+
+@auth_bp.route('/auth/min-konto')
+def min_konto():
+    bruker_id = session.get('bruker_id')
+    if not bruker_id:
+        return redirect('/auth/logg-inn')
+    bruker = finn_bruker_id(bruker_id)
+    if not bruker:
+        session.clear()
+        return redirect('/auth/logg-inn')
+    return _auth_side('Min konto', f'''
+<p style="color:#94a3b8;font-size:0.85rem;margin-bottom:1.5rem">
+Innlogget som <strong style="color:#e5e7eb">{bruker["brukernavn"]}</strong></p>
+<a href="/auth/logg-ut" style="display:block;text-align:center;background:#3b82f6;border-radius:6px;
+   color:white;font-weight:600;padding:12px;text-decoration:none;margin-bottom:1rem">Logg ut</a>
+<a href="/auth/slett-meg" style="display:block;text-align:center;border:1px solid #ef4444;border-radius:6px;
+   color:#ef4444;font-size:0.85rem;padding:10px;text-decoration:none">Slett min konto</a>
+<a href="/">← Tilbake</a>''')
+
+
+@auth_bp.route('/auth/slett-meg', methods=['GET', 'POST'])
+def slett_meg():
+    bruker_id = session.get('bruker_id')
+    if not bruker_id:
+        return redirect('/auth/logg-inn')
+    bruker = finn_bruker_id(bruker_id)
+    if not bruker:
+        session.clear()
+        return redirect('/auth/logg-inn')
+
+    if request.method == 'POST':
+        passord = request.form.get('passord', '').strip()
+        if not check_password_hash(bruker['passord_hash'], passord):
+            return _auth_side('Slett konto', _slett_meg_form(), 'Feil passord.')
+        slett_bruker(bruker_id)
+        session.clear()
+        return _auth_side('Konto slettet',
+            '<p style="color:#94a3b8">Kontoen din er nå slettet.</p>'
+            '<a href="/">← Til forsiden</a>')
+
+    return _auth_side('Slett konto', _slett_meg_form())
+
+
+def _slett_meg_form():
+    return '''<p style="color:#ef4444;font-size:0.85rem;margin-bottom:1rem">
+Dette sletter kontoen din permanent. Handlingen kan ikke angres.</p>
+<form method="post">
+<label>Bekreft med passordet ditt</label>
+<input name="passord" type="password" autofocus autocomplete="current-password">
+<button style="background:#ef4444">Slett min konto</button></form>
+<a href="/auth/min-konto">← Avbryt</a>'''
 
 
 def _invitasjon_form(token):

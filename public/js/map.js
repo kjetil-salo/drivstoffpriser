@@ -15,6 +15,7 @@ export function initMap(containerId, startPos) {
         maxBoundsViscosity: 1.0,
         minZoom: 5,
     }).setView(senter, 13);
+    map.getContainer().setAttribute('aria-label', 'Kart med bensinstasjoner. Bruk listefanen for tastaturnavigasjon.');
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
         maxZoom: 19,
@@ -25,6 +26,12 @@ export function initMap(containerId, startPos) {
 
 export function sentrerKart(lat, lon, zoom = 13) {
     if (map) map.setView([lat, lon], zoom);
+}
+
+export function getKartSenter() {
+    if (!map) return null;
+    const c = map.getCenter();
+    return { lat: c.lat, lon: c.lng };
 }
 
 export function initKartBevegelse(onBevegelse) {
@@ -38,7 +45,7 @@ export function initKartBevegelse(onBevegelse) {
             const senter = map.getCenter();
             const lat = senter.lat;
             const lon = senter.lng;
-            if (sisteHentPos && kmMellom(lat, lon, sisteHentPos.lat, sisteHentPos.lon) < 3) return;
+            if (sisteHentPos && kmMellom(lat, lon, sisteHentPos.lat, sisteHentPos.lon) < 10) return;
             sisteHentPos = { lat, lon };
             onBevegelse(lat, lon);
         }, 600);
@@ -104,6 +111,7 @@ export function refreshKartInnstillinger() {
         const erBilligst = s.id === billigsteId;
         oppdaterMarkerTooltip(marker, s, erBilligst);
         marker.setIcon(prisIkon(s));
+        marker.setZIndexOffset(erBilligst ? 5000 : 0);
     });
 }
 
@@ -116,6 +124,7 @@ export function oppdaterStasjonPriser(stasjon, onKlikk) {
         const erBilligst = s.id === billigsteId;
         oppdaterMarkerTooltip(m, s, erBilligst);
         m.setIcon(prisIkon(s));
+        m.setZIndexOffset(erBilligst ? 5000 : 0);
     });
     const marker = stasjonMarkorer.get(stasjon.id);
     if (!marker) return;
@@ -131,12 +140,16 @@ function harRelevantPris(s) {
            (inn.diesel && s.diesel != null);
 }
 
-function prisIkon(s) {
-    if (!harRelevantPris(s)) return fargeIkon('grey');
+function prisFarge(s) {
+    if (!harRelevantPris(s)) return 'grey';
     const alder = prisAlderTimer(s.pris_tidspunkt);
-    if (alder === null || alder >= 24) return fargeIkon('red');
-    if (alder >= 8) return fargeIkon('orange');
-    return fargeIkon('green');
+    if (alder === null || alder >= 24) return 'violet';
+    if (alder >= 8) return 'orange';
+    return 'green';
+}
+
+function prisIkon(s) {
+    return fargeIkon(prisFarge(s));
 }
 
 function prisAlderTimer(tidspunkt) {
@@ -150,6 +163,8 @@ function oppdaterMarkerTooltip(marker, s, erBilligst) {
     const el = marker.getTooltip()?.getElement();
     if (el) {
         el.classList.toggle('billigst-tooltip', erBilligst);
+        ['green', 'orange', 'violet', 'grey'].forEach(f =>
+            el.classList.toggle(`tooltip-${f}`, !erBilligst && prisFarge(s) === f));
     }
 }
 
@@ -157,12 +172,14 @@ function lagMarker(s, erBilligst = false) {
     const marker = L.marker([s.lat, s.lon], {
         icon: prisIkon(s),
         zIndexOffset: erBilligst ? 5000 : 0,
+        title: s.navn,
+        alt: s.navn,
     }).addTo(map);
 
     marker.bindTooltip(byggTooltip(s, erBilligst), {
         permanent: true,
         direction: 'top',
-        className: erBilligst ? 'station-tooltip billigst-tooltip' : 'station-tooltip',
+        className: erBilligst ? 'station-tooltip billigst-tooltip' : `station-tooltip tooltip-${prisFarge(s)}`,
         offset: [0, -38],
     });
     return marker;

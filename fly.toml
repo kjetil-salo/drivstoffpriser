@@ -1,0 +1,32 @@
+app = 'drivstoffpriser'
+primary_region = 'arn'
+
+[build]
+
+[env]
+  PORT = '3002'
+  DB_PATH = '/app/data/drivstoff.db'
+  DATA_DIR = '/app/data'
+
+[http_service]
+  internal_port = 3002
+  force_https = true
+  auto_stop_machines = 'off'
+  auto_start_machines = true
+  min_machines_running = 1
+
+[[http_service.checks]]
+  grace_period = '10s'
+  interval = '30s'
+  method = 'GET'
+  path = '/health'
+  timeout = '5s'
+
+[[mounts]]
+  source = 'drivstoff_data'
+  destination = '/app/data'
+
+[[vm]]
+  memory = '512mb'
+  cpu_kind = 'shared'
+  cpus = 1
