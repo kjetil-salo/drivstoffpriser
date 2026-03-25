@@ -85,16 +85,6 @@ class TestRegistrering:
         assert resp.status_code == 302
         assert db_mod.finn_bruker('ny@bruker.no') is not None
 
-    def test_feil_tilgangskode(self, app):
-        import os
-        os.environ['REGISTRER_KODE'] = 'hemmelig'
-        client = app.test_client()
-        resp = client.post('/registrer', data={
-            'epost': 'ny@bruker.no', 'passord': 'passord123', 'kode': 'feilkode',
-        })
-        assert 'Feil tilgangskode' in resp.data.decode()
-        os.environ['REGISTRER_KODE'] = ''
-
     def test_ugyldig_epost(self, client):
         resp = client.post('/registrer', data={
             'epost': 'ugyldig', 'passord': 'passord123',

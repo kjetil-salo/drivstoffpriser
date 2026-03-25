@@ -11,7 +11,6 @@ def test_db(tmp_path):
     db_path = str(tmp_path / 'test.db')
     os.environ['DB_PATH'] = db_path
     os.environ['SECRET_KEY'] = 'test-secret'
-    os.environ['REGISTRER_KODE'] = ''
     os.environ['STATS_KEY'] = 'testkey'
     os.environ['RESEND_API_KEY'] = ''
 
