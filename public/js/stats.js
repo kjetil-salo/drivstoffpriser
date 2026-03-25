@@ -14,15 +14,10 @@ function formaterTid(tidspunkt) {
 function visPrisKort(elementId, data) {
     const el = document.getElementById(elementId);
     if (!data) {
-        el.innerHTML = `
-            <div class="stat-pris-type">${el.querySelector('.stat-pris-type')?.textContent || ''}</div>
-            <div class="stat-pris-ingen">Ingen priser siste 24 timer</div>
-        `;
+        el.innerHTML = `<div class="stat-pris-ingen">Ingen data</div>`;
         return;
     }
-    const typeLabel = el.querySelector('.stat-pris-type')?.textContent || '';
     el.innerHTML = `
-        <div class="stat-pris-type">${typeLabel}</div>
         <div class="stat-pris-verdi">${data.pris.toFixed(2)} kr</div>
         <div class="stat-pris-stasjon">${data.stasjon}</div>
         <div class="stat-pris-tid">${formaterTid(data.tidspunkt)}</div>

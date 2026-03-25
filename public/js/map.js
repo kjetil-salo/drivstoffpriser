@@ -143,9 +143,10 @@ function harRelevantPris(s) {
 function prisFarge(s) {
     if (!harRelevantPris(s)) return 'grey';
     const alder = prisAlderTimer(s.pris_tidspunkt);
-    if (alder === null || alder >= 24) return 'violet';
-    if (alder >= 8) return 'orange';
-    return 'green';
+    if (alder === null || alder >= 168) return 'grey';  // > 7 dager
+    if (alder >= 48) return 'violet';                     // 2–7 dager
+    if (alder >= 8) return 'orange';                      // 8–48 timer
+    return 'green';                                       // < 8 timer
 }
 
 function prisIkon(s) {
@@ -163,8 +164,10 @@ function oppdaterMarkerTooltip(marker, s, erBilligst) {
     const el = marker.getTooltip()?.getElement();
     if (el) {
         el.classList.toggle('billigst-tooltip', erBilligst);
+        const farge = prisFarge(s);
         ['green', 'orange', 'violet', 'grey'].forEach(f =>
-            el.classList.toggle(`tooltip-${f}`, !erBilligst && prisFarge(s) === f));
+            el.classList.toggle(`tooltip-${f}`, !erBilligst && farge === f));
+        el.classList.toggle('tooltip-gammel', farge === 'grey' && harRelevantPris(s));
     }
 }
 
@@ -179,7 +182,7 @@ function lagMarker(s, erBilligst = false) {
     marker.bindTooltip(byggTooltip(s, erBilligst), {
         permanent: true,
         direction: 'top',
-        className: erBilligst ? 'station-tooltip billigst-tooltip' : `station-tooltip tooltip-${prisFarge(s)}`,
+        className: erBilligst ? 'station-tooltip billigst-tooltip' : `station-tooltip tooltip-${prisFarge(s)}${prisFarge(s) === 'grey' && harRelevantPris(s) ? ' tooltip-gammel' : ''}`,
         offset: [0, -38],
     });
     return marker;

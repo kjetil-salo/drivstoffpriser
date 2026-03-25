@@ -17,6 +17,7 @@ import resend
 from flask import Flask, request, redirect
 
 from db import init_db, _migrer_db
+from osm import start_bakgrunnsoppdatering
 from routes_auth import auth_bp
 from routes_admin import admin_bp
 from routes_api import api_bp
@@ -75,5 +76,6 @@ def index():
 if __name__ == '__main__':
     init_db()
     _migrer_db()
+    start_bakgrunnsoppdatering()
     port = int(os.environ.get('PORT', 7342))
     app.run(host='0.0.0.0', port=port, debug=True)

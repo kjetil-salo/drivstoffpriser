@@ -5,7 +5,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY server.py db.py osm.py routes_auth.py routes_admin.py routes_api.py ./
+COPY server.py db.py osm.py routes_auth.py routes_admin.py routes_api.py seed_stasjoner.py ./
 COPY public/ ./public/
 
 EXPOSE 3002

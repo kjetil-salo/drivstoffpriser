@@ -273,6 +273,9 @@ html, body {
   border: 2px solid #9ca3af !important;
   box-shadow: 0 0 0 1px rgba(156,163,175,0.2), var(--shadow-md) !important;
 }
+.tooltip-gammel .tt-priser {
+  font-style: italic;
+}
 .billigst-tooltip {
   background: #15803d !important;
   border: 2px solid #4ade80 !important;
@@ -1202,7 +1205,7 @@ html, body {
   border-radius: var(--radius-md);
   padding: var(--space-lg);
   text-align: center;
-  margin-bottom: var(--space-lg);
+  margin-top: var(--space-lg);
 }
 
 .stat-tall {
@@ -1228,21 +1231,48 @@ html, body {
   margin-bottom: var(--space-sm);
 }
 
-.stat-pris-kort {
-  background: var(--color-card-bg);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  padding: var(--space-md);
-  margin-bottom: var(--space-sm);
+.stat-rad-header {
+  display: grid;
+  grid-template-columns: auto 1fr 1fr;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-xs);
+  padding: 0 var(--space-md);
 }
 
-.stat-pris-type {
+.stat-rad-header span {
   font-size: var(--font-xs);
   color: var(--color-muted);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  margin-bottom: var(--space-xs);
+}
+
+.stat-rad-header span:first-child {
+  width: 5rem;
+}
+
+.stat-rad {
+  display: grid;
+  grid-template-columns: auto 1fr 1fr;
+  gap: var(--space-sm);
+  align-items: start;
+  margin-bottom: var(--space-sm);
+}
+
+.stat-rad-label {
+  width: 5rem;
+  font-size: var(--font-sm);
+  font-weight: 600;
+  color: var(--color-muted);
+  padding-top: var(--space-md);
+}
+
+.stat-pris-kort {
+  background: var(--color-card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  min-width: 0;
 }
 
 .stat-pris-verdi {

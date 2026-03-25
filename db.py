@@ -8,7 +8,9 @@ DB_PATH = os.environ.get('DB_PATH', _default_db)
 
 
 def get_conn():
-    return sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=10)
+    conn.execute("PRAGMA journal_mode=WAL")
+    return conn
 
 
 def init_db():
@@ -38,6 +40,7 @@ def init_db():
                 user_agent TEXT,
                 ts        TEXT DEFAULT (datetime('now'))
             );
+            CREATE INDEX IF NOT EXISTS idx_stasjoner_pos ON stasjoner(lat, lon);
             CREATE INDEX IF NOT EXISTS idx_visninger_device ON visninger(device_id);
             CREATE INDEX IF NOT EXISTS idx_visninger_ts ON visninger(ts);
             CREATE TABLE IF NOT EXISTS brukere (
@@ -89,18 +92,6 @@ def _haversine(lat1, lon1, lat2, lon2):
     a = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
     return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
-
-def har_ferske_stasjoner(lat, lon, max_alder_timer=24):
-    """Sjekk om det finnes ferske stasjoner nær denne posisjonen (bounding box ±0.22 grader ≈ ~25km)."""
-    delta = 0.22
-    with get_conn() as conn:
-        row = conn.execute(
-            '''SELECT COUNT(*) FROM stasjoner
-               WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ?
-               AND sist_oppdatert > datetime('now', ? || ' hours')''',
-            (lat - delta, lat + delta, lon - delta, lon + delta, f'-{max_alder_timer}')
-        ).fetchone()
-        return row[0] > 0
 
 
 def lagre_stasjon(navn, kjede, lat, lon, osm_id):
@@ -389,6 +380,10 @@ def slett_stasjon(stasjon_id: int):
 
 
 def get_stasjoner_med_priser(user_lat, user_lon, radius_m=30000, limit=30):
+    # Bounding box for å filtrere i SQL først (1 grad ≈ 111 km)
+    delta_lat = radius_m / 111_000
+    delta_lon = radius_m / (111_000 * max(math.cos(math.radians(user_lat)), 0.01))
+
     with get_conn() as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
@@ -399,32 +394,26 @@ def get_stasjoner_med_priser(user_lat, user_lon, radius_m=30000, limit=30):
                    SELECT stasjon_id, bensin, diesel, bensin98, tidspunkt
                    FROM priser
                    WHERE id IN (SELECT MAX(id) FROM priser GROUP BY stasjon_id)
-               ) p ON p.stasjon_id = s.id'''
+               ) p ON p.stasjon_id = s.id
+               WHERE s.lat BETWEEN ? AND ? AND s.lon BETWEEN ? AND ?''',
+            (user_lat - delta_lat, user_lat + delta_lat,
+             user_lon - delta_lon, user_lon + delta_lon)
         ).fetchall()
 
     result = []
-    now = datetime.now()
     for row in rows:
         dist = _haversine(user_lat, user_lon, row['lat'], row['lon'])
         if dist <= radius_m:
-            # Fjern priser eldre enn 24 timer — volatile marked
-            pris_fersk = False
-            if row['tidspunkt']:
-                try:
-                    pris_tid = datetime.strptime(row['tidspunkt'], '%Y-%m-%d %H:%M:%S')
-                    pris_fersk = (now - pris_tid).total_seconds() < 86400
-                except ValueError:
-                    pass
             result.append({
                 'id': row['id'],
                 'navn': row['navn'],
                 'kjede': row['kjede'] or '',
                 'lat': row['lat'],
                 'lon': row['lon'],
-                'bensin': row['bensin'] if pris_fersk else None,
-                'diesel': row['diesel'] if pris_fersk else None,
-                'bensin98': row['bensin98'] if pris_fersk else None,
-                'pris_tidspunkt': row['tidspunkt'] if pris_fersk else None,
+                'bensin': row['bensin'],
+                'diesel': row['diesel'],
+                'bensin98': row['bensin98'],
+                'pris_tidspunkt': row['tidspunkt'],
                 'avstand_m': round(dist),
                 'brukeropprettet': row['lagt_til_av'] is not None,
             })

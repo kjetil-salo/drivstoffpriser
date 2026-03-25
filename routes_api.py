@@ -14,7 +14,6 @@ from db import (get_stasjoner_med_priser, lagre_pris, logg_visning,
                 antall_stasjoner_med_pris, finn_bruker_id, DB_PATH,
                 opprett_stasjon, hent_billigste_priser_24t,
                 antall_prisoppdateringer_24t)
-from osm import hent_stasjoner_fra_osm_async
 
 logger = logging.getLogger('drivstoff')
 
@@ -92,8 +91,6 @@ def stasjoner():
         return jsonify({'error': 'lat og lon er påkrevd'}), 400
     if not er_i_norge(lat, lon):
         return jsonify({'error': 'Kun tilgjengelig i Norge', 'utenfor': True}), 400
-
-    hent_stasjoner_fra_osm_async(lat, lon)
 
     data = get_stasjoner_med_priser(lat, lon)
     return jsonify({'stasjoner': data})
