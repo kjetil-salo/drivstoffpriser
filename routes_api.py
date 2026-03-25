@@ -87,12 +87,15 @@ def meg():
 def stasjoner():
     lat = request.args.get('lat', type=float)
     lon = request.args.get('lon', type=float)
+    radius_km = request.args.get('radius', default=30, type=int)
     if lat is None or lon is None:
         return jsonify({'error': 'lat og lon er påkrevd'}), 400
     if not er_i_norge(lat, lon):
         return jsonify({'error': 'Kun tilgjengelig i Norge', 'utenfor': True}), 400
 
-    data = get_stasjoner_med_priser(lat, lon)
+    radius_m = max(1000, min(radius_km * 1000, 100_000))
+    limit = 50 if radius_km >= 50 else 30
+    data = get_stasjoner_med_priser(lat, lon, radius_m=radius_m, limit=limit)
     return jsonify({'stasjoner': data})
 
 
@@ -288,6 +291,13 @@ def om():
   <h2>Hva er dette?</h2>
   <p>En gratis webapp der brukerne selv registrerer og oppdaterer drivstoffpriser. Jo flere som bidrar, jo bedre og ferskere priser f&#229;r alle.</p>
   <p>Appen st&#248;tter <strong>95 oktan</strong>, <strong>98 oktan</strong> og <strong>Diesel</strong>.</p>
+  <p style="margin-top:0.5rem;font-size:0.85rem;color:#94a3b8">Liker du appen? En liten donasjon hjelper med &#229; dekke serverdrift.</p>
+  <a class="donasjon" href="https://qr.vipps.no/box/4aa50659-cefa-415b-b638-fa1f73e65d1e/pay-in" target="_blank" rel="noopener">
+    <svg viewBox="0 0 128 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path fill-rule="evenodd" clip-rule="evenodd" d="M128 7.67678C126.56 2.18136 123.063 0 118.289 0C114.422 0 109.568 2.18136 109.568 7.43431C109.568 10.828 111.913 13.4952 115.739 14.1823L119.359 14.8284C121.828 15.2726 122.528 16.2022 122.528 17.4548C122.528 18.8689 121.005 19.6769 118.743 19.6769C115.781 19.6769 113.929 18.6265 113.641 15.6766L108.416 16.4849C109.239 22.1817 114.34 24.5259 118.948 24.5259C123.309 24.5259 127.958 22.0202 127.958 16.9699C127.958 13.535 125.86 11.0307 121.951 10.3024L117.961 9.57584C115.739 9.17187 114.999 8.08075 114.999 7.03034C114.999 5.69675 116.438 4.84898 118.413 4.84898C120.923 4.84898 122.692 5.69675 122.774 8.48472L128 7.67678ZM11.85 16.3226L17.2798 0.605739H23.6567L14.1937 23.9188H9.46293L0 0.606177H6.37685L11.85 16.3226ZM45.2167 7.27281C45.2167 9.13116 43.7356 10.424 42.0073 10.424C40.2795 10.424 38.7988 9.13116 38.7988 7.27281C38.7988 5.41401 40.2795 4.12156 42.0073 4.12156C43.7356 4.12156 45.2172 5.41401 45.2172 7.27281H45.2167ZM46.204 15.5155C44.0642 18.2622 41.8014 20.1613 37.8106 20.1614C33.7386 20.1614 30.5698 17.7371 28.1014 14.1819C27.1137 12.7271 25.5914 12.4041 24.4803 13.1718C23.452 13.8992 23.2057 15.4345 24.1514 16.7681C27.566 21.8994 32.2972 24.8887 37.8102 24.8887C42.8712 24.8887 46.8212 22.4649 49.9064 18.4243C51.0582 16.9296 51.017 15.3943 49.9064 14.5456C48.8776 13.7368 47.3553 14.0208 46.204 15.5155ZM60.3999 12.2019C60.3999 16.9699 63.1978 19.4751 66.3249 19.4751C69.2868 19.4751 72.3317 17.1314 72.3317 12.2019C72.3317 7.3529 69.2868 5.01004 66.3656 5.01004C63.1978 5.01004 60.3999 7.2321 60.3999 12.2019ZM60.3999 3.83883V0.646005H54.5992V32H60.3999V20.8481C62.3338 23.4343 64.8434 24.5259 67.6818 24.5259C72.9901 24.5259 78.1736 20.4043 78.1736 11.9196C78.1736 3.79769 72.784 0.000437673 68.1757 0.000437673C64.514 0.000437673 62.0049 1.65659 60.3999 3.83883ZM88.2551 12.2019C88.2551 16.9699 91.0524 19.4751 94.1796 19.4751C97.1415 19.4751 100.186 17.1314 100.186 12.2019C100.186 7.3529 97.1415 5.01004 94.2203 5.01004C91.0524 5.01004 88.2546 7.2321 88.2546 12.2019H88.2551ZM88.2551 3.83883V0.646005H88.2546H82.4539V32H88.2546V20.8481C90.1885 23.4343 92.6981 24.5259 95.5365 24.5259C100.844 24.5259 106.028 20.4043 106.028 11.9196C106.028 3.79769 100.639 0.000437673 96.0304 0.000437673C92.3687 0.000437673 89.8596 1.65659 88.2551 3.83883Z" fill="#ff5b24"/>
+    </svg>
+    <div class="donasjon-tekst"><strong>St&#248;tt prosjektet</strong><br>Vipps en kaffekopp eller to</div>
+  </a>
 </div>
 
 <div class="kort">
@@ -326,10 +336,10 @@ def om():
 
 <div class="kort">
   <h2>Fargekoder p&#229; kartet</h2>
-  <div class="farge-rad"><span class="farge-prikk" style="background:#22c55e"></span> Pris oppdatert for under 8 timer siden</div>
-  <div class="farge-rad"><span class="farge-prikk" style="background:#f59e0b"></span> Pris oppdatert for 8&#8211;24 timer siden</div>
-  <div class="farge-rad"><span class="farge-prikk" style="background:#ef4444"></span> Pris oppdatert for over 24 timer siden</div>
-  <div class="farge-rad"><span class="farge-prikk" style="background:#6b7280"></span> Ingen pris registrert</div>
+  <div class="farge-rad"><span class="farge-prikk" style="background:#22c55e"></span> Fersk pris (under 8 timer)</div>
+  <div class="farge-rad"><span class="farge-prikk" style="background:#f59e0b"></span> Pris 8&#8211;48 timer gammel</div>
+  <div class="farge-rad"><span class="farge-prikk" style="background:#8b5cf6"></span> Pris 2&#8211;7 dager gammel</div>
+  <div class="farge-rad"><span class="farge-prikk" style="background:#6b7280"></span> Eldre pris eller ingen pris</div>
 </div>
 
 <div class="kort">
@@ -346,14 +356,23 @@ def om():
 </div>
 
 <div class="kort">
-  <p>Liker du appen? En liten donasjon hjelper med &#229; dekke serverdrift.</p>
-  <a class="donasjon" href="https://qr.vipps.no/box/4aa50659-cefa-415b-b638-fa1f73e65d1e/pay-in" target="_blank" rel="noopener">
-    <svg viewBox="0 0 128 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <path fill-rule="evenodd" clip-rule="evenodd" d="M128 7.67678C126.56 2.18136 123.063 0 118.289 0C114.422 0 109.568 2.18136 109.568 7.43431C109.568 10.828 111.913 13.4952 115.739 14.1823L119.359 14.8284C121.828 15.2726 122.528 16.2022 122.528 17.4548C122.528 18.8689 121.005 19.6769 118.743 19.6769C115.781 19.6769 113.929 18.6265 113.641 15.6766L108.416 16.4849C109.239 22.1817 114.34 24.5259 118.948 24.5259C123.309 24.5259 127.958 22.0202 127.958 16.9699C127.958 13.535 125.86 11.0307 121.951 10.3024L117.961 9.57584C115.739 9.17187 114.999 8.08075 114.999 7.03034C114.999 5.69675 116.438 4.84898 118.413 4.84898C120.923 4.84898 122.692 5.69675 122.774 8.48472L128 7.67678ZM11.85 16.3226L17.2798 0.605739H23.6567L14.1937 23.9188H9.46293L0 0.606177H6.37685L11.85 16.3226ZM45.2167 7.27281C45.2167 9.13116 43.7356 10.424 42.0073 10.424C40.2795 10.424 38.7988 9.13116 38.7988 7.27281C38.7988 5.41401 40.2795 4.12156 42.0073 4.12156C43.7356 4.12156 45.2172 5.41401 45.2172 7.27281H45.2167ZM46.204 15.5155C44.0642 18.2622 41.8014 20.1613 37.8106 20.1614C33.7386 20.1614 30.5698 17.7371 28.1014 14.1819C27.1137 12.7271 25.5914 12.4041 24.4803 13.1718C23.452 13.8992 23.2057 15.4345 24.1514 16.7681C27.566 21.8994 32.2972 24.8887 37.8102 24.8887C42.8712 24.8887 46.8212 22.4649 49.9064 18.4243C51.0582 16.9296 51.017 15.3943 49.9064 14.5456C48.8776 13.7368 47.3553 14.0208 46.204 15.5155ZM60.3999 12.2019C60.3999 16.9699 63.1978 19.4751 66.3249 19.4751C69.2868 19.4751 72.3317 17.1314 72.3317 12.2019C72.3317 7.3529 69.2868 5.01004 66.3656 5.01004C63.1978 5.01004 60.3999 7.2321 60.3999 12.2019ZM60.3999 3.83883V0.646005H54.5992V32H60.3999V20.8481C62.3338 23.4343 64.8434 24.5259 67.6818 24.5259C72.9901 24.5259 78.1736 20.4043 78.1736 11.9196C78.1736 3.79769 72.784 0.000437673 68.1757 0.000437673C64.514 0.000437673 62.0049 1.65659 60.3999 3.83883ZM88.2551 12.2019C88.2551 16.9699 91.0524 19.4751 94.1796 19.4751C97.1415 19.4751 100.186 17.1314 100.186 12.2019C100.186 7.3529 97.1415 5.01004 94.2203 5.01004C91.0524 5.01004 88.2546 7.2321 88.2546 12.2019H88.2551ZM88.2551 3.83883V0.646005H88.2546H82.4539V32H88.2546V20.8481C90.1885 23.4343 92.6981 24.5259 95.5365 24.5259C100.844 24.5259 106.028 20.4043 106.028 11.9196C106.028 3.79769 100.639 0.000437673 96.0304 0.000437673C92.3687 0.000437673 89.8596 1.65659 88.2551 3.83883Z" fill="#ff5b24"/>
-    </svg>
-    <div class="donasjon-tekst"><strong>St&#248;tt prosjektet</strong><br>Vipps en kaffekopp eller to</div>
-  </a>
+  <h2>Versjonshistorikk</h2>
+  <p><strong>v1.1.0</strong> <span class="tag">25. mars 2026</span></p>
+  <ul>
+    <li>Ny innstilling: velg s&#248;keradius (5&#8211;100 km) for kart og liste</li>
+    <li>Fikset s&#248;kefelt som ikke reagerte p&#229; klikk</li>
+    <li>Nedlagte stasjoner filtreres bort fra Overpass-import</li>
+  </ul>
+  <p style="margin-top:1rem"><strong>v1.0.0</strong> <span class="tag">mars 2026</span></p>
+  <ul>
+    <li>F&#248;rste versjon med kart, liste og statistikk</li>
+    <li>Brukerregistrering og prisoppdatering</li>
+    <li>PWA med offline-st&#248;tte</li>
+    <li>Full tilgjengelighet (UU/a11y)</li>
+    <li>Steds&#248;k og navigering</li>
+  </ul>
 </div>
+
 </div></body></html>'''
 
 

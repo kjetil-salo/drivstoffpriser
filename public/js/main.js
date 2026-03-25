@@ -4,7 +4,7 @@ import { initMap, sentrerKart, visUserPosisjon, visStasjoner, oppdaterStasjonPri
 import { visListe, oppdaterKort } from './list.js';
 import { initSheet, visStasjonSheet, oppdaterSheetStasjon, lukkSheet, refreshSheetInnstillinger } from './station-sheet.js';
 import { initSearch } from './search.js';
-import { initInnstillinger } from './settings.js';
+import { initInnstillinger, getInnstillinger } from './settings.js';
 import { initAddStation, openAddStation } from './add-station.js';
 import { lastStatistikk } from './stats.js';
 
@@ -144,10 +144,24 @@ if (!lagretPos) {
 }
 
 // ── Innstillinger ─────────────────────────────────
-initInnstillinger(() => {
+let sisteRadius = getInnstillinger().radius;
+initInnstillinger(async (ny) => {
     if (viewListe.style.display !== 'none') visListe(stasjoner, visStasjonSheet);
     refreshKartInnstillinger();
     refreshSheetInnstillinger();
+
+    // Re-hent stasjoner ved radius-endring
+    if (sisteRadius !== null && ny.radius !== sisteRadius) {
+        const pos = hentLagretPos() || getKartSenter();
+        if (pos) {
+            try {
+                stasjoner = await hentStasjoner(pos.lat, pos.lon);
+                visStasjoner(stasjoner, visStasjonSheet);
+                if (viewListe.style.display !== 'none') visListe(stasjoner, visStasjonSheet);
+            } catch {}
+        }
+    }
+    sisteRadius = ny.radius;
 });
 
 

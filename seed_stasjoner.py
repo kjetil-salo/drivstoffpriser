@@ -62,8 +62,15 @@ def hent_alle_stasjoner_norge():
     logger.info(f'Mottok {len(elements)} elementer fra Overpass')
 
     count = 0
+    hoppet_over = 0
     for el in elements:
         tags = el.get('tags', {})
+
+        # Hopp over nedlagte stasjoner
+        if tags.get('disused') == 'yes' or tags.get('demolished') == 'yes' or tags.get('abandoned') == 'yes':
+            hoppet_over += 1
+            continue
+
         if el['type'] == 'node':
             lat, lon = el['lat'], el['lon']
         elif el['type'] == 'way' and 'center' in el:
@@ -78,6 +85,8 @@ def hent_alle_stasjoner_norge():
         lagre_stasjon(navn, kjede, lat, lon, osm_id)
         count += 1
 
+    if hoppet_over:
+        logger.info(f'Hoppet over {hoppet_over} nedlagte stasjoner')
     logger.info(f'Lagret/oppdatert {count} stasjoner')
     return count
 

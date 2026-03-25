@@ -48,7 +48,7 @@ export function initSearch(onValg) {
     });
 
     document.addEventListener('click', e => {
-        if (!searchBox.contains(e.target) && e.target !== toggleBtn) {
+        if (!searchBox.contains(e.target) && !toggleBtn.contains(e.target)) {
             lukkSearch();
         }
     });

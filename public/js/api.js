@@ -1,5 +1,8 @@
+import { getInnstillinger } from './settings.js';
+
 export async function hentStasjoner(lat, lon) {
-    const resp = await fetch(`/api/stasjoner?lat=${lat}&lon=${lon}`);
+    const { radius } = getInnstillinger();
+    const resp = await fetch(`/api/stasjoner?lat=${lat}&lon=${lon}&radius=${radius}`);
     if (!resp.ok) {
         const data = await resp.json().catch(() => ({}));
         if (data.utenfor) throw Object.assign(new Error('utenfor'), { utenfor: true });

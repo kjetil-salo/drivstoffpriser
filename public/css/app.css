@@ -133,6 +133,22 @@ html, body {
   font-size: var(--font-sm);
 }
 
+.innstilling-separator {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-color);
+}
+
+#sett-radius {
+  flex: 1;
+  background: var(--color-bg);
+  color: var(--color-text);
+  border: 1px solid var(--border-color-medium);
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  font-size: var(--font-sm);
+}
+
 #totalt-info {
   font-size: var(--font-xs);
   color: var(--color-muted);
@@ -226,6 +242,7 @@ html, body {
   top: 48px;
   left: 0; right: 0;
   bottom: 56px;
+  z-index: 0;
 }
 
 #view-kart { display: block; }

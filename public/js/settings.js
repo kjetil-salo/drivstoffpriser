@@ -1,5 +1,5 @@
 const SETTINGS_KEY = 'drivstoff_innstillinger';
-const STANDARD = { bensin: true, bensin98: true, diesel: true };
+const STANDARD = { bensin: true, bensin98: true, diesel: true, radius: 30 };
 
 export function getInnstillinger() {
     try {
@@ -14,11 +14,13 @@ export function initInnstillinger(onChange) {
     const cbBensin = document.getElementById('sett-bensin');
     const cbBensin98 = document.getElementById('sett-bensin98');
     const cbDiesel = document.getElementById('sett-diesel');
+    const radiusSelect = document.getElementById('sett-radius');
 
     const s = getInnstillinger();
     cbBensin.checked = s.bensin;
     cbBensin98.checked = s.bensin98;
     cbDiesel.checked = s.diesel;
+    radiusSelect.value = String(s.radius);
 
     btn.addEventListener('click', () => {
         panel.toggleAttribute('hidden');
@@ -39,7 +41,14 @@ export function initInnstillinger(onChange) {
             cb.checked = true;
             return;
         }
-        const ny = { bensin: cbBensin.checked, bensin98: cbBensin98.checked, diesel: cbDiesel.checked };
+        lagre();
+    }
+
+    function lagre() {
+        const ny = {
+            bensin: cbBensin.checked, bensin98: cbBensin98.checked, diesel: cbDiesel.checked,
+            radius: parseInt(radiusSelect.value, 10),
+        };
         localStorage.setItem(SETTINGS_KEY, JSON.stringify(ny));
         if (onChange) onChange(ny);
     }
@@ -47,4 +56,5 @@ export function initInnstillinger(onChange) {
     cbBensin.addEventListener('change', function () { oppdater(this); });
     cbBensin98.addEventListener('change', function () { oppdater(this); });
     cbDiesel.addEventListener('change', function () { oppdater(this); });
+    radiusSelect.addEventListener('change', lagre);
 }
