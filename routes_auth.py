@@ -11,7 +11,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from db import (antall_brukere, opprett_bruker, finn_bruker, finn_bruker_id,
                 opprett_invitasjon, hent_invitasjon, merk_invitasjon_brukt,
                 opprett_tilbakestilling, hent_tilbakestilling, merk_tilbakestilling_brukt, oppdater_passord,
-                slett_bruker)
+                slett_bruker, hent_innstilling)
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -105,23 +105,27 @@ def logg_ut():
 
 @auth_bp.route('/registrer', methods=['GET', 'POST'])
 def registrer():
+    # Admin kan stoppe registreringer via admin-panel
+    if hent_innstilling('registrering_stoppet') == '1':
+        return _auth_side('Registrering', '<p style="color:#94a3b8">Registrering er midlertidig stengt.</p><a href="/">&#8592; Tilbake</a>')
+
+    # Tilgangskode kan aktiveres via env-variabel REGISTRER_KODE
     registrer_kode = os.environ.get('REGISTRER_KODE', '')
-    if not registrer_kode:
-        return _auth_side('Registrering', '<p style="color:#94a3b8">Registrering er ikke aktivert.</p><a href="/">← Tilbake</a>')
 
     if request.method == 'POST':
         epost = request.form.get('epost', '').strip().lower()
         passord = request.form.get('passord', '').strip()
-        kode = request.form.get('kode', '').strip()
 
         if not _EPOST_RE.match(epost):
-            return _auth_side('Registrer deg', _registrer_form(), 'Ugyldig e-postadresse.')
+            return _auth_side('Registrer deg', _registrer_form(registrer_kode), 'Ugyldig e-postadresse.')
         if len(passord) < 6:
-            return _auth_side('Registrer deg', _registrer_form(), 'Passordet må være minst 6 tegn.')
-        if kode != registrer_kode:
-            return _auth_side('Registrer deg', _registrer_form(), 'Feil tilgangskode.')
+            return _auth_side('Registrer deg', _registrer_form(registrer_kode), 'Passordet må være minst 6 tegn.')
+        if registrer_kode:
+            kode = request.form.get('kode', '').strip()
+            if kode != registrer_kode:
+                return _auth_side('Registrer deg', _registrer_form(registrer_kode), 'Feil tilgangskode.')
         if finn_bruker(epost):
-            return _auth_side('Registrer deg', _registrer_form(), 'E-postadressen er allerede i bruk.')
+            return _auth_side('Registrer deg', _registrer_form(registrer_kode), 'E-postadressen er allerede i bruk.')
 
         opprett_bruker(epost, generate_password_hash(passord))
         bruker = finn_bruker(epost)
@@ -129,14 +133,15 @@ def registrer():
         session['bruker_id'] = bruker['id']
         return redirect('/')
 
-    return _auth_side('Registrer deg', _registrer_form())
+    return _auth_side('Registrer deg', _registrer_form(registrer_kode))
 
 
-def _registrer_form():
-    return '''<form method="post">
+def _registrer_form(registrer_kode=''):
+    kode_felt = '<label>Tilgangskode</label><input name="kode" type="text" autocomplete="off">' if registrer_kode else ''
+    return f'''<form method="post">
 <label>E-post</label><input name="epost" type="email" autofocus autocomplete="email">
 <label>Passord</label><input name="passord" type="password" autocomplete="new-password">
-<label>Tilgangskode</label><input name="kode" type="text" autocomplete="off">
+{kode_felt}
 <button>Registrer deg</button></form>
 <a href="/auth/logg-inn">Har du konto? Logg inn</a>'''
 

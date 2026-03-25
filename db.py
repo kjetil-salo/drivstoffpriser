@@ -65,6 +65,10 @@ def init_db():
                 utloper   TEXT NOT NULL,
                 brukt     INTEGER NOT NULL DEFAULT 0
             );
+            CREATE TABLE IF NOT EXISTS innstillinger (
+                noekkel  TEXT PRIMARY KEY,
+                verdi    TEXT NOT NULL
+            );
         ''')
 
 
@@ -81,6 +85,20 @@ def _migrer_db():
             conn.execute("ALTER TABLE stasjoner ADD COLUMN lagt_til_av INTEGER REFERENCES brukere(id)")
         if 'godkjent' not in stasjon_kolonner:
             conn.execute("ALTER TABLE stasjoner ADD COLUMN godkjent INTEGER DEFAULT 1")
+
+
+def hent_innstilling(noekkel, standard=None):
+    with get_conn() as conn:
+        row = conn.execute('SELECT verdi FROM innstillinger WHERE noekkel = ?', (noekkel,)).fetchone()
+        return row[0] if row else standard
+
+
+def sett_innstilling(noekkel, verdi):
+    with get_conn() as conn:
+        conn.execute(
+            'INSERT INTO innstillinger (noekkel, verdi) VALUES (?, ?) ON CONFLICT(noekkel) DO UPDATE SET verdi=excluded.verdi',
+            (noekkel, str(verdi))
+        )
 
 
 def _haversine(lat1, lon1, lat2, lon2):

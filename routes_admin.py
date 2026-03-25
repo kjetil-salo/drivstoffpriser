@@ -14,7 +14,8 @@ from db import (finn_bruker_id, hent_alle_brukere, slett_bruker,
                 opprett_invitasjon, hent_siste_prisoppdateringer,
                 stasjoner_med_pris_koordinater, get_statistikk,
                 antall_stasjoner_med_pris, antall_brukere,
-                hent_brukerstasjoner, slett_stasjon)
+                hent_brukerstasjoner, slett_stasjon,
+                hent_innstilling, sett_innstilling)
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -46,6 +47,11 @@ def krever_admin(f):
 def admin():
     brukere_antall = antall_brukere()
     stasjoner_antall = antall_stasjoner_med_pris()
+    reg_stoppet = hent_innstilling('registrering_stoppet') == '1'
+    reg_status = 'STOPPET' if reg_stoppet else 'Åpen'
+    reg_farge = '#ef4444' if reg_stoppet else '#22c55e'
+    reg_knapp = 'Stopp registrering' if not reg_stoppet else 'Åpne registrering'
+    reg_verdi = '0' if reg_stoppet else '1'
     return f'''<!DOCTYPE html><html lang="no"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Admin – Drivstoffpriser</title>
@@ -63,32 +69,55 @@ def admin():
   .tile-ikon{{font-size:1.8rem;margin-bottom:0.75rem}}
   .tile-tittel{{font-size:0.95rem;font-weight:600;margin-bottom:0.3rem}}
   .tile-info{{font-size:0.78rem;color:#94a3b8}}
+  .admin-panel{{background:#111827;border:1px solid #1f2937;border-radius:12px;padding:1.25rem;margin-bottom:1.5rem}}
+  .admin-panel h2{{font-size:0.95rem;margin-bottom:0.75rem;color:#f1f5f9}}
+  .admin-rad{{display:flex;align-items:center;justify-content:space-between;gap:1rem}}
+  .admin-status{{font-size:0.85rem;font-weight:600}}
+  .admin-btn{{background:#1f2937;border:1px solid #374151;border-radius:6px;color:#e5e7eb;
+              font-size:0.82rem;padding:8px 14px;cursor:pointer;transition:background 0.15s}}
+  .admin-btn:hover{{background:#374151}}
+  .admin-btn.fare{{border-color:#ef4444;color:#ef4444}}
+  .admin-btn.fare:hover{{background:rgba(239,68,68,0.15)}}
+  .admin-btn.ok{{border-color:#22c55e;color:#22c55e}}
+  .admin-btn.ok:hover{{background:rgba(34,197,94,0.15)}}
 </style></head><body><div class="container">
-<nav><a href="/">← Appen</a></nav>
+<nav><a href="/">&#8592; Appen</a></nav>
 <h1>Admin</h1>
+
+<div class="admin-panel">
+  <h2>Registrering</h2>
+  <div class="admin-rad">
+    <span class="admin-status" style="color:{reg_farge}">&#9679; {reg_status}</span>
+    <form method="post" action="/admin/toggle-registrering" style="margin:0">
+      <input type="hidden" name="verdi" value="{reg_verdi}">
+      <button class="admin-btn {'ok' if reg_stoppet else 'fare'}">{reg_knapp}</button>
+    </form>
+  </div>
+</div>
+
 <div class="tiles">
   <a href="/admin/brukere" class="tile">
-    <div class="tile-ikon">👥</div>
+    <div class="tile-ikon">&#128101;</div>
     <div class="tile-tittel">Brukere</div>
     <div class="tile-info">{brukere_antall} registrerte</div>
   </a>
   <a href="/admin/steder" class="tile">
-    <div class="tile-ikon">📍</div>
+    <div class="tile-ikon">&#128205;</div>
     <div class="tile-tittel">Steder</div>
     <div class="tile-info">Bruker-opprettede stasjoner</div>
   </a>
   <a href="/admin/oversikt" class="tile">
-    <div class="tile-ikon">📊</div>
+    <div class="tile-ikon">&#128202;</div>
     <div class="tile-tittel">Statistikk</div>
     <div class="tile-info">Visninger og trender</div>
   </a>
   <a href="/admin/prislogg" class="tile">
-    <div class="tile-ikon">💰</div>
+    <div class="tile-ikon">&#128176;</div>
     <div class="tile-tittel">Prislogg</div>
     <div class="tile-info">Siste prisoppdateringer</div>
   </a>
   <a href="/admin/kart" class="tile">
-    <div class="tile-ikon">🗺️</div>
+    <div class="tile-ikon">&#128506;&#65039;</div>
     <div class="tile-tittel">Kart</div>
     <div class="tile-info">{stasjoner_antall} stasjoner med pris</div>
   </a>
@@ -269,6 +298,15 @@ def prislogg():
   </table>
 </div>
 </div></body></html>'''
+
+
+@admin_bp.route('/admin/toggle-registrering', methods=['POST'])
+@krever_innlogging
+@krever_admin
+def toggle_registrering():
+    verdi = request.form.get('verdi', '0')
+    sett_innstilling('registrering_stoppet', '1' if verdi == '1' else '0')
+    return redirect('/admin')
 
 
 @admin_bp.route('/admin/invitasjon', methods=['POST'])

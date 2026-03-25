@@ -80,43 +80,45 @@ class TestRegistrering:
 
     def test_vellykket_registrering(self, client):
         resp = client.post('/registrer', data={
-            'epost': 'ny@bruker.no', 'passord': 'passord123', 'kode': 'testkode',
+            'epost': 'ny@bruker.no', 'passord': 'passord123',
         }, follow_redirects=False)
         assert resp.status_code == 302
         assert db_mod.finn_bruker('ny@bruker.no') is not None
 
-    def test_feil_tilgangskode(self, client):
+    def test_feil_tilgangskode(self, app):
+        import os
+        os.environ['REGISTRER_KODE'] = 'hemmelig'
+        client = app.test_client()
         resp = client.post('/registrer', data={
             'epost': 'ny@bruker.no', 'passord': 'passord123', 'kode': 'feilkode',
         })
         assert 'Feil tilgangskode' in resp.data.decode()
+        os.environ['REGISTRER_KODE'] = ''
 
     def test_ugyldig_epost(self, client):
         resp = client.post('/registrer', data={
-            'epost': 'ugyldig', 'passord': 'passord123', 'kode': 'testkode',
+            'epost': 'ugyldig', 'passord': 'passord123',
         })
         assert 'Ugyldig e-postadresse' in resp.data.decode()
 
     def test_for_kort_passord(self, client):
         resp = client.post('/registrer', data={
-            'epost': 'ny@bruker.no', 'passord': '123', 'kode': 'testkode',
+            'epost': 'ny@bruker.no', 'passord': '123',
         })
         assert 'minst 6 tegn' in resp.data.decode()
 
     def test_duplikat_epost(self, client):
         db_mod.opprett_bruker('dup@t.no', generate_password_hash('x'))
         resp = client.post('/registrer', data={
-            'epost': 'dup@t.no', 'passord': 'passord123', 'kode': 'testkode',
+            'epost': 'dup@t.no', 'passord': 'passord123',
         })
         assert 'allerede i bruk' in resp.data.decode()
 
-    def test_deaktivert_registrering(self, app):
-        import os
-        os.environ['REGISTRER_KODE'] = ''
-        client = app.test_client()
+    def test_stoppet_registrering(self, client):
+        db_mod.sett_innstilling('registrering_stoppet', '1')
         resp = client.get('/registrer')
-        assert 'ikke aktivert' in resp.data.decode()
-        os.environ['REGISTRER_KODE'] = 'testkode'  # Restore
+        assert 'midlertidig stengt' in resp.data.decode()
+        db_mod.sett_innstilling('registrering_stoppet', '0')
 
 
 # ── Invitasjoner ───────────────────────────────────
