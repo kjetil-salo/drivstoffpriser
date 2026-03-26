@@ -29,6 +29,17 @@ export async function opprettStasjon(navn, kjede, lat, lon) {
     return data;
 }
 
+export async function meldNedlagt(stasjonId) {
+    const resp = await fetch('/api/rapporter-nedlagt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stasjon_id: stasjonId }),
+    });
+    if (resp.status === 401) return { status: 401 };
+    if (!resp.ok) throw new Error('Feil ved rapportering');
+    return resp.json();
+}
+
 export async function oppdaterPris(stasjonId, bensin, diesel, bensin98) {
     const resp = await fetch('/api/pris', {
         method: 'POST',

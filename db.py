@@ -69,6 +69,14 @@ def init_db():
                 noekkel  TEXT PRIMARY KEY,
                 verdi    TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS rapporter (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                stasjon_id INTEGER NOT NULL,
+                bruker_id  INTEGER NOT NULL,
+                tidspunkt  TEXT DEFAULT (datetime('now')),
+                FOREIGN KEY (stasjon_id) REFERENCES stasjoner(id),
+                FOREIGN KEY (bruker_id) REFERENCES brukere(id)
+            );
         ''')
 
 
@@ -85,6 +93,18 @@ def _migrer_db():
             conn.execute("ALTER TABLE stasjoner ADD COLUMN lagt_til_av INTEGER REFERENCES brukere(id)")
         if 'godkjent' not in stasjon_kolonner:
             conn.execute("ALTER TABLE stasjoner ADD COLUMN godkjent INTEGER DEFAULT 1")
+
+        # Rapporter-tabell (migrering)
+        tabeller = [r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
+        if 'rapporter' not in tabeller:
+            conn.execute('''CREATE TABLE rapporter (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                stasjon_id INTEGER NOT NULL,
+                bruker_id  INTEGER NOT NULL,
+                tidspunkt  TEXT DEFAULT (datetime('now')),
+                FOREIGN KEY (stasjon_id) REFERENCES stasjoner(id),
+                FOREIGN KEY (bruker_id) REFERENCES brukere(id)
+            )''')
 
 
 def hent_innstilling(noekkel, standard=None):
@@ -170,14 +190,14 @@ def get_statistikk() -> dict:
 
         besok_per_time = conn.execute(
             "SELECT strftime('%Y-%m-%d %H:00:00', ts) as time, COUNT(*) as cnt "
-            "FROM visninger WHERE ts >= datetime('now', '-10 hours') "
+            "FROM visninger WHERE ts >= datetime('now', '-24 hours') "
             "GROUP BY time ORDER BY time"
         ).fetchall()
 
     from datetime import datetime, timedelta, timezone
     now = datetime.now(timezone.utc)
     timer_map = {}
-    for i in range(10, -1, -1):
+    for i in range(24, -1, -1):
         t = (now - timedelta(hours=i)).strftime('%Y-%m-%d %H:00:00')
         timer_map[t] = 0
     for row in besok_per_time:
@@ -202,7 +222,8 @@ def hent_billigste_priser_24t() -> list:
                       s.navn, s.kjede
                FROM priser p
                JOIN stasjoner s ON s.id = p.stasjon_id
-               WHERE p.tidspunkt > datetime('now', '-24 hours')
+               WHERE s.godkjent != 0
+                 AND p.tidspunkt > datetime('now', '-24 hours')
                  AND p.id IN (SELECT MAX(p2.id) FROM priser p2
                               WHERE p2.tidspunkt > datetime('now', '-24 hours')
                               GROUP BY p2.stasjon_id)
@@ -214,6 +235,46 @@ def hent_billigste_priser_24t() -> list:
             d = dict(r)
             resultater.append(d)
         return resultater
+
+
+def nye_brukere_per_time_48t() -> list:
+    """Antall nye brukere per time siste 48 timer."""
+    from datetime import timedelta, timezone
+    now = datetime.now(timezone.utc)
+    timer_map = {}
+    for i in range(48, -1, -1):
+        t = (now - timedelta(hours=i)).strftime('%Y-%m-%d %H:00:00')
+        timer_map[t] = 0
+    with get_conn() as conn:
+        conn.row_factory = sqlite3.Row
+        for row in conn.execute(
+            "SELECT strftime('%Y-%m-%d %H:00:00', opprettet) as time, COUNT(*) as cnt "
+            "FROM brukere WHERE opprettet >= datetime('now', '-48 hours') "
+            "GROUP BY time ORDER BY time"
+        ).fetchall():
+            if row['time'] in timer_map:
+                timer_map[row['time']] = row['cnt']
+    return list(timer_map.items())
+
+
+def prisoppdateringer_per_time_48t() -> list:
+    """Antall prisoppdateringer per time siste 48 timer."""
+    from datetime import timedelta, timezone
+    now = datetime.now(timezone.utc)
+    timer_map = {}
+    for i in range(48, -1, -1):
+        t = (now - timedelta(hours=i)).strftime('%Y-%m-%d %H:00:00')
+        timer_map[t] = 0
+    with get_conn() as conn:
+        conn.row_factory = sqlite3.Row
+        for row in conn.execute(
+            "SELECT strftime('%Y-%m-%d %H:00:00', tidspunkt) as time, COUNT(*) as cnt "
+            "FROM priser WHERE tidspunkt >= datetime('now', '-48 hours') "
+            "GROUP BY time ORDER BY time"
+        ).fetchall():
+            if row['time'] in timer_map:
+                timer_map[row['time']] = row['cnt']
+    return list(timer_map.items())
 
 
 def antall_prisoppdateringer_24t() -> int:
@@ -354,7 +415,7 @@ def finn_naer_stasjon(lat, lon, maks_avstand_m=50):
         delta = 0.005
         rows = conn.execute(
             '''SELECT id, navn, lat, lon FROM stasjoner
-               WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ?''',
+               WHERE godkjent != 0 AND lat BETWEEN ? AND ? AND lon BETWEEN ? AND ?''',
             (lat - delta, lat + delta, lon - delta, lon + delta)
         ).fetchall()
     for row in rows:
@@ -397,6 +458,84 @@ def slett_stasjon(stasjon_id: int):
         conn.execute("DELETE FROM stasjoner WHERE id = ? AND lagt_til_av IS NOT NULL", (stasjon_id,))
 
 
+def deaktiver_stasjon(stasjon_id: int):
+    with get_conn() as conn:
+        conn.execute("UPDATE stasjoner SET godkjent = 0 WHERE id = ?", (stasjon_id,))
+
+
+def reaktiver_stasjon(stasjon_id: int):
+    with get_conn() as conn:
+        conn.execute("UPDATE stasjoner SET godkjent = 1 WHERE id = ?", (stasjon_id,))
+
+
+def hent_deaktiverte_stasjoner() -> list:
+    with get_conn() as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            '''SELECT s.id, s.navn, s.kjede, s.lat, s.lon, s.sist_oppdatert
+               FROM stasjoner s
+               WHERE s.godkjent = 0
+               ORDER BY s.sist_oppdatert DESC'''
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def meld_stasjon_nedlagt(stasjon_id: int, bruker_id: int):
+    with get_conn() as conn:
+        conn.execute(
+            'INSERT INTO rapporter (stasjon_id, bruker_id) VALUES (?, ?)',
+            (stasjon_id, bruker_id)
+        )
+
+
+def hent_rapporter() -> list:
+    with get_conn() as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            '''SELECT r.id, r.stasjon_id, r.tidspunkt,
+                      s.navn, s.kjede, s.lat, s.lon, s.godkjent,
+                      b.brukernavn,
+                      (SELECT COUNT(*) FROM rapporter r2 WHERE r2.stasjon_id = r.stasjon_id) as antall
+               FROM rapporter r
+               JOIN stasjoner s ON s.id = r.stasjon_id
+               LEFT JOIN brukere b ON b.id = r.bruker_id
+               WHERE s.godkjent != 0
+               GROUP BY r.stasjon_id
+               ORDER BY antall DESC, r.tidspunkt DESC'''
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def hent_rapportorer_epost(stasjon_id: int) -> tuple[str, list[str]]:
+    """Hent stasjonsnavn og unike e-poster for brukere som rapporterte stasjonen."""
+    with get_conn() as conn:
+        conn.row_factory = sqlite3.Row
+        navn = conn.execute(
+            "SELECT navn FROM stasjoner WHERE id = ?", (stasjon_id,)
+        ).fetchone()
+        stasjonsnavn = dict(navn)['navn'] if navn else 'Ukjent stasjon'
+        rows = conn.execute(
+            '''SELECT DISTINCT b.brukernavn
+               FROM rapporter r JOIN brukere b ON b.id = r.bruker_id
+               WHERE r.stasjon_id = ?''',
+            (stasjon_id,)
+        ).fetchall()
+        return stasjonsnavn, [dict(r)['brukernavn'] for r in rows]
+
+
+def slett_rapporter_for_stasjon(stasjon_id: int):
+    with get_conn() as conn:
+        conn.execute("DELETE FROM rapporter WHERE stasjon_id = ?", (stasjon_id,))
+
+
+def antall_ubehandlede_rapporter() -> int:
+    with get_conn() as conn:
+        return conn.execute(
+            '''SELECT COUNT(DISTINCT r.stasjon_id) FROM rapporter r
+               JOIN stasjoner s ON s.id = r.stasjon_id WHERE s.godkjent != 0'''
+        ).fetchone()[0]
+
+
 def get_stasjoner_med_priser(user_lat, user_lon, radius_m=30000, limit=30):
     # Bounding box for å filtrere i SQL først (1 grad ≈ 111 km)
     delta_lat = radius_m / 111_000
@@ -413,7 +552,8 @@ def get_stasjoner_med_priser(user_lat, user_lon, radius_m=30000, limit=30):
                    FROM priser
                    WHERE id IN (SELECT MAX(id) FROM priser GROUP BY stasjon_id)
                ) p ON p.stasjon_id = s.id
-               WHERE s.lat BETWEEN ? AND ? AND s.lon BETWEEN ? AND ?''',
+               WHERE s.godkjent != 0
+                 AND s.lat BETWEEN ? AND ? AND s.lon BETWEEN ? AND ?''',
             (user_lat - delta_lat, user_lat + delta_lat,
              user_lon - delta_lon, user_lon + delta_lon)
         ).fetchall()

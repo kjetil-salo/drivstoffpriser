@@ -15,9 +15,37 @@ from db import (finn_bruker_id, hent_alle_brukere, slett_bruker,
                 stasjoner_med_pris_koordinater, get_statistikk,
                 antall_stasjoner_med_pris, antall_brukere,
                 hent_brukerstasjoner, slett_stasjon,
-                hent_innstilling, sett_innstilling)
+                hent_innstilling, sett_innstilling,
+                nye_brukere_per_time_48t, prisoppdateringer_per_time_48t,
+                hent_rapporter, antall_ubehandlede_rapporter,
+                deaktiver_stasjon, reaktiver_stasjon,
+                slett_rapporter_for_stasjon, hent_deaktiverte_stasjoner,
+                hent_rapportorer_epost)
 
 admin_bp = Blueprint('admin', __name__)
+
+
+def _send_takk_for_rapport(eposter: list[str], stasjonsnavn: str):
+    """Send takke-e-post til brukere som rapporterte en nedlagt stasjon."""
+    if not eposter:
+        return
+    import resend
+    import logging
+    for epost in eposter:
+        try:
+            resend.Emails.send({
+                'from': 'Drivstoffpriser <noreply@ksalo.no>',
+                'to': epost,
+                'subject': 'Takk for rapporten!',
+                'html': f'<p>Hei!</p>'
+                        f'<p>Takk for at du meldte inn at <strong>{stasjonsnavn}</strong> er nedlagt. '
+                        f'Vi har nå fjernet stasjonen fra kartet.</p>'
+                        f'<p>Slike tilbakemeldinger hjelper oss med å holde dataene oppdaterte for alle brukere. '
+                        f'Vi setter stor pris på bidraget ditt!</p>'
+                        f'<p>Mvh,<br>Drivstoffpriser</p>',
+            })
+        except Exception as e:
+            logging.getLogger('drivstoff').error(f'Takke-epost til {epost} feilet: {e}')
 
 
 def krever_innlogging(f):
@@ -47,6 +75,8 @@ def krever_admin(f):
 def admin():
     brukere_antall = antall_brukere()
     stasjoner_antall = antall_stasjoner_med_pris()
+    rapporter_antall = antall_ubehandlede_rapporter()
+    deaktiverte_antall = len(hent_deaktiverte_stasjoner())
     reg_stoppet = hent_innstilling('registrering_stoppet') == '1'
     reg_status = 'STOPPET' if reg_stoppet else 'Åpen'
     reg_farge = '#ef4444' if reg_stoppet else '#22c55e'
@@ -120,6 +150,16 @@ def admin():
     <div class="tile-ikon">&#128506;&#65039;</div>
     <div class="tile-tittel">Kart</div>
     <div class="tile-info">{stasjoner_antall} stasjoner med pris</div>
+  </a>
+  <a href="/admin/rapporter" class="tile" {('style="border-color:#f59e0b"' if rapporter_antall else '')}>
+    <div class="tile-ikon">&#9888;&#65039;</div>
+    <div class="tile-tittel">Rapporter</div>
+    <div class="tile-info">{rapporter_antall} ubehandlede</div>
+  </a>
+  <a href="/admin/deaktiverte" class="tile">
+    <div class="tile-ikon">&#128683;</div>
+    <div class="tile-tittel">Deaktiverte</div>
+    <div class="tile-info">{deaktiverte_antall} stasjoner</div>
   </a>
 </div>
 </div></body></html>'''
@@ -340,6 +380,143 @@ def admin_slett_stasjon():
     return redirect('/admin/steder')
 
 
+@admin_bp.route('/admin/rapporter')
+@krever_innlogging
+@krever_admin
+def admin_rapporter():
+    rapporter = hent_rapporter()
+    rader = []
+    for r in rapporter:
+        navn = r['navn'] + (f' ({r["kjede"]})' if r['kjede'] else '')
+        kart_url = f'https://www.google.com/maps?q={r["lat"]},{r["lon"]}'
+        dato = r['tidspunkt'][:10] if r['tidspunkt'] else '–'
+        rader.append(
+            f'<tr>'
+            f'<td><a href="{kart_url}" target="_blank" style="color:#93c5fd;text-decoration:none">{navn}</a></td>'
+            f'<td style="text-align:center;color:#f59e0b;font-weight:600">{r["antall"]}</td>'
+            f'<td style="color:#94a3b8;font-size:0.78rem">{r["brukernavn"] or "–"}</td>'
+            f'<td style="color:#94a3b8;font-size:0.78rem">{dato}</td>'
+            f'<td style="white-space:nowrap">'
+            f'<form method="post" action="/admin/deaktiver-stasjon" style="display:inline;margin:0"'
+            f' onsubmit="return confirm(\'Deaktivere {r["navn"]}? Stasjonen skjules fra brukere.\')">'
+            f'<input type="hidden" name="stasjon_id" value="{r["stasjon_id"]}">'
+            f'<button style="background:transparent;border:1px solid #ef4444;color:#ef4444;'
+            f'font-size:0.75rem;padding:3px 8px;border-radius:4px;cursor:pointer;margin-right:4px">'
+            f'Deaktiver</button></form>'
+            f'<form method="post" action="/admin/avvis-rapport" style="display:inline;margin:0">'
+            f'<input type="hidden" name="stasjon_id" value="{r["stasjon_id"]}">'
+            f'<button style="background:transparent;border:1px solid #94a3b8;color:#94a3b8;'
+            f'font-size:0.75rem;padding:3px 8px;border-radius:4px;cursor:pointer">'
+            f'Avvis</button></form>'
+            f'</td></tr>'
+        )
+    rader_html = ''.join(rader) or '<tr><td colspan="5" style="color:#94a3b8">Ingen rapporter</td></tr>'
+    return f'''<!DOCTYPE html><html lang="no"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rapporter – Admin</title>
+<style>
+  *{{box-sizing:border-box;margin:0;padding:0}}
+  body{{font-family:system-ui,sans-serif;background:#0f172a;color:#e5e7eb;padding:2rem 1rem}}
+  .container{{max-width:800px;margin:0 auto}}
+  h1{{font-size:1.3rem;margin-bottom:0.5rem;color:#f1f5f9}}
+  p.info{{font-size:0.85rem;color:#94a3b8;margin-bottom:1.5rem}}
+  .kort{{background:#111827;border:1px solid #1f2937;border-radius:10px;padding:1.5rem;margin-bottom:1.5rem;overflow-x:auto}}
+  table{{width:100%;border-collapse:collapse;font-size:0.88rem}}
+  td,th{{padding:8px 10px;border-bottom:1px solid #1f2937;text-align:left}}
+  th{{color:#94a3b8;font-weight:500}}
+  nav{{margin-bottom:1.5rem;font-size:0.85rem}}
+  nav a{{color:#94a3b8}}
+</style></head><body><div class="container">
+<nav><a href="/admin">← Admin</a></nav>
+<h1>Meldte stasjoner</h1>
+<p class="info">Stasjoner som brukere har meldt som nedlagt. Klikk stasjonsnavnet for å sjekke i Google Maps.</p>
+<div class="kort">
+  <table><tr><th>Stasjon</th><th style="text-align:center">Antall</th><th>Sist meldt av</th><th>Dato</th><th></th></tr>{rader_html}</table>
+</div>
+</div></body></html>'''
+
+
+@admin_bp.route('/admin/deaktiverte')
+@krever_innlogging
+@krever_admin
+def admin_deaktiverte():
+    stasjoner = hent_deaktiverte_stasjoner()
+    rader = []
+    for s in stasjoner:
+        navn = s['navn'] + (f' ({s["kjede"]})' if s['kjede'] else '')
+        kart_url = f'https://www.google.com/maps?q={s["lat"]},{s["lon"]}'
+        dato = s['sist_oppdatert'][:10] if s['sist_oppdatert'] else '–'
+        rader.append(
+            f'<tr>'
+            f'<td><a href="{kart_url}" target="_blank" style="color:#93c5fd;text-decoration:none">{navn}</a></td>'
+            f'<td style="color:#94a3b8;font-size:0.78rem">{dato}</td>'
+            f'<td><form method="post" action="/admin/reaktiver-stasjon" style="margin:0"'
+            f' onsubmit="return confirm(\'Reaktivere {s["navn"]}?\')">'
+            f'<input type="hidden" name="stasjon_id" value="{s["id"]}">'
+            f'<button style="background:transparent;border:1px solid #22c55e;color:#22c55e;'
+            f'font-size:0.75rem;padding:3px 8px;border-radius:4px;cursor:pointer">'
+            f'Reaktiver</button></form></td>'
+            f'</tr>'
+        )
+    rader_html = ''.join(rader) or '<tr><td colspan="3" style="color:#94a3b8">Ingen deaktiverte stasjoner</td></tr>'
+    return f'''<!DOCTYPE html><html lang="no"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Deaktiverte – Admin</title>
+<style>
+  *{{box-sizing:border-box;margin:0;padding:0}}
+  body{{font-family:system-ui,sans-serif;background:#0f172a;color:#e5e7eb;padding:2rem 1rem}}
+  .container{{max-width:640px;margin:0 auto}}
+  h1{{font-size:1.3rem;margin-bottom:0.5rem;color:#f1f5f9}}
+  p.info{{font-size:0.85rem;color:#94a3b8;margin-bottom:1.5rem}}
+  .kort{{background:#111827;border:1px solid #1f2937;border-radius:10px;padding:1.5rem;margin-bottom:1.5rem}}
+  table{{width:100%;border-collapse:collapse;font-size:0.88rem}}
+  td,th{{padding:8px 10px;border-bottom:1px solid #1f2937;text-align:left}}
+  th{{color:#94a3b8;font-weight:500}}
+  nav{{margin-bottom:1.5rem;font-size:0.85rem}}
+  nav a{{color:#94a3b8}}
+</style></head><body><div class="container">
+<nav><a href="/admin">← Admin</a></nav>
+<h1>Deaktiverte stasjoner</h1>
+<p class="info">Disse stasjonene er skjult for brukere. Reaktiver hvis de likevel er i drift.</p>
+<div class="kort">
+  <table><tr><th>Stasjon</th><th>Deaktivert</th><th></th></tr>{rader_html}</table>
+</div>
+</div></body></html>'''
+
+
+@admin_bp.route('/admin/deaktiver-stasjon', methods=['POST'])
+@krever_innlogging
+@krever_admin
+def admin_deaktiver_stasjon():
+    stasjon_id = request.form.get('stasjon_id', type=int)
+    if stasjon_id:
+        stasjonsnavn, eposter = hent_rapportorer_epost(stasjon_id)
+        deaktiver_stasjon(stasjon_id)
+        slett_rapporter_for_stasjon(stasjon_id)
+        _send_takk_for_rapport(eposter, stasjonsnavn)
+    return redirect('/admin/rapporter')
+
+
+@admin_bp.route('/admin/reaktiver-stasjon', methods=['POST'])
+@krever_innlogging
+@krever_admin
+def admin_reaktiver_stasjon():
+    stasjon_id = request.form.get('stasjon_id', type=int)
+    if stasjon_id:
+        reaktiver_stasjon(stasjon_id)
+    return redirect('/admin/deaktiverte')
+
+
+@admin_bp.route('/admin/avvis-rapport', methods=['POST'])
+@krever_innlogging
+@krever_admin
+def admin_avvis_rapport():
+    stasjon_id = request.form.get('stasjon_id', type=int)
+    if stasjon_id:
+        slett_rapporter_for_stasjon(stasjon_id)
+    return redirect('/admin/rapporter')
+
+
 @admin_bp.route('/admin/oversikt')
 @krever_innlogging
 @krever_admin
@@ -356,6 +533,22 @@ def oversikt():
         lokal = datetime.fromisoformat(ts).replace(tzinfo=timezone.utc).astimezone(_oslo)
         time_labels.append(lokal.strftime('%H:%M'))
         time_values.append(cnt)
+    # Nye brukere per time siste 48t
+    bruker_48t = nye_brukere_per_time_48t()
+    bruker_48_labels = []
+    bruker_48_values = []
+    for ts, cnt in bruker_48t:
+        lokal = datetime.fromisoformat(ts).replace(tzinfo=timezone.utc).astimezone(_oslo)
+        bruker_48_labels.append(lokal.strftime('%d.%m %H:00'))
+        bruker_48_values.append(cnt)
+    # Prisoppdateringer per time siste 48t
+    pris_48t = prisoppdateringer_per_time_48t()
+    pris_48_labels = []
+    pris_48_values = []
+    for ts, cnt in pris_48t:
+        lokal = datetime.fromisoformat(ts).replace(tzinfo=timezone.utc).astimezone(_oslo)
+        pris_48_labels.append(lokal.strftime('%d.%m %H:00'))
+        pris_48_values.append(cnt)
     return f'''<!DOCTYPE html>
 <html lang="no">
 <head>
@@ -399,8 +592,16 @@ def oversikt():
     <canvas id="graf" style="width:100%;max-height:240px"></canvas>
   </div>
   <div class="seksjon">
-    <h2>Besøk siste 10 timer</h2>
+    <h2>Besøk siste 24 timer</h2>
     <canvas id="timegraf" style="width:100%;max-height:200px"></canvas>
+  </div>
+  <div class="seksjon">
+    <h2>Nye brukere per time – siste 48 timer</h2>
+    <canvas id="brukergraf48" style="width:100%;max-height:220px"></canvas>
+  </div>
+  <div class="seksjon">
+    <h2>Prisoppdateringer per time – siste 48 timer</h2>
+    <canvas id="prisgraf48" style="width:100%;max-height:220px"></canvas>
   </div>
 </div>
 <script>
@@ -438,6 +639,40 @@ new Chart(document.getElementById('timegraf'), {{
     }}
   }}
 }});
+new Chart(document.getElementById('brukergraf48'), {{
+  type: 'bar',
+  data: {{
+    labels: {bruker_48_labels},
+    datasets: [{{ label: 'Nye brukere', data: {bruker_48_values},
+      backgroundColor: 'rgba(168,85,247,0.6)',
+      borderColor: 'rgba(168,85,247,1)', borderWidth: 1 }}]
+  }},
+  options: {{
+    responsive: true,
+    plugins: {{ legend: {{ display: false }} }},
+    scales: {{
+      x: {{ ticks: {{ maxRotation: 60, color: '#94a3b8', font: {{ size: 9 }}, autoSkip: true, maxTicksLimit: 16 }}, grid: {{ color: '#1f2937' }} }},
+      y: {{ beginAtZero: true, ticks: {{ stepSize: 1, color: '#94a3b8' }}, grid: {{ color: '#1f2937' }} }}
+    }}
+  }}
+}});
+new Chart(document.getElementById('prisgraf48'), {{
+  type: 'bar',
+  data: {{
+    labels: {pris_48_labels},
+    datasets: [{{ label: 'Prisoppdateringer', data: {pris_48_values},
+      backgroundColor: 'rgba(251,146,60,0.6)',
+      borderColor: 'rgba(251,146,60,1)', borderWidth: 1 }}]
+  }},
+  options: {{
+    responsive: true,
+    plugins: {{ legend: {{ display: false }} }},
+    scales: {{
+      x: {{ ticks: {{ maxRotation: 60, color: '#94a3b8', font: {{ size: 9 }}, autoSkip: true, maxTicksLimit: 16 }}, grid: {{ color: '#1f2937' }} }},
+      y: {{ beginAtZero: true, ticks: {{ stepSize: 1, color: '#94a3b8' }}, grid: {{ color: '#1f2937' }} }}
+    }}
+  }}
+}});
 </script>
 </body>
 </html>'''
@@ -469,7 +704,7 @@ def admin_kart():
 <nav><a href="/admin">← Admin</a></nav>
 <h1>Registrerte priser i Norge</h1>
 <div class="info">{len(stasjoner)} stasjoner med pris</div>
-<div class="legend"><span><span class="dot" style="background:#22c55e"></span>&lt; 8 timer</span><span><span class="dot" style="background:#f59e0b"></span>8–24 timer</span><span><span class="dot" style="background:#ef4444"></span>&gt; 24 timer</span><span><span class="dot" style="background:#6b7280"></span>Ukjent</span></div>
+<div class="legend"><span><span class="dot" style="background:#22c55e"></span>&lt; 8 timer</span><span><span class="dot" style="background:#f59e0b"></span>8–48 timer</span><span><span class="dot" style="background:#3b82f6"></span>2–7 dager</span><span><span class="dot" style="background:#6b7280"></span>&gt; 7 dager</span></div>
 <div id="map"></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
@@ -482,8 +717,9 @@ function prisFarge(tidspunkt) {{
   if (!tidspunkt) return '#6b7280';
   const timer = (Date.now() - new Date(tidspunkt.replace(' ', 'T')).getTime()) / 3600000;
   if (timer < 8) return '#22c55e';
-  if (timer < 24) return '#f59e0b';
-  return '#ef4444';
+  if (timer < 48) return '#f59e0b';
+  if (timer < 168) return '#3b82f6';
+  return '#6b7280';
 }}
 stasjoner.forEach(s => {{
   const priser = [

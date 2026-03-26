@@ -960,6 +960,24 @@ html, body {
 }
 .btn-kart:active { background: rgba(59,130,246,0.3); }
 
+.btn-nedlagt {
+  display: block;
+  width: 100%;
+  margin-top: var(--space-md);
+  padding: 8px;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--color-muted);
+  font-size: var(--font-xs);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.btn-nedlagt:hover, .btn-nedlagt:focus-visible {
+  color: #ef4444;
+  border-color: #ef4444;
+}
+
 .sheet-edit-tittel {
   font-size: var(--font-base);
   font-weight: 600;

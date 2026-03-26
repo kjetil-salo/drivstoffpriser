@@ -13,7 +13,7 @@ from flask import Blueprint, request, jsonify, make_response, session
 from db import (get_stasjoner_med_priser, lagre_pris, logg_visning,
                 antall_stasjoner_med_pris, finn_bruker_id, DB_PATH,
                 opprett_stasjon, hent_billigste_priser_24t,
-                antall_prisoppdateringer_24t)
+                antall_prisoppdateringer_24t, meld_stasjon_nedlagt)
 
 logger = logging.getLogger('drivstoff')
 
@@ -241,6 +241,23 @@ def ny_stasjon():
         'ok': True,
         'stasjon': {'id': stasjon_id, 'navn': navn, 'kjede': kjede, 'lat': lat, 'lon': lon}
     })
+
+
+@api_bp.route('/api/rapporter-nedlagt', methods=['POST'])
+@krever_innlogging
+def rapporter_nedlagt():
+    data = request.get_json(silent=True) or {}
+    stasjon_id = data.get('stasjon_id')
+    if not stasjon_id:
+        return jsonify({'error': 'stasjon_id er påkrevd'}), 400
+    bruker_id = session.get('bruker_id')
+    try:
+        meld_stasjon_nedlagt(stasjon_id, bruker_id)
+        logger.info(f'Stasjon {stasjon_id} meldt som nedlagt av bruker {bruker_id}')
+        return jsonify({'ok': True})
+    except Exception as e:
+        logger.warning(f'Rapportering feilet: {e}')
+        return jsonify({'error': 'Feil ved rapportering'}), 500
 
 
 @api_bp.route('/om')

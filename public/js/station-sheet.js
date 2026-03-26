@@ -1,4 +1,4 @@
-import { oppdaterPris } from './api.js';
+import { oppdaterPris, meldNedlagt } from './api.js';
 import { getInnstillinger } from './settings.js';
 import { getKjedeFarge, getKjedeInitials, getKjedeLogo } from './kjede.js';
 
@@ -22,6 +22,7 @@ const endreBtnEl = document.getElementById('sheet-endre-btn');
 const bekreftBtnEl = document.getElementById('sheet-bekreft-btn');
 const navigerBtnEl = document.getElementById('sheet-naviger-btn');
 const kartBtnEl = document.getElementById('sheet-kart-btn');
+const nedlagtBtnEl = document.getElementById('sheet-nedlagt-btn');
 
 // Edit-elementer
 const bensinInput = document.getElementById('sheet-bensin-input');
@@ -42,6 +43,7 @@ export function initSheet(onOppdatert) {
     bekreftBtnEl.addEventListener('click', bekreftPris);
     editAvbrytBtn.addEventListener('click', visVisModus);
     editLagreBtn.addEventListener('click', lagrePris);
+    nedlagtBtnEl.addEventListener('click', rapporterNedlagt);
 
     const enterLagre = (e) => { if (e.key === 'Enter') lagrePris(); };
     bensinInput.addEventListener('keydown', enterLagre);
@@ -62,6 +64,9 @@ export function visStasjonSheet(stasjon) {
     const harPriser = stasjon.bensin != null || stasjon.bensin98 != null || stasjon.diesel != null;
     endreBtnEl.style.display = innlogget ? '' : 'none';
     bekreftBtnEl.style.display = innlogget && harPriser ? '' : 'none';
+    nedlagtBtnEl.style.display = innlogget ? '' : 'none';
+    nedlagtBtnEl.disabled = false;
+    nedlagtBtnEl.textContent = 'Meld som nedlagt';
     sheet.classList.add('open');
     backdrop.classList.add('open');
     setTimeout(() => navnEl.focus(), 100);
@@ -177,6 +182,24 @@ async function bekreftPris() {
     }
     bekreftBtnEl.disabled = false;
     bekreftBtnEl.textContent = 'Bekreft priser';
+}
+
+async function rapporterNedlagt() {
+    if (!confirm('Er du sikker på at denne stasjonen er nedlagt? Den meldes til admin for vurdering.')) return;
+    nedlagtBtnEl.disabled = true;
+    nedlagtBtnEl.textContent = 'Sender …';
+    try {
+        const resultat = await meldNedlagt(aktivStasjon.id);
+        if (resultat?.status === 401) {
+            nedlagtBtnEl.disabled = false;
+            nedlagtBtnEl.textContent = 'Meld som nedlagt';
+            return;
+        }
+        nedlagtBtnEl.textContent = 'Takk for meldingen!';
+    } catch {
+        nedlagtBtnEl.textContent = 'Feil – prøv igjen';
+        nedlagtBtnEl.disabled = false;
+    }
 }
 
 async function lagrePris() {
