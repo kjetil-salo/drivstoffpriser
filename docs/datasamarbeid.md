@@ -6,134 +6,130 @@ Drivstoffpriser-appen samler inn priser via brukerbidrag. Andre utviklere bygger
 
 ## Konsept
 
-Federert datadeling via API. Hver app beholder egen database og eget brukergrensesnitt. Prisdata synkroniseres mellom partene via et enkelt, avtalt API.
+Federert datadeling via API. Hver app beholder egen database og eget brukergrensesnitt. Prisdata deles via et enkelt API.
 
 ```
-┌──────────────┐         push/pull         ┌──────────────┐
-│   App A      │ ◄──────────────────────►  │   App B      │
-│   (vår app)  │    POST/GET /api/sync     │   (partner)  │
-│   Egen DB    │                           │   Egen DB    │
-└──────────────┘                           └──────────────┘
+┌──────────────┐         GET /api/share       ┌──────────────┐
+│   App A      │ ◄────────────────────────────  │   Partner    │
+│   (vår app)  │    X-API-Key: <nøkkel>        │              │
+│   Egen DB    │                               │   Egen DB    │
+└──────────────┘                               └──────────────┘
 ```
 
 ## Prinsipper
 
-1. **Symmetrisk avtale** — begge eksponerer samme API med samme kontrakt
-2. **Kun prisdata** — ingen brukerdata, kontoer eller beriket metadata deles
-3. **Attribusjon** — hvert datapunkt tagges med `kilde` slik at opprinnelsen er sporbar
-4. **Kvotebasert rettferdighet** — logg ratio gitt/mottatt, pause ved skjevhet
-5. **Uavhengighet** — hver app fungerer fullt ut uten synk-partneren
+1. **Kun prisdata** — ingen brukerdata, kontoer eller beriket metadata deles
+2. **Uavhengighet** — hver app fungerer fullt ut uten partneren
+3. **Nøkkel per partner** — hver partner har en unik API-nøkkel som kan deaktiveres
 
-## API-kontrakt
+## API
 
 ### Autentisering
 
 Hver partner får en unik API-nøkkel. Sendes som header:
 
 ```
-X-Sync-Key: <nøkkel>
+X-API-Key: <nøkkel>
 ```
 
-### Push priser
+Nøkler lagres i `api_nøkler`-tabellen og kan deaktiveres med `aktiv = 0`.
+
+### Hent priser
 
 ```
-POST /api/sync/priser
+GET /api/share/prices?from=<ISO 8601>&to=<ISO 8601>
+```
 
-Body:
+**Parametere:**
+
+| Parameter | Påkrevd | Beskrivelse |
+|-----------|---------|-------------|
+| `from` | Nei | Starttidspunkt (ISO 8601). Default: 24 timer siden |
+| `to` | Nei | Sluttidspunkt (ISO 8601). Default: nå |
+
+**Begrensninger:**
+- Maks 24 timers spenn mellom `from` og `to`
+- `to` må være etter `from`
+
+**Eksempel:**
+
+```bash
+curl -H "X-API-Key: <nøkkel>" \
+  "https://pris.ksalo.no/api/share/prices?from=2026-03-26T10:00:00&to=2026-03-26T18:00:00"
+```
+
+**Respons (200):**
+
+```json
 {
-  "priser": [
+  "prices": [
     {
-      "stasjon_osm_id": "node/12345678",
-      "drivstoff": "bensin95",
-      "pris": 21.35,
-      "tidspunkt": "2026-03-24T14:30:00Z",
-      "kilde": "app-b"
+      "station_id": 12345,
+      "name": "Circle K Trondheim",
+      "petrol": 22.44,
+      "diesel": 24.84,
+      "petrol98": null,
+      "updated": "2026-03-26 15:57:57"
     }
   ]
 }
-
-Respons:
-{ "ok": true, "mottatt": 12, "avvist": 1 }
 ```
 
-### Pull nye priser
+**Feilresponser:**
 
-```
-GET /api/sync/priser?siden=2026-03-24T12:00:00Z&limit=100
+| Kode | Årsak |
+|------|-------|
+| 400 | Ugyldig datoformat, `to` før `from`, eller spenn > 24 timer |
+| 403 | Ugyldig eller deaktivert API-nøkkel |
 
-Respons:
-{
-  "priser": [ ... ],
-  "neste": "2026-03-24T14:30:00Z"
-}
-```
+## Logging
 
-### Dataformat
+Alle API-kall logges i `api_logg`-tabellen med partnernavn, antall returnerte priser og tidspunkt.
 
-| Felt | Type | Beskrivelse |
-|------|------|-------------|
-| `stasjon_osm_id` | string | OpenStreetMap node-ID (felles referanse) |
-| `drivstoff` | string | `bensin95`, `bensin98`, `diesel` |
-| `pris` | float | Pris i kr/liter |
-| `tidspunkt` | string | ISO 8601 UTC |
-| `kilde` | string | Identifikator for avsender-appen |
+## DB-tabeller
 
-OSM-ID brukes som felles stasjonsreferanse. Begge apper henter stasjoner fra OSM, så dette er en naturlig nøkkel.
-
-## Beskyttelsesmekanismer
-
-### Rate limiting
-- Maks 60 requests/minutt per partner
-- Maks 1000 priser per push
-
-### Rettferdighetskvote
-- Ratio gitt/mottatt logges per uke
-- Ved skjevhet over 80/20 i mer enn 2 uker: automatisk pause med varsel
-- Dashboard for begge parter med ukentlig statistikk
-
-### Kill switch
-- Hver part kan revoke API-nøkkelen umiddelbart
-- Synk stoppes uten å påvirke egen app
-
-### Datakvalitet
-- Priser utenfor rimelig intervall (f.eks. < 10 kr eller > 40 kr) avvises
-- Duplikater (samme stasjon + drivstoff innen 5 min) ignoreres
-- Priser eldre enn 48 timer avvises
-
-## Utrullingsstrategi
-
-### Fase 1: Pilot (2-4 uker)
-- Aktiver synk for én region (f.eks. Oslo-området)
-- Begge parter implementerer push + pull
-- Mål ratio og datakvalitet
-
-### Fase 2: Evaluering
-- Gjennomgå ratio og brukeropplevelse
-- Juster kvoteregler om nødvendig
-- Avklar eventuelle edge cases
-
-### Fase 3: Full utrulling
-- Aktiver for hele Norge
-- Utvid til flere partnere om relevant
-
-## DB-endringer (vår side)
-
-Ny tabell for synk-logg:
+### api_nøkler
 
 ```sql
-CREATE TABLE sync_logg (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    partner TEXT NOT NULL,
-    retning TEXT NOT NULL,  -- 'inn' eller 'ut'
-    antall INTEGER NOT NULL,
-    tidspunkt TEXT DEFAULT (datetime('now'))
+CREATE TABLE api_nøkler (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    partner   TEXT NOT NULL,
+    nøkkel    TEXT NOT NULL UNIQUE,
+    aktiv     INTEGER NOT NULL DEFAULT 1,
+    opprettet TEXT DEFAULT (datetime('now'))
 );
 ```
 
-Ny kolonne på priser-tabellen:
+### api_logg
 
 ```sql
-ALTER TABLE priser ADD COLUMN kilde TEXT;  -- NULL = egen bruker
+CREATE TABLE api_logg (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    partner    TEXT NOT NULL,
+    antall     INTEGER NOT NULL,
+    tidspunkt  TEXT DEFAULT (datetime('now'))
+);
+```
+
+## Administrasjon
+
+Legge til ny partner:
+
+```sql
+INSERT INTO api_nøkler (partner, nøkkel) VALUES ('partnernavn', '<uuid>');
+```
+
+Deaktivere partner:
+
+```sql
+UPDATE api_nøkler SET aktiv = 0 WHERE partner = 'partnernavn';
+```
+
+Se bruksstatistikk:
+
+```sql
+SELECT partner, COUNT(*) as kall, SUM(antall) as priser, MAX(tidspunkt) as sist
+FROM api_logg GROUP BY partner;
 ```
 
 ## Hva som IKKE deles
@@ -141,5 +137,4 @@ ALTER TABLE priser ADD COLUMN kilde TEXT;  -- NULL = egen bruker
 - Brukerkontoer eller innloggingsdata
 - Enhets-IDer eller IP-adresser
 - Visningsstatistikk
-- Bruker-opprettede stasjoner (kun OSM-stasjoner synkes)
 - Intern metadata (godkjenningsstatus, admin-notater)

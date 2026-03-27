@@ -1,4 +1,4 @@
-import { oppdaterPris, meldNedlagt } from './api.js';
+import { oppdaterPris, meldNedlagt, settKjede } from './api.js';
 import { getInnstillinger } from './settings.js';
 import { getKjedeFarge, getKjedeInitials, getKjedeLogo } from './kjede.js';
 
@@ -24,6 +24,12 @@ const navigerBtnEl = document.getElementById('sheet-naviger-btn');
 const kartBtnEl = document.getElementById('sheet-kart-btn');
 const nedlagtBtnEl = document.getElementById('sheet-nedlagt-btn');
 
+// Admin-elementer
+const adminKjedeEl = document.getElementById('sheet-admin-kjede');
+const kjedeSelectEl = document.getElementById('sheet-kjede-select');
+const kjedeStatusEl = document.getElementById('sheet-kjede-status');
+const kjedelagreBtnEl = document.getElementById('sheet-kjede-lagre-btn');
+
 // Edit-elementer
 const bensinInput = document.getElementById('sheet-bensin-input');
 const bensin98Input = document.getElementById('sheet-bensin98-input');
@@ -44,6 +50,7 @@ export function initSheet(onOppdatert) {
     editAvbrytBtn.addEventListener('click', visVisModus);
     editLagreBtn.addEventListener('click', lagrePris);
     nedlagtBtnEl.addEventListener('click', rapporterNedlagt);
+    kjedelagreBtnEl.addEventListener('click', lagreKjede);
 
     const enterLagre = (e) => { if (e.key === 'Enter') lagrePris(); };
     bensinInput.addEventListener('keydown', enterLagre);
@@ -67,6 +74,17 @@ export function visStasjonSheet(stasjon) {
     nedlagtBtnEl.style.display = innlogget ? '' : 'none';
     nedlagtBtnEl.disabled = false;
     nedlagtBtnEl.textContent = 'Meld som nedlagt';
+
+    if (window.__erAdmin) {
+        adminKjedeEl.removeAttribute('hidden');
+        kjedeSelectEl.value = stasjon.kjede || '';
+        kjedeStatusEl.style.display = 'none';
+        kjedelagreBtnEl.disabled = false;
+        kjedelagreBtnEl.textContent = 'Lagre kjede';
+    } else {
+        adminKjedeEl.setAttribute('hidden', '');
+    }
+
     sheet.classList.add('open');
     backdrop.classList.add('open');
     setTimeout(() => navnEl.focus(), 100);
@@ -94,8 +112,9 @@ function fyllVisning(s) {
     kjedeEl.textContent = s.kjede || '';
     kjedeEl.style.display = s.kjede ? '' : 'none';
 
-    const logoUrl = getKjedeLogo(s.kjede);
-    const farge = getKjedeFarge(s.kjede);
+    const kjedeEllerNavn = s.kjede || s.navn;
+    const logoUrl = getKjedeLogo(kjedeEllerNavn);
+    const farge = getKjedeFarge(kjedeEllerNavn);
     badgeEl.style.background = logoUrl ? '#1e293b' : farge;
     badgeEl.style.border = logoUrl ? `1px solid rgba(148,163,184,0.2)` : '';
     if (logoUrl) {
@@ -200,6 +219,31 @@ async function rapporterNedlagt() {
         nedlagtBtnEl.textContent = 'Feil – prøv igjen';
         nedlagtBtnEl.disabled = false;
     }
+}
+
+async function lagreKjede() {
+    const kjede = kjedeSelectEl.value;
+    kjedelagreBtnEl.disabled = true;
+    kjedelagreBtnEl.textContent = 'Lagrer …';
+    kjedeStatusEl.style.display = 'none';
+    try {
+        await settKjede(aktivStasjon.id, kjede);
+        const oppdatert = { ...aktivStasjon, kjede: kjede || null };
+        aktivStasjon = oppdatert;
+        fyllVisning(oppdatert);
+        if (onPrisOppdatert) onPrisOppdatert(oppdatert);
+        kjedeStatusEl.textContent = 'Kjede lagret!';
+        kjedeStatusEl.style.display = 'block';
+        kjedeStatusEl.style.background = 'rgba(34,197,94,0.2)';
+        kjedeStatusEl.style.color = '#22c55e';
+    } catch {
+        kjedeStatusEl.textContent = 'Feil ved lagring. Prøv igjen.';
+        kjedeStatusEl.style.display = 'block';
+        kjedeStatusEl.style.background = 'rgba(239,68,68,0.2)';
+        kjedeStatusEl.style.color = '#ef4444';
+    }
+    kjedelagreBtnEl.disabled = false;
+    kjedelagreBtnEl.textContent = 'Lagre kjede';
 }
 
 async function lagrePris() {

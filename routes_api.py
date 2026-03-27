@@ -5,6 +5,7 @@ import os
 import shutil
 import tempfile
 import uuid
+from datetime import datetime, timedelta
 from functools import wraps
 
 import httpx
@@ -13,7 +14,8 @@ from flask import Blueprint, request, jsonify, make_response, session
 from db import (get_stasjoner_med_priser, lagre_pris, logg_visning,
                 antall_stasjoner_med_pris, finn_bruker_id, DB_PATH,
                 opprett_stasjon, hent_billigste_priser_24t,
-                antall_prisoppdateringer_24t, meld_stasjon_nedlagt)
+                antall_prisoppdateringer_24t, meld_stasjon_nedlagt,
+                get_conn, hent_innstilling)
 
 logger = logging.getLogger('drivstoff')
 
@@ -80,7 +82,9 @@ def meg():
     if not bruker:
         session.clear()
         return jsonify({'innlogget': False})
-    return jsonify({'innlogget': True, 'brukernavn': bruker['brukernavn'], 'er_admin': bool(bruker['er_admin'])})
+    return jsonify({'innlogget': True, 'brukernavn': bruker['brukernavn'],
+                    'kallenavn': bruker.get('kallenavn') or '', 'bruker_id': bruker['id'],
+                    'er_admin': bool(bruker['er_admin'])})
 
 
 @api_bp.route('/api/stasjoner')
@@ -258,6 +262,23 @@ def rapporter_nedlagt():
     except Exception as e:
         logger.warning(f'Rapportering feilet: {e}')
         return jsonify({'error': 'Feil ved rapportering'}), 500
+
+
+@api_bp.route('/api/nyhet')
+def nyhet():
+    import hashlib
+    tekst = hent_innstilling('nyhet_tekst', '')
+    utloper = hent_innstilling('nyhet_utloper', '')
+    if not tekst or not utloper:
+        return jsonify({'tekst': None})
+    try:
+        utloper_dt = datetime.fromisoformat(utloper)
+    except ValueError:
+        return jsonify({'tekst': None})
+    if datetime.now() >= utloper_dt:
+        return jsonify({'tekst': None})
+    nyhet_id = hashlib.md5(tekst.encode()).hexdigest()[:8]
+    return jsonify({'tekst': tekst, 'utloper': utloper, 'id': nyhet_id})
 
 
 @api_bp.route('/om')
@@ -486,5 +507,81 @@ def personvern():
 </div>
 
 </div></body></html>'''
+
+
+# --- Datadeling ---
+
+@api_bp.route('/api/share/prices', methods=['GET'])
+def share_prices():
+    nøkkel = request.headers.get('X-API-Key', '')
+    with get_conn() as conn:
+        partner = conn.execute(
+            'SELECT partner FROM api_nøkler WHERE nøkkel = ? AND aktiv = 1',
+            (nøkkel,)
+        ).fetchone()
+    if not nøkkel or not partner:
+        return jsonify({'error': 'Ugyldig API-nøkkel'}), 403
+
+    partner_navn = partner[0]
+
+    fra = request.args.get('from')
+    til = request.args.get('to')
+
+    now = datetime.utcnow()
+    if fra:
+        try:
+            fra_dt = datetime.fromisoformat(fra)
+        except ValueError:
+            return jsonify({'error': 'Ugyldig from-format, bruk ISO 8601'}), 400
+    else:
+        fra_dt = now - timedelta(hours=24)
+
+    if til:
+        try:
+            til_dt = datetime.fromisoformat(til)
+        except ValueError:
+            return jsonify({'error': 'Ugyldig to-format, bruk ISO 8601'}), 400
+    else:
+        til_dt = now
+
+    if til_dt <= fra_dt:
+        return jsonify({'error': 'to må være etter from'}), 400
+
+    if (til_dt - fra_dt) > timedelta(hours=24):
+        return jsonify({'error': 'Maks 24 timers spenn'}), 400
+
+    with get_conn() as conn:
+        rows = conn.execute('''
+            SELECT s.id, s.navn,
+                   p.bensin, p.diesel, p.bensin98, p.tidspunkt
+            FROM stasjoner s
+            JOIN priser p ON p.stasjon_id = s.id
+            WHERE p.id = (
+                SELECT p2.id FROM priser p2
+                WHERE p2.stasjon_id = s.id
+                ORDER BY p2.tidspunkt DESC LIMIT 1
+            )
+            AND p.tidspunkt >= ? AND p.tidspunkt <= ?
+        ''', (fra_dt.isoformat(), til_dt.isoformat())).fetchall()
+
+    prices = [
+        {
+            'station_id': r[0],
+            'name': r[1],
+            'petrol': r[2],
+            'diesel': r[3],
+            'petrol98': r[4],
+            'updated': r[5]
+        }
+        for r in rows
+    ]
+
+    with get_conn() as conn:
+        conn.execute(
+            'INSERT INTO api_logg (partner, antall) VALUES (?, ?)',
+            (partner_navn, len(prices))
+        )
+
+    return jsonify({'prices': prices})
 
 

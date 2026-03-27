@@ -721,6 +721,69 @@ html, body {
   padding: 12px;
 }
 
+/* ── Nyhet-dialog ────────────────────────────────── */
+#nyhet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  z-index: calc(var(--z-modal) + 5);
+}
+#nyhet-backdrop[hidden], #nyhet-dialog[hidden] { display: none; }
+
+#nyhet-dialog {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: calc(var(--z-modal) + 6);
+  background: var(--color-card-bg);
+  border: 1px solid var(--border-color-medium);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+  padding: 0;
+  width: min(380px, calc(100vw - 2rem));
+  text-align: center;
+  animation: sokApen 0.2s ease;
+  overflow: hidden;
+}
+
+#nyhet-stripe {
+  height: 4px;
+  background: var(--color-accent);
+}
+
+#nyhet-dialog h2 {
+  font-size: var(--font-md);
+  font-weight: 700;
+  color: var(--color-text);
+  padding: var(--space-lg) var(--space-lg) 0;
+  margin-bottom: var(--space-sm);
+}
+
+#nyhet-tekst {
+  font-size: var(--font-sm);
+  color: var(--color-muted);
+  line-height: 1.6;
+  padding: 0 var(--space-lg);
+  margin-bottom: var(--space-lg);
+  white-space: pre-line;
+  text-align: left;
+}
+
+#nyhet-lukk {
+  width: calc(100% - 2 * var(--space-lg));
+  margin: 0 var(--space-lg) var(--space-lg);
+  background: var(--color-accent);
+  border: none;
+  border-radius: var(--radius-sm);
+  color: white;
+  font-size: var(--font-base);
+  font-weight: 600;
+  padding: 12px;
+  cursor: pointer;
+}
+#nyhet-lukk:hover { background: #2563eb; }
+
 /* ── Lokasjonsfeil-dialog ────────────────────────── */
 #lok-feil-backdrop {
   position: fixed;

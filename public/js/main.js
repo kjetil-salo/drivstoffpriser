@@ -87,16 +87,46 @@ fetch('/api/instance').then(r => r.json()).then(d => {
     }
 }).catch(() => {});
 
+// ── Nyhet-splash ─────────────────────────────────
+fetch('/api/nyhet').then(r => r.json()).then(d => {
+    if (!d.tekst) return;
+    const cookieName = `nyhet_lest_${d.id}`;
+    if (document.cookie.split(';').some(c => c.trim().startsWith(cookieName + '='))) return;
+    const backdrop = document.getElementById('nyhet-backdrop');
+    const dialog = document.getElementById('nyhet-dialog');
+    const tekst = document.getElementById('nyhet-tekst');
+    tekst.textContent = d.tekst;
+    const tidligereFokus = document.activeElement;
+    backdrop.removeAttribute('hidden');
+    dialog.removeAttribute('hidden');
+    setTimeout(() => document.getElementById('nyhet-lukk').focus(), 100);
+    function lukk() {
+        backdrop.setAttribute('hidden', '');
+        dialog.setAttribute('hidden', '');
+        const utloper = new Date(d.utloper);
+        const maxAge = Math.max(0, Math.floor((utloper - Date.now()) / 1000));
+        document.cookie = `${cookieName}=1;max-age=${maxAge};path=/;SameSite=Lax`;
+        if (tidligereFokus) tidligereFokus.focus();
+    }
+    document.getElementById('nyhet-lukk').addEventListener('click', lukk);
+    backdrop.addEventListener('click', lukk);
+    const escHandler = (e) => {
+        if (e.key === 'Escape' && !dialog.hasAttribute('hidden')) { lukk(); document.removeEventListener('keydown', escHandler); }
+    };
+    document.addEventListener('keydown', escHandler);
+}).catch(() => {});
+
 // ── Statistikk ────────────────────────────────────
 fetch('/api/logview', { method: 'POST' }).catch(() => {});
 
 // ── Auth-status ───────────────────────────────────
 const meg = await fetch('/api/meg').then(r => r.json()).catch(() => ({}));
 window.__innlogget = meg.innlogget || false;
+window.__erAdmin = meg.er_admin || false;
 
 const authLenke = document.getElementById('auth-lenke');
 if (window.__innlogget) {
-    authLenke.textContent = meg.brukernavn;
+    authLenke.textContent = meg.kallenavn || meg.brukernavn;
     authLenke.href = '/auth/min-konto';
     authLenke.removeAttribute('hidden');
 } else {

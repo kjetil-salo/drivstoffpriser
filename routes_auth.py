@@ -11,7 +11,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from db import (antall_brukere, opprett_bruker, finn_bruker, finn_bruker_id,
                 opprett_invitasjon, hent_invitasjon, merk_invitasjon_brukt,
                 opprett_tilbakestilling, hent_tilbakestilling, merk_tilbakestilling_brukt, oppdater_passord,
-                slett_bruker, hent_innstilling)
+                slett_bruker, hent_innstilling, sett_kallenavn)
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -228,7 +228,7 @@ def invitasjon():
     return _auth_side('Opprett konto', _invitasjon_form(token))
 
 
-@auth_bp.route('/auth/min-konto')
+@auth_bp.route('/auth/min-konto', methods=['GET', 'POST'])
 def min_konto():
     bruker_id = session.get('bruker_id')
     if not bruker_id:
@@ -237,14 +237,32 @@ def min_konto():
     if not bruker:
         session.clear()
         return redirect('/auth/logg-inn')
+
+    melding = ''
+    if request.method == 'POST':
+        kallenavn = request.form.get('kallenavn', '').strip()
+        sett_kallenavn(bruker_id, kallenavn)
+        bruker = finn_bruker_id(bruker_id)
+        melding = '<p style="color:#22c55e;font-size:0.85rem;margin-bottom:1rem">Kallenavn lagret.</p>'
+
+    kallenavn_verdi = bruker.get('kallenavn') or ''
     return _auth_side('Min konto', f'''
 <p style="color:#94a3b8;font-size:0.85rem;margin-bottom:1.5rem">
 Innlogget som <strong style="color:#e5e7eb">{bruker["brukernavn"]}</strong></p>
-<a href="/auth/logg-ut" style="display:block;text-align:center;background:#3b82f6;border-radius:6px;
-   color:white;font-weight:600;padding:12px;text-decoration:none;margin-bottom:1rem">Logg ut</a>
+{melding}
+<form method="post" style="margin-bottom:1.5rem">
+  <label style="display:block;font-size:0.85rem;color:#94a3b8;margin-bottom:4px">Kallenavn (vises i topplister)</label>
+  <input name="kallenavn" value="{kallenavn_verdi}" placeholder="Velg et kallenavn …"
+    style="width:100%;background:rgba(148,163,184,0.08);border:1px solid rgba(148,163,184,0.3);
+           border-radius:6px;color:#e5e7eb;font-size:0.92rem;padding:10px 14px;margin-bottom:0.75rem;outline:none">
+  <button type="submit" style="width:100%;background:#3b82f6;border:none;border-radius:6px;
+    color:white;font-weight:600;font-size:0.9rem;padding:12px;cursor:pointer">Lagre kallenavn</button>
+</form>
+<a href="/auth/logg-ut" style="display:block;text-align:center;border:1px solid #475569;border-radius:6px;
+   color:#94a3b8;font-size:0.85rem;padding:10px;text-decoration:none;margin-bottom:0.75rem">Logg ut</a>
 <a href="/auth/slett-meg" style="display:block;text-align:center;border:1px solid #ef4444;border-radius:6px;
    color:#ef4444;font-size:0.85rem;padding:10px;text-decoration:none">Slett min konto</a>
-<a href="/">← Tilbake</a>''')
+<a href="/" style="display:block;text-align:center;font-size:0.85rem;color:#94a3b8;margin-top:1rem">← Tilbake</a>''')
 
 
 @auth_bp.route('/auth/slett-meg', methods=['GET', 'POST'])

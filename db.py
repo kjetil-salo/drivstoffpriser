@@ -69,6 +69,19 @@ def init_db():
                 noekkel  TEXT PRIMARY KEY,
                 verdi    TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS api_nøkler (
+                id        INTEGER PRIMARY KEY AUTOINCREMENT,
+                partner   TEXT NOT NULL,
+                nøkkel    TEXT NOT NULL UNIQUE,
+                aktiv     INTEGER NOT NULL DEFAULT 1,
+                opprettet TEXT DEFAULT (datetime('now'))
+            );
+            CREATE TABLE IF NOT EXISTS api_logg (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                partner    TEXT NOT NULL,
+                antall     INTEGER NOT NULL,
+                tidspunkt  TEXT DEFAULT (datetime('now'))
+            );
             CREATE TABLE IF NOT EXISTS rapporter (
                 id         INTEGER PRIMARY KEY AUTOINCREMENT,
                 stasjon_id INTEGER NOT NULL,
@@ -87,6 +100,10 @@ def _migrer_db():
             conn.execute("ALTER TABLE priser ADD COLUMN bensin98 REAL")
         if 'bruker_id' not in kolonner:
             conn.execute("ALTER TABLE priser ADD COLUMN bruker_id INTEGER REFERENCES brukere(id)")
+
+        bruker_kolonner = [r[1] for r in conn.execute("PRAGMA table_info(brukere)").fetchall()]
+        if 'kallenavn' not in bruker_kolonner:
+            conn.execute("ALTER TABLE brukere ADD COLUMN kallenavn TEXT")
 
         stasjon_kolonner = [r[1] for r in conn.execute("PRAGMA table_info(stasjoner)").fetchall()]
         if 'lagt_til_av' not in stasjon_kolonner:
@@ -396,6 +413,18 @@ def merk_tilbakestilling_brukt(token: str):
         conn.execute("UPDATE tilbakestilling SET brukt = 1 WHERE token = ?", (token,))
 
 
+def sett_kallenavn(bruker_id: int, kallenavn: str):
+    with get_conn() as conn:
+        conn.execute("UPDATE brukere SET kallenavn = ? WHERE id = ?",
+                     (kallenavn or None, bruker_id))
+
+
+def sett_kjede_for_stasjon(stasjon_id: int, kjede: str):
+    with get_conn() as conn:
+        conn.execute("UPDATE stasjoner SET kjede = ? WHERE id = ?",
+                     (kjede or None, stasjon_id))
+
+
 def oppdater_passord(epost: str, passord_hash: str):
     with get_conn() as conn:
         conn.execute("UPDATE brukere SET passord_hash = ? WHERE brukernavn = ?", (passord_hash, epost))
@@ -534,6 +563,80 @@ def antall_ubehandlede_rapporter() -> int:
             '''SELECT COUNT(DISTINCT r.stasjon_id) FROM rapporter r
                JOIN stasjoner s ON s.id = r.stasjon_id WHERE s.godkjent != 0'''
         ).fetchone()[0]
+
+
+def hent_toppliste(limit=50) -> list:
+    """Antall prisregistreringer per bruker, ekskluderer partnere."""
+    with get_conn() as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            '''SELECT b.id, b.kallenavn, COUNT(p.id) as antall
+               FROM priser p
+               JOIN brukere b ON b.id = p.bruker_id
+               WHERE b.brukernavn NOT LIKE 'partner:%'
+               GROUP BY p.bruker_id
+               ORDER BY antall DESC
+               LIMIT ?''',
+            (limit,)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def finn_stasjoner_by_navn(navn: str) -> list:
+    """Søk etter stasjoner med navn som matcher (case-insensitive)."""
+    with get_conn() as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            '''SELECT id, navn, kjede, lat, lon FROM stasjoner
+               WHERE godkjent != 0 AND LOWER(navn) LIKE ?
+               LIMIT 5''',
+            (f'%{navn.lower()}%',)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def hent_eller_opprett_partner(navn: str) -> int:
+    """Hent bruker_id for partner, opprett hvis ikke finnes."""
+    brukernavn = f'partner:{navn}'
+    with get_conn() as conn:
+        row = conn.execute(
+            'SELECT id FROM brukere WHERE brukernavn = ?', (brukernavn,)
+        ).fetchone()
+        if row:
+            return row[0]
+        cursor = conn.execute(
+            "INSERT INTO brukere (brukernavn, passord_hash, er_admin) VALUES (?, '', 0)",
+            (brukernavn,)
+        )
+        return cursor.lastrowid
+
+
+def finn_stasjoner_by_osm_ids(osm_ids: list) -> dict:
+    """Slå opp stasjoner via OSM-id-er. Returnerer {original_id: {id, navn, kjede, ...}}.
+    Håndterer at vår DB bruker 'node/'-prefix mens partnere kan sende bare tallet."""
+    if not osm_ids:
+        return {}
+    # Bygg oppslag med node/-prefix for id-er som mangler det
+    søk_ids = []
+    prefiks_map = {}  # node/123 -> 123 (original)
+    for oid in osm_ids:
+        if oid.startswith('node/') or oid.startswith('way/'):
+            søk_ids.append(oid)
+            prefiks_map[oid] = oid
+        else:
+            full_id = f'node/{oid}'
+            søk_ids.append(full_id)
+            prefiks_map[full_id] = oid
+    with get_conn() as conn:
+        conn.row_factory = sqlite3.Row
+        placeholders = ','.join('?' for _ in søk_ids)
+        rows = conn.execute(
+            f'''SELECT id, navn, kjede, lat, lon, osm_id FROM stasjoner
+                WHERE godkjent != 0 AND osm_id IN ({placeholders})''',
+            søk_ids
+        ).fetchall()
+        # Returner med original-id som nøkkel
+        return {prefiks_map.get(r['osm_id'], r['osm_id']): dict(r) for r in rows}
 
 
 def get_stasjoner_med_priser(user_lat, user_lon, radius_m=30000, limit=30):

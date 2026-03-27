@@ -40,6 +40,17 @@ export async function meldNedlagt(stasjonId) {
     return resp.json();
 }
 
+export async function settKjede(stasjonId, kjede) {
+    const resp = await fetch('/admin/sett-kjede', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stasjon_id: stasjonId, kjede }),
+    });
+    if (resp.status === 403) return { status: 403 };
+    if (!resp.ok) throw new Error('Feil ved oppdatering av kjede');
+    return resp.json();
+}
+
 export async function oppdaterPris(stasjonId, bensin, diesel, bensin98) {
     const resp = await fetch('/api/pris', {
         method: 'POST',

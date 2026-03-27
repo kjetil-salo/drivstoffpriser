@@ -2,6 +2,7 @@
 
 import os
 import secrets
+import logging
 from datetime import datetime, timedelta
 from functools import wraps
 
@@ -20,7 +21,9 @@ from db import (finn_bruker_id, hent_alle_brukere, slett_bruker,
                 hent_rapporter, antall_ubehandlede_rapporter,
                 deaktiver_stasjon, reaktiver_stasjon,
                 slett_rapporter_for_stasjon, hent_deaktiverte_stasjoner,
-                hent_rapportorer_epost)
+                hent_rapportorer_epost, finn_stasjoner_by_osm_ids,
+                lagre_pris, hent_eller_opprett_partner, hent_toppliste,
+                sett_kjede_for_stasjon)
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -160,6 +163,21 @@ def admin():
     <div class="tile-ikon">&#128683;</div>
     <div class="tile-tittel">Deaktiverte</div>
     <div class="tile-info">{deaktiverte_antall} stasjoner</div>
+  </a>
+  <a href="/admin/nyhet" class="tile">
+    <div class="tile-ikon">&#128227;</div>
+    <div class="tile-tittel">Nyhet</div>
+    <div class="tile-info">Splash-melding</div>
+  </a>
+  <a href="/admin/import" class="tile">
+    <div class="tile-ikon">&#128229;</div>
+    <div class="tile-tittel">Import</div>
+    <div class="tile-info">Partnerdata</div>
+  </a>
+  <a href="/admin/toppliste" class="tile">
+    <div class="tile-ikon">&#127942;</div>
+    <div class="tile-tittel">Toppliste</div>
+    <div class="tile-info">Prisregistreringer</div>
   </a>
 </div>
 </div></body></html>'''
@@ -507,6 +525,19 @@ def admin_reaktiver_stasjon():
     return redirect('/admin/deaktiverte')
 
 
+@admin_bp.route('/admin/sett-kjede', methods=['POST'])
+@krever_innlogging
+@krever_admin
+def admin_sett_kjede():
+    data = request.get_json()
+    stasjon_id = data.get('stasjon_id') if data else None
+    kjede = data.get('kjede', '') if data else ''
+    if not stasjon_id:
+        return {'error': 'Mangler stasjon_id'}, 400
+    sett_kjede_for_stasjon(int(stasjon_id), kjede)
+    return {'ok': True}
+
+
 @admin_bp.route('/admin/avvis-rapport', methods=['POST'])
 @krever_innlogging
 @krever_admin
@@ -515,6 +546,123 @@ def admin_avvis_rapport():
     if stasjon_id:
         slett_rapporter_for_stasjon(stasjon_id)
     return redirect('/admin/rapporter')
+
+
+@admin_bp.route('/admin/nyhet', methods=['GET', 'POST'])
+@krever_innlogging
+@krever_admin
+def admin_nyhet():
+    if request.method == 'POST':
+        action = request.form.get('action', 'lagre')
+        if action == 'fjern':
+            sett_innstilling('nyhet_tekst', '')
+            sett_innstilling('nyhet_utloper', '')
+        else:
+            tekst = request.form.get('tekst', '').strip()
+            utloper = request.form.get('utloper', '').strip()
+            if tekst and utloper:
+                sett_innstilling('nyhet_tekst', tekst)
+                sett_innstilling('nyhet_utloper', utloper)
+        return redirect('/admin/nyhet')
+
+    tekst = hent_innstilling('nyhet_tekst', '')
+    utloper = hent_innstilling('nyhet_utloper', '')
+
+    aktiv = False
+    gjenstaar = ''
+    if tekst and utloper:
+        try:
+            utloper_dt = datetime.fromisoformat(utloper)
+            if datetime.now() < utloper_dt:
+                aktiv = True
+                delta = utloper_dt - datetime.now()
+                timer = int(delta.total_seconds() // 3600)
+                minutter = int((delta.total_seconds() % 3600) // 60)
+                gjenstaar = f'{timer}t {minutter}m'
+        except ValueError:
+            pass
+
+    aktiv_html = ''
+    if aktiv:
+        aktiv_html = f'''
+    <div class="kort" style="border-color:#22c55e">
+      <h2 style="color:#22c55e">Aktiv nyhet</h2>
+      <div style="background:rgba(148,163,184,0.07);border:1px solid #1f2937;border-radius:6px;padding:12px;margin-bottom:12px;white-space:pre-line;font-size:0.9rem;line-height:1.6">{tekst}</div>
+      <p style="font-size:0.82rem;color:#94a3b8;margin-bottom:12px">Utløper: {utloper} (om {gjenstaar})</p>
+      <form method="post" style="margin:0">
+        <input type="hidden" name="action" value="fjern">
+        <button class="admin-btn fare">Fjern nyhet</button>
+      </form>
+    </div>'''
+
+    default_utloper = (datetime.now() + timedelta(days=2)).strftime('%Y-%m-%dT%H:%M')
+
+    return f'''<!DOCTYPE html><html lang="no"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nyhet – Admin</title>
+<style>
+  *{{box-sizing:border-box;margin:0;padding:0}}
+  body{{font-family:system-ui,sans-serif;background:#0f172a;color:#e5e7eb;padding:2rem 1rem}}
+  .container{{max-width:640px;margin:0 auto}}
+  h1{{font-size:1.3rem;margin-bottom:2rem;color:#f1f5f9}}
+  h2{{font-size:1rem;color:#94a3b8;margin-bottom:0.75rem}}
+  .kort{{background:#111827;border:1px solid #1f2937;border-radius:10px;padding:1.5rem;margin-bottom:1.5rem}}
+  label{{display:block;font-size:0.85rem;color:#94a3b8;margin-bottom:4px}}
+  textarea{{width:100%;background:rgba(148,163,184,0.08);border:1px solid rgba(148,163,184,0.3);
+            border-radius:6px;color:#e5e7eb;font-size:0.92rem;padding:10px 14px;resize:vertical;
+            min-height:100px;font-family:inherit;outline:none}}
+  textarea:focus{{border-color:#3b82f6}}
+  input[type="datetime-local"]{{background:rgba(148,163,184,0.08);border:1px solid rgba(148,163,184,0.3);
+            border-radius:6px;color:#e5e7eb;font-size:0.92rem;padding:10px 14px;width:100%;outline:none}}
+  input[type="datetime-local"]:focus{{border-color:#3b82f6}}
+  .gruppe{{margin-bottom:1rem}}
+  .btn{{background:#3b82f6;border:none;border-radius:6px;color:white;font-size:0.9rem;
+        font-weight:600;padding:12px 20px;cursor:pointer;width:100%}}
+  .btn:hover{{background:#2563eb}}
+  .admin-btn{{background:#1f2937;border:1px solid #374151;border-radius:6px;color:#e5e7eb;
+              font-size:0.82rem;padding:8px 14px;cursor:pointer}}
+  .admin-btn.fare{{border-color:#ef4444;color:#ef4444}}
+  .admin-btn.fare:hover{{background:rgba(239,68,68,0.15)}}
+  nav{{margin-bottom:1.5rem;font-size:0.85rem}}
+  nav a{{color:#94a3b8}}
+  .preview{{background:rgba(148,163,184,0.07);border:1px solid #1f2937;border-radius:6px;
+            padding:12px;margin-top:8px;white-space:pre-line;font-size:0.9rem;line-height:1.6;
+            min-height:2rem;color:#94a3b8}}
+</style></head><body><div class="container">
+<nav><a href="/admin">← Admin</a></nav>
+<h1>Nyhetsmelding</h1>
+{aktiv_html}
+<div class="kort">
+  <h2>Publiser nyhet</h2>
+  <p style="font-size:0.82rem;color:#94a3b8;margin-bottom:1rem">Meldingen vises som en splash screen for alle besøkende. Hver bruker ser den kun én gang.</p>
+  <form method="post">
+    <div class="gruppe">
+      <label for="nyhet-tekst">Meldingstekst</label>
+      <textarea id="nyhet-tekst" name="tekst" placeholder="Skriv en kort melding til brukerne …">{tekst if aktiv else ''}</textarea>
+    </div>
+    <div class="gruppe">
+      <label for="nyhet-utloper">Utløpsdato</label>
+      <input type="datetime-local" id="nyhet-utloper" name="utloper" value="{default_utloper}">
+    </div>
+    <div class="gruppe">
+      <label>Forhåndsvisning</label>
+      <div class="preview" id="preview"></div>
+    </div>
+    <button class="btn" type="submit">Publiser nyhet</button>
+  </form>
+</div>
+</div>
+<script>
+const ta = document.getElementById('nyhet-tekst');
+const pre = document.getElementById('preview');
+function oppdater() {{
+  pre.textContent = ta.value || '(tom)';
+  pre.style.color = ta.value ? '#e5e7eb' : '#94a3b8';
+}}
+ta.addEventListener('input', oppdater);
+oppdater();
+</script>
+</body></html>'''
 
 
 @admin_bp.route('/admin/oversikt')
@@ -741,3 +889,338 @@ if (stasjoner.length) {{
   map.fitBounds(bounds, {{ padding: [30, 30] }});
 }}
 </script></body></html>'''
+
+
+@admin_bp.route('/admin/import')
+@krever_innlogging
+@krever_admin
+def admin_import():
+    return '''<!DOCTYPE html><html lang="no"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Import – Admin</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:system-ui,sans-serif;background:#0f172a;color:#e5e7eb;padding:2rem 1rem}
+  .container{max-width:900px;margin:0 auto}
+  h1{font-size:1.3rem;margin-bottom:0.5rem;color:#f1f5f9}
+  p.info{font-size:0.85rem;color:#94a3b8;margin-bottom:1.5rem}
+  nav{margin-bottom:1.5rem;font-size:0.85rem}
+  nav a{color:#94a3b8}
+  .kort{background:#111827;border:1px solid #1f2937;border-radius:10px;padding:1.5rem;margin-bottom:1.5rem;overflow-x:auto}
+  .btn{border:none;border-radius:6px;font-size:0.9rem;font-weight:600;padding:10px 18px;cursor:pointer}
+  .btn-hent{background:#3b82f6;color:white}
+  .btn-hent:hover{background:#2563eb}
+  .btn-hent:disabled{opacity:0.5;cursor:not-allowed}
+  .bulk-bar{display:flex;gap:0.75rem;margin-bottom:1rem;flex-wrap:wrap;align-items:center}
+  .btn-godkjenn{background:transparent;border:1px solid #22c55e;color:#22c55e;font-size:0.82rem;padding:6px 14px;border-radius:6px;cursor:pointer}
+  .btn-godkjenn:hover{background:rgba(34,197,94,0.15)}
+  .btn-underkjenn{background:transparent;border:1px solid #ef4444;color:#ef4444;font-size:0.82rem;padding:6px 14px;border-radius:6px;cursor:pointer}
+  .btn-underkjenn:hover{background:rgba(239,68,68,0.15)}
+  table{width:100%;border-collapse:collapse;font-size:0.85rem}
+  td,th{padding:8px 10px;border-bottom:1px solid #1f2937;text-align:left}
+  th{color:#94a3b8;font-weight:500}
+  tr.godkjent{opacity:0.4}
+  tr.underkjent{opacity:0.3;text-decoration:line-through}
+  .status-ikon{font-size:1rem;margin-right:4px}
+  .melding{padding:12px 16px;border-radius:8px;font-size:0.88rem;margin-bottom:1rem}
+  .melding-ok{background:rgba(34,197,94,0.15);border:1px solid rgba(34,197,94,0.3);color:#22c55e}
+  .melding-feil{background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);color:#ef4444}
+  .melding-info{background:rgba(59,130,246,0.15);border:1px solid rgba(59,130,246,0.3);color:#93c5fd}
+  .spinner{display:inline-block;width:16px;height:16px;border:2px solid #3b82f6;border-top-color:transparent;border-radius:50%;animation:spin 0.6s linear infinite;margin-right:8px;vertical-align:middle}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .teller{font-size:0.85rem;color:#94a3b8;margin-left:auto}
+</style></head><body><div class="container">
+<nav><a href="/admin">&larr; Admin</a></nav>
+<h1>Partnerimport</h1>
+<p class="info">Hent prisdata fra partner-API. Data grupperes per stasjon (OSM-id). Gjennomgå og godkjenn enkeltvis eller samlet.</p>
+
+<div class="kort">
+  <div style="display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap">
+    <button class="btn btn-hent" id="hent-btn" onclick="hentData()">Hent data</button>
+    <label style="font-size:0.85rem;color:#94a3b8">
+      <input type="number" id="dager-tilbake" value="1" min="1" max="30" style="width:60px;background:#1f2937;border:1px solid #374151;border-radius:4px;color:#e5e7eb;padding:4px 8px;text-align:center">
+      dager tilbake
+    </label>
+    <span id="status-tekst" style="font-size:0.85rem;color:#94a3b8"></span>
+  </div>
+</div>
+
+<div id="resultat"></div>
+
+</div>
+<script>
+let importData = [];
+
+async function hentData() {
+  const btn = document.getElementById('hent-btn');
+  const statusEl = document.getElementById('status-tekst');
+  const resultatEl = document.getElementById('resultat');
+  const dager = parseInt(document.getElementById('dager-tilbake').value) || 5;
+  const from = Date.now() - dager * 86400000;
+
+  btn.disabled = true;
+  statusEl.innerHTML = '<span class="spinner"></span>Henter data ...';
+  resultatEl.innerHTML = '';
+
+  try {
+    const resp = await fetch('/admin/import/hent', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({from: from})
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+      statusEl.textContent = '';
+      resultatEl.innerHTML = '<div class="melding melding-feil">' + (data.error || 'Feil ved henting') + '</div>';
+      btn.disabled = false;
+      return;
+    }
+    importData = data.stasjoner || [];
+    const forkastet = data.forkastet || 0;
+    let info = importData.length + ' stasjoner hentet';
+    if (forkastet > 0) info += ' (' + forkastet + ' rader uten gyldig OSM-id forkastet)';
+    statusEl.textContent = info;
+    visTabell();
+  } catch(e) {
+    statusEl.textContent = '';
+    resultatEl.innerHTML = '<div class="melding melding-feil">Nettverksfeil: ' + e.message + '</div>';
+  }
+  btn.disabled = false;
+}
+
+function visTabell() {
+  const el = document.getElementById('resultat');
+  if (importData.length === 0) {
+    el.innerHTML = '<div class="melding melding-ok">Ingen nye priser fra partner.</div>';
+    return;
+  }
+
+  const ventende = importData.filter(p => !p._status).length;
+  let html = '<div class="kort">';
+  html += '<div class="bulk-bar">';
+  html += '<button class="btn-godkjenn" onclick="godkjennAlle()">Godkjenn alle</button>';
+  html += '<button class="btn-underkjenn" onclick="underkjennAlle()">Underkjenn alle</button>';
+  html += '<span class="teller" id="ventende-teller">' + ventende + ' ventende</span>';
+  html += '</div>';
+  html += '<table><tr><th>OSM-id</th><th>Vår stasjon</th><th style="text-align:right">95</th><th style="text-align:right">98</th><th style="text-align:right">Diesel</th><th style="text-align:right">Siste oppdatering</th><th></th></tr>';
+
+  importData.forEach((s, i) => {
+    const cls = s._status === 'godkjent' ? ' class="godkjent"' : s._status === 'underkjent' ? ' class="underkjent"' : '';
+    const statusIkon = s._status === 'godkjent' ? '<span class="status-ikon">&#9989;</span>' :
+                       s._status === 'underkjent' ? '<span class="status-ikon">&#10060;</span>' : '';
+    const fmt = v => v != null ? parseFloat(v).toFixed(2) : '&#8211;';
+    const matchNavn = s.match ? s.match.navn + (s.match.kjede ? ' (' + s.match.kjede + ')' : '') : '<span style="color:#f59e0b">Ikke i vår DB</span>';
+    const tidKort = s.updated ? s.updated.replace('T', ' ').substring(0, 16) : '&#8211;';
+
+    html += '<tr' + cls + '>';
+    html += '<td style="font-family:monospace;font-size:0.78rem;color:#94a3b8">' + statusIkon + s.osm_id + '</td>';
+    html += '<td>' + matchNavn + '</td>';
+    html += '<td style="text-align:right">' + fmt(s.bensin) + '</td>';
+    html += '<td style="text-align:right">' + fmt(s.bensin98) + '</td>';
+    html += '<td style="text-align:right">' + fmt(s.diesel) + '</td>';
+    html += '<td style="text-align:right;color:#94a3b8;font-size:0.78rem">' + tidKort + '</td>';
+    html += '<td style="white-space:nowrap">';
+    if (!s._status) {
+      html += '<button class="btn-godkjenn" onclick="godkjenn(' + i + ')" ' + (s.match ? '' : 'disabled title="Ikke i vår DB"') + '>Godkjenn</button> ';
+      html += '<button class="btn-underkjenn" onclick="underkjenn(' + i + ')">Underkjenn</button>';
+    }
+    html += '</td></tr>';
+  });
+  html += '</table></div>';
+  el.innerHTML = html;
+}
+
+async function godkjenn(idx) {
+  const s = importData[idx];
+  if (!s.match) return;
+  try {
+    const resp = await fetch('/admin/import/godkjenn', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        stasjon_id: s.match.id,
+        bensin: s.bensin,
+        diesel: s.diesel,
+        bensin98: s.bensin98
+      })
+    });
+    if (resp.ok) {
+      s._status = 'godkjent';
+      visTabell();
+    }
+  } catch(e) { console.error(e); }
+}
+
+function underkjenn(idx) {
+  importData[idx]._status = 'underkjent';
+  visTabell();
+}
+
+async function godkjennAlle() {
+  for (let i = 0; i < importData.length; i++) {
+    const s = importData[i];
+    if (s._status || !s.match) continue;
+    try {
+      const resp = await fetch('/admin/import/godkjenn', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          stasjon_id: s.match.id,
+          bensin: s.bensin,
+          diesel: s.diesel,
+          bensin98: s.bensin98
+        })
+      });
+      if (resp.ok) s._status = 'godkjent';
+    } catch(e) { console.error(e); }
+  }
+  visTabell();
+}
+
+function underkjennAlle() {
+  importData.forEach(s => { if (!s._status) s._status = 'underkjent'; });
+  visTabell();
+}
+</script>
+</body></html>'''
+
+
+@admin_bp.route('/admin/import/hent', methods=['POST'])
+@krever_innlogging
+@krever_admin
+def admin_import_hent():
+    import urllib.request
+    import json as json_mod
+
+    api_url = os.environ.get('PARTNER_API_URL', 'https://api-lev4nsfo5q-uc.a.run.app/')
+    api_key = os.environ.get('PARTNER_API_KEY', '')
+    if not api_key:
+        return jsonify({'error': 'PARTNER_API_KEY ikke konfigurert'}), 500
+
+    body = request.get_json(silent=True) or {}
+    from_ts = body.get('from')
+
+    url = api_url
+    if from_ts:
+        url += f'?from={int(from_ts)}'
+
+    req = urllib.request.Request(url, headers={'X-API-Key': api_key})
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json_mod.loads(resp.read())
+    except Exception as e:
+        log = logging.getLogger('drivstoff')
+        log.error(f'Partner-import feilet: {e}')
+        return jsonify({'error': f'Feil ved henting fra partner: {e}'}), 502
+
+    rader = data.get('prices', [])
+
+    # Grupper per stasjon (osm_id) — bruk siste pris per drivstofftype
+    # Filtrer bort ugyldige id-er
+    ugyldige = {'ukjent_id', 'undefined', '', None}
+    forkastet = 0
+    per_stasjon = {}
+    for r in rader:
+        sid = r.get('station_id', '')
+        if sid in ugyldige:
+            forkastet += 1
+            continue
+        if sid not in per_stasjon:
+            per_stasjon[sid] = {'osm_id': sid, 'bensin': None, 'bensin98': None,
+                                'diesel': None, 'updated': None}
+        fuel = r.get('fuel_type', '')
+        pris = r.get('price')
+        oppdatert = r.get('updated', '')
+        if fuel == 'bensin95':
+            per_stasjon[sid]['bensin'] = pris
+        elif fuel == 'bensin98':
+            per_stasjon[sid]['bensin98'] = pris
+        elif fuel == 'diesel':
+            per_stasjon[sid]['diesel'] = pris
+        # Bruk siste tidspunkt
+        if oppdatert and (not per_stasjon[sid]['updated'] or oppdatert > per_stasjon[sid]['updated']):
+            per_stasjon[sid]['updated'] = oppdatert
+
+    # Slå opp alle OSM-id-er mot vår database
+    osm_ids = list(per_stasjon.keys())
+    match_map = finn_stasjoner_by_osm_ids(osm_ids)
+
+    stasjoner = []
+    for sid, s in per_stasjon.items():
+        if sid in match_map:
+            s['match'] = match_map[sid]
+        stasjoner.append(s)
+
+    # Sorter: nyeste først, umatchede sist
+    stasjoner.sort(key=lambda s: (0 if s.get('match') else 1, s.get('updated') or ''), reverse=True)
+
+    return jsonify({'stasjoner': stasjoner, 'forkastet': forkastet})
+
+
+@admin_bp.route('/admin/import/godkjenn', methods=['POST'])
+@krever_innlogging
+@krever_admin
+def admin_import_godkjenn():
+    data = request.get_json(silent=True) or {}
+    stasjon_id = data.get('stasjon_id')
+    bensin = data.get('bensin')
+    diesel = data.get('diesel')
+    bensin98 = data.get('bensin98')
+
+    if not stasjon_id:
+        return jsonify({'error': 'Mangler stasjon_id'}), 400
+
+    if bensin is None and diesel is None and bensin98 is None:
+        return jsonify({'error': 'Ingen priser å lagre'}), 400
+
+    partner_id = hent_eller_opprett_partner('drivstoffnorge')
+    lagre_pris(stasjon_id, bensin, diesel, bensin98, partner_id)
+    return jsonify({'ok': True})
+
+
+@admin_bp.route('/admin/toppliste')
+@krever_innlogging
+@krever_admin
+def admin_toppliste():
+    liste = hent_toppliste(limit=10)
+    medaljer = ['&#127947;', '&#129352;', '&#129353;']
+    rader = []
+    for i, rad in enumerate(liste):
+        plass = medaljer[i] if i < 3 else str(i + 1) + '.'
+        if rad['kallenavn']:
+            visningsnavn = rad['kallenavn']
+            navn_stil = ''
+        else:
+            visningsnavn = f'Bruker #{rad["id"]}'
+            navn_stil = ' style="color:#94a3b8;font-style:italic"'
+        rader.append(
+            f'<tr>'
+            f'<td style="text-align:center;font-size:{"1.2rem" if i < 3 else "0.88rem"};width:2.5rem">{plass}</td>'
+            f'<td{navn_stil}>{visningsnavn}</td>'
+            f'<td style="text-align:right;font-weight:600;color:#3b82f6">{rad["antall"]}</td>'
+            f'</tr>'
+        )
+    rader_html = ''.join(rader) or '<tr><td colspan="3" style="color:#94a3b8;text-align:center">Ingen registreringer ennå</td></tr>'
+    return f'''<!DOCTYPE html><html lang="no"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Toppliste – Admin</title>
+<style>
+  *{{box-sizing:border-box;margin:0;padding:0}}
+  body{{font-family:system-ui,sans-serif;background:#0f172a;color:#e5e7eb;padding:2rem 1rem}}
+  .container{{max-width:480px;margin:0 auto}}
+  h1{{font-size:1.3rem;margin-bottom:0.5rem;color:#f1f5f9}}
+  p.info{{font-size:0.85rem;color:#94a3b8;margin-bottom:1.5rem}}
+  nav{{margin-bottom:1.5rem;font-size:0.85rem}}
+  nav a{{color:#94a3b8}}
+  .kort{{background:#111827;border:1px solid #1f2937;border-radius:10px;padding:1.5rem}}
+  table{{width:100%;border-collapse:collapse;font-size:0.9rem}}
+  td{{padding:10px 8px;border-bottom:1px solid #1f2937}}
+  tr:last-child td{{border-bottom:none}}
+</style></head><body><div class="container">
+<nav><a href="/admin">← Admin</a></nav>
+<h1>Toppliste</h1>
+<p class="info">Alle brukere. Uten kallenavn vises som Bruker #id. Partnere ekskludert.</p>
+<div class="kort">
+  <table>{rader_html}</table>
+</div>
+</div></body></html>'''

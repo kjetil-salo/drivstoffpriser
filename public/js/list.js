@@ -160,8 +160,9 @@ function kortHtml(s, billigste = {}, erHovedBilligst = false) {
         inn.bensin98  ? { label: '98',     v: formatPris(s.bensin98), billigst: billigste.bensin98 === s.id } : null,
         inn.diesel    ? { label: 'Diesel', v: formatPris(s.diesel),   billigst: billigste.diesel   === s.id } : null,
     ].filter(Boolean);
-    const logoUrl = getKjedeLogo(s.kjede);
-    const farge = getKjedeFarge(s.kjede);
+    const kjedeEllerNavn = s.kjede || s.navn;
+    const logoUrl = getKjedeLogo(kjedeEllerNavn);
+    const farge = getKjedeFarge(kjedeEllerNavn);
     const badgeHtml = logoUrl
         ? `<div class="sk-badge" style="background:#1e293b;border:1px solid rgba(148,163,184,0.2)">
              <img src="${logoUrl}" alt="${s.kjede || ''}" style="width:28px;height:28px;object-fit:contain"

@@ -171,6 +171,15 @@
     </div>
   </div>
 
+  <!-- Nyhet-dialog -->
+  <div id="nyhet-backdrop" hidden></div>
+  <div id="nyhet-dialog" hidden role="dialog" aria-modal="true" aria-labelledby="nyhet-tittel">
+    <div id="nyhet-stripe"></div>
+    <h2 id="nyhet-tittel">Nyhet</h2>
+    <div id="nyhet-tekst"></div>
+    <button id="nyhet-lukk">Lukk</button>
+  </div>
+
   <!-- Lokasjonsfeil-dialog -->
   <div id="lok-feil-backdrop" hidden></div>
   <div id="lok-feil-dialog" hidden role="alertdialog" aria-modal="true" aria-labelledby="lok-feil-tittel" aria-describedby="lok-feil-tekst">
@@ -210,7 +219,6 @@
           <option value="St1">St1</option>
           <option value="Best">Best</option>
           <option value="Oljeleverandøren">Oljeleverandøren</option>
-          <option value="Tanken">Tanken</option>
         </select>
       </div>
       <div id="add-station-status" class="add-station-status" role="status" aria-live="polite"></div>
@@ -276,6 +284,28 @@
           <button id="sheet-endre-btn" class="btn-lagre">Endre pris</button>
         </div>
         <button id="sheet-nedlagt-btn" class="btn-nedlagt" style="display:none">Meld som nedlagt</button>
+
+        <!-- Admin: tilknytt kjede -->
+        <div id="sheet-admin-kjede" hidden>
+          <div class="sheet-divider" style="margin:1rem 0"></div>
+          <div class="pris-input-gruppe">
+            <label for="sheet-kjede-select">Kjede (admin)</label>
+            <select id="sheet-kjede-select">
+              <option value="">— Ingen kjede —</option>
+              <option value="Circle K">Circle K</option>
+              <option value="Uno-X">Uno-X</option>
+              <option value="YX">YX</option>
+              <option value="Esso">Esso</option>
+              <option value="Shell">Shell</option>
+              <option value="Preem">Preem</option>
+              <option value="St1">St1</option>
+              <option value="Best">Best</option>
+              <option value="Oljeleverandøren">Oljeleverandøren</option>
+            </select>
+          </div>
+          <div id="sheet-kjede-status" role="status" aria-live="polite" style="display:none"></div>
+          <button id="sheet-kjede-lagre-btn" class="btn-lagre" style="width:100%">Lagre kjede</button>
+        </div>
       </div>
 
       <!-- Redigering (inline) -->
