@@ -82,7 +82,7 @@ Alle kan se priser. For å rapportere priser trenger du en konto:
 | Hosting | Raspberry Pi + Docker + Cloudflare Tunnel |
 | Failover | Fly.io med automatisk DB-synk |
 | PWA | Service Worker, manifest, offline-støtte |
-| Tester | Playwright (WebKit/Chromium) |
+| Tester | pytest (enhetstester), Playwright (E2E) |
 
 ### Filstruktur
 
@@ -115,6 +115,11 @@ drivstoffpriser/
 │       ├── kjede.js       # Kjedelogoer og farger
 │       └── api.js         # Fetch-wrapper mot backend
 ├── tests/
+│   ├── conftest.py        # Pytest-fixtures
+│   ├── test_api.py        # API-endepunkt-tester
+│   ├── test_auth.py       # Autentiserings-tester
+│   ├── test_admin.py      # Admin-panel-tester
+│   ├── test_db.py         # Databasefunksjons-tester
 │   └── sheet.spec.js      # E2E-tester (Playwright)
 ├── Dockerfile
 ├── docker-compose.yml
@@ -212,6 +217,10 @@ python3 server.py
 ### Tester
 
 ```bash
+# Enhetstester (pytest)
+pytest tests/test_db.py tests/test_auth.py tests/test_api.py tests/test_admin.py -q
+
+# E2E-tester (Playwright)
 npm install
 npx playwright install webkit chromium
 npx playwright test
@@ -236,7 +245,6 @@ npx playwright test
 | `SECRET_KEY` | — | Flask session-nøkkel (**sett sterk verdi i prod**) |
 | `STATS_KEY` | — | Nøkkel for admin-statistikk |
 | `RESEND_API_KEY` | — | API-nøkkel for Resend (e-post) |
-| `REGISTRER_KODE` | — | Tilgangskode for selvregistrering |
 | `BASE_URL` | `request.host_url` | Base-URL for e-postlenker |
 | `FLY_APP_NAME` | — | Satt på Fly.io for backup-deteksjon |
 | `LOG_LEVEL` | `INFO` | Loggnivå |
