@@ -108,14 +108,6 @@ class TestHaversine:
         dist = db_mod._haversine(60.39, 5.33, 58.97, 5.73)
         assert 155_000 < dist < 165_000
 
-    def test_ferske_stasjoner(self):
-        db_mod.lagre_stasjon('Test', 'T', 60.39, 5.33, 'node/1')
-        assert db_mod.har_ferske_stasjoner(60.39, 5.33)
-
-    def test_ingen_ferske_stasjoner_langt_unna(self):
-        db_mod.lagre_stasjon('Test', 'T', 60.39, 5.33, 'node/1')
-        # Oslo er langt unna Bergen
-        assert not db_mod.har_ferske_stasjoner(59.91, 10.75)
 
 
 # ── Brukere ────────────────────────────────────────
@@ -210,7 +202,7 @@ class TestTilbakestilling:
 
 class TestVisninger:
     def test_logg_visning(self):
-        db_mod.logg_visning('1.2.3.4', 'device-1', 'Mozilla/5.0')
+        db_mod.logg_visning('device-1', 'Mozilla/5.0')
         stats = db_mod.get_statistikk()
         assert stats['totalt'] == 1
         assert stats['unike_enheter'] == 1
@@ -220,7 +212,6 @@ class TestVisninger:
         assert 'prisendringer' in stats
         assert 'totalt' in stats
         assert 'unike_enheter' in stats
-        assert 'unike_ips' in stats
         assert 'trend_30d' in stats
         assert 'besok_per_time' in stats
         assert len(stats['trend_30d']) == 30

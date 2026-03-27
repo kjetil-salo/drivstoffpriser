@@ -15,6 +15,19 @@ usage() {
     exit 1
 }
 
+kjor_tester() {
+    echo "[test] Kjører tester før deploy..."
+
+    if [ -f ".venv/bin/pytest" ]; then
+        PYTEST=".venv/bin/pytest"
+    else
+        PYTEST="pytest"
+    fi
+
+    $PYTEST tests/test_db.py tests/test_auth.py tests/test_api.py tests/test_admin.py -q --tb=short
+    echo "[test] Alle tester OK."
+}
+
 deploy_pi() {
     local ENV_NAME=$1
     local COMPOSE_FILE=$2
@@ -37,15 +50,19 @@ deploy_fly() {
 
 case "${1:-}" in
     prod)
+        kjor_tester
         deploy_pi "prod" "docker-compose.yml" "~/drivstoffpriser"
         ;;
     staging)
+        kjor_tester
         deploy_pi "staging" "docker-compose.staging.yml" "~/drivstoffpriser-staging"
         ;;
     fly)
+        kjor_tester
         deploy_fly
         ;;
     all)
+        kjor_tester
         deploy_pi "prod" "docker-compose.yml" "~/drivstoffpriser"
         deploy_fly
         ;;

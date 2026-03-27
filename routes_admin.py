@@ -117,28 +117,7 @@ def admin():
 <nav><a href="/">&#8592; Appen</a></nav>
 <h1>Admin</h1>
 
-<div class="admin-panel">
-  <h2>Registrering</h2>
-  <div class="admin-rad">
-    <span class="admin-status" style="color:{reg_farge}">&#9679; {reg_status}</span>
-    <form method="post" action="/admin/toggle-registrering" style="margin:0">
-      <input type="hidden" name="verdi" value="{reg_verdi}">
-      <button class="admin-btn {'ok' if reg_stoppet else 'fare'}">{reg_knapp}</button>
-    </form>
-  </div>
-</div>
-
 <div class="tiles">
-  <a href="/admin/brukere" class="tile">
-    <div class="tile-ikon">&#128101;</div>
-    <div class="tile-tittel">Brukere</div>
-    <div class="tile-info">{brukere_antall} registrerte</div>
-  </a>
-  <a href="/admin/steder" class="tile">
-    <div class="tile-ikon">&#128205;</div>
-    <div class="tile-tittel">Steder</div>
-    <div class="tile-info">Bruker-opprettede stasjoner</div>
-  </a>
   <a href="/admin/oversikt" class="tile">
     <div class="tile-ikon">&#128202;</div>
     <div class="tile-tittel">Statistikk</div>
@@ -153,6 +132,21 @@ def admin():
     <div class="tile-ikon">&#128506;&#65039;</div>
     <div class="tile-tittel">Kart</div>
     <div class="tile-info">{stasjoner_antall} stasjoner med pris</div>
+  </a>
+  <a href="/admin/import" class="tile">
+    <div class="tile-ikon">&#128229;</div>
+    <div class="tile-tittel">Import</div>
+    <div class="tile-info">Partnerdata</div>
+  </a>
+  <a href="/admin/steder" class="tile">
+    <div class="tile-ikon">&#128205;</div>
+    <div class="tile-tittel">Steder</div>
+    <div class="tile-info">Bruker-opprettede stasjoner</div>
+  </a>
+  <a href="/admin/brukere" class="tile">
+    <div class="tile-ikon">&#128101;</div>
+    <div class="tile-tittel">Brukere</div>
+    <div class="tile-info">{brukere_antall} registrerte</div>
   </a>
   <a href="/admin/rapporter" class="tile" {('style="border-color:#f59e0b"' if rapporter_antall else '')}>
     <div class="tile-ikon">&#9888;&#65039;</div>
@@ -169,16 +163,22 @@ def admin():
     <div class="tile-tittel">Nyhet</div>
     <div class="tile-info">Splash-melding</div>
   </a>
-  <a href="/admin/import" class="tile">
-    <div class="tile-ikon">&#128229;</div>
-    <div class="tile-tittel">Import</div>
-    <div class="tile-info">Partnerdata</div>
-  </a>
   <a href="/admin/toppliste" class="tile">
     <div class="tile-ikon">&#127942;</div>
     <div class="tile-tittel">Toppliste</div>
     <div class="tile-info">Prisregistreringer</div>
   </a>
+</div>
+
+<div class="admin-panel" style="margin-top:1.5rem">
+  <h2>Registrering</h2>
+  <div class="admin-rad">
+    <span class="admin-status" style="color:{reg_farge}">&#9679; {reg_status}</span>
+    <form method="post" action="/admin/toggle-registrering" style="margin:0">
+      <input type="hidden" name="verdi" value="{reg_verdi}">
+      <button class="admin-btn {'ok' if reg_stoppet else 'fare'}">{reg_knapp}</button>
+    </form>
+  </div>
 </div>
 </div></body></html>'''
 
@@ -1182,7 +1182,7 @@ def admin_import_godkjenn():
 @krever_innlogging
 @krever_admin
 def admin_toppliste():
-    liste = hent_toppliste(limit=10)
+    liste = hent_toppliste(limit=20)
     medaljer = ['&#127947;', '&#129352;', '&#129353;']
     rader = []
     for i, rad in enumerate(liste):

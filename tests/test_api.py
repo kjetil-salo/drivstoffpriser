@@ -155,18 +155,18 @@ class TestStedssok:
         assert resp.get_json() == []
 
 
-# ── /oversikt ──────────────────────────────────────
+# ── /admin/oversikt ────────────────────────────────
 
 class TestOversikt:
-    def test_krever_noekkel(self, client):
-        resp = client.get('/oversikt')
-        assert resp.status_code == 401
+    def test_krever_innlogging(self, client):
+        resp = client.get('/admin/oversikt')
+        assert resp.status_code == 302
 
-    def test_feil_noekkel(self, client):
-        resp = client.get('/oversikt?key=feil')
-        assert resp.status_code == 401
+    def test_krever_admin(self, innlogget_client):
+        resp = innlogget_client.get('/admin/oversikt')
+        assert resp.status_code == 403
 
-    def test_riktig_noekkel(self, client):
-        resp = client.get('/oversikt?key=testkey')
+    def test_admin_far_tilgang(self, admin_client):
+        resp = admin_client.get('/admin/oversikt')
         assert resp.status_code == 200
         assert 'statistikk' in resp.data.decode().lower()
