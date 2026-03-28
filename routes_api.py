@@ -283,7 +283,7 @@ def nyhet():
 
 @api_bp.route('/api/toppliste')
 def toppliste():
-    liste = hent_toppliste(limit=10)
+    liste = hent_toppliste(limit=15)
     resultat = []
     for rad in liste:
         resultat.append({

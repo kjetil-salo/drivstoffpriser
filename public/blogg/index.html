@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <meta name="theme-color" content="#1a1a2e">
+  <title>Prisanalyse – Drivstoffprisene</title>
+  <link rel="stylesheet" href="/css/tokens.css">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--color-bg);
+      color: var(--color-text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 16px;
+      min-height: 100vh;
+    }
+
+    header {
+      position: sticky;
+      top: 0;
+      background: rgba(15, 23, 42, 0.92);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--border-color);
+      padding: 0 var(--space-lg);
+      height: 48px;
+      display: flex;
+      align-items: center;
+      gap: var(--space-md);
+      z-index: 10;
+    }
+
+    header a {
+      color: var(--color-muted);
+      text-decoration: none;
+      font-size: var(--font-sm);
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+    }
+
+    header a:hover { color: var(--color-text); }
+
+    header .site-title {
+      color: var(--color-text);
+      font-weight: 600;
+      font-size: var(--font-base);
+    }
+
+    header .sep { color: var(--border-color-medium); }
+
+    main {
+      max-width: 720px;
+      margin: 0 auto;
+      padding: var(--space-lg);
+    }
+
+    .blogg-tittel {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: var(--space-xs);
+    }
+
+    .blogg-ingress {
+      color: var(--color-muted);
+      font-size: var(--font-base);
+      margin-bottom: var(--space-lg);
+      line-height: 1.5;
+    }
+
+    .artikkel-liste {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-md);
+    }
+
+    .artikkel-kort {
+      background: var(--color-card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: var(--space-md) var(--space-lg);
+      text-decoration: none;
+      color: inherit;
+      display: block;
+      transition: border-color var(--transition-base);
+    }
+
+    .artikkel-kort:hover {
+      border-color: var(--color-accent);
+    }
+
+    .artikkel-dato {
+      font-size: var(--font-xs);
+      color: var(--color-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: var(--space-xs);
+    }
+
+    .artikkel-overskrift {
+      font-size: var(--font-md);
+      font-weight: 600;
+      margin-bottom: var(--space-xs);
+    }
+
+    .artikkel-sammendrag {
+      font-size: var(--font-sm);
+      color: var(--color-muted);
+      line-height: 1.5;
+    }
+
+    .tom-melding {
+      color: var(--color-muted);
+      font-size: var(--font-base);
+      text-align: center;
+      padding: 3rem 0;
+    }
+
+    :focus-visible {
+      outline: 2px solid var(--color-accent);
+      outline-offset: 2px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/">⛽ Drivstoffprisene</a>
+    <span class="sep">/</span>
+    <span class="site-title">Prisanalyse</span>
+  </header>
+
+  <main>
+    <h1 class="blogg-tittel">Prisanalyse</h1>
+    <p class="blogg-ingress">Ukentlige analyser av drivstoffpriser i Norge — trender, rekorder og regionale forskjeller, basert på data fra brukere av appen.</p>
+
+    <div class="artikkel-liste" id="artikkel-liste">
+      <p class="tom-melding">Ingen artikler ennå — kom tilbake snart.</p>
+    </div>
+  </main>
+</body>
+</html>

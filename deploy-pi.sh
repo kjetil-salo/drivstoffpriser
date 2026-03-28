@@ -5,6 +5,9 @@ set -e
 PI="kjetil@100.76.35.106"
 REMOTE_DIR="~/drivstoffpriser"
 
+echo "Kjører tester..."
+pytest tests/
+echo ""
 echo "Kopierer filer til Pi..."
 rsync -av --exclude-from='.rsyncignore' ./ "$PI:$REMOTE_DIR/"
 
