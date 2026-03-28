@@ -891,6 +891,49 @@ if (stasjoner.length) {{
 </script></body></html>'''
 
 
+@admin_bp.route('/admin/kart2')
+@krever_innlogging
+@krever_admin
+def admin_kart2():
+    import json
+    stasjoner = stasjoner_med_pris_koordinater()
+    return f'''<!DOCTYPE html><html lang="no"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Priskart grønn – Admin</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  *{{box-sizing:border-box;margin:0;padding:0}}
+  body{{font-family:system-ui,sans-serif;background:#0f172a;color:#e5e7eb}}
+  nav{{padding:1rem;font-size:0.85rem}}
+  nav a{{color:#94a3b8}}
+  h1{{font-size:1.3rem;padding:0 1rem 1rem;color:#f1f5f9}}
+  #map{{height:calc(100vh - 80px);width:100%;border-radius:10px;margin:0 auto;max-width:1200px}}
+  .info{{background:#111827;border:1px solid #1f2937;border-radius:8px;padding:0.75rem 1rem;
+         margin:0 1rem 1rem;font-size:0.85rem;color:#94a3b8;display:inline-block}}
+</style></head><body>
+<nav><a href="/admin">← Admin</a></nav>
+<h1>Stasjoner med registrerte priser</h1>
+<div class="info">{len(stasjoner)} stasjoner</div>
+<div id="map"></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const stasjoner = {json.dumps(stasjoner, ensure_ascii=False)};
+const map = L.map('map').setView([63.4, 10.4], 5);
+L.tileLayer('https://{{s}}.basemaps.cartocdn.com/dark_nolabels/{{z}}/{{x}}/{{y}}{{r}}.png', {{
+  maxZoom: 19
+}}).addTo(map);
+stasjoner.forEach(s => {{
+  L.circleMarker([s.lat, s.lon], {{
+    radius: 5, fillColor: '#22c55e', color: '#22c55e', weight: 0, fillOpacity: 0.85
+  }}).addTo(map);
+}});
+if (stasjoner.length) {{
+  const bounds = L.latLngBounds(stasjoner.map(s => [s.lat, s.lon]));
+  map.fitBounds(bounds, {{ padding: [30, 30] }});
+}}
+</script></body></html>'''
+
+
 @admin_bp.route('/admin/import')
 @krever_innlogging
 @krever_admin
