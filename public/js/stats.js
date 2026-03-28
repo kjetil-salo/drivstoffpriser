@@ -24,12 +24,32 @@ function visPrisKort(elementId, data) {
     `;
 }
 
+function visToppliste(liste) {
+    const el = document.getElementById('stat-toppliste');
+    if (!liste || liste.length === 0) {
+        el.innerHTML = '<div class="stat-toppliste-tom">Ingen registreringer ennå</div>';
+        return;
+    }
+    const medaljer = ['🥇', '🥈', '🥉'];
+    const rader = liste.map((rad, i) => {
+        const plass = i < 3 ? `<span class="stat-toppliste-medalje">${medaljer[i]}</span>` : `<span class="stat-toppliste-nr">${i + 1}.</span>`;
+        const navn = rad.kallenavn
+            ? `<span class="stat-toppliste-navn">${rad.kallenavn}</span>`
+            : `<span class="stat-toppliste-navn stat-toppliste-anonym">Anonym bidragsyter</span>`;
+        return `<div class="stat-toppliste-rad">${plass}${navn}<span class="stat-toppliste-antall">${rad.antall}</span></div>`;
+    });
+    el.innerHTML = rader.join('');
+}
+
 export async function lastStatistikk() {
     if (lastet) return;
     try {
-        const resp = await fetch('/api/statistikk');
-        if (!resp.ok) return;
-        const data = await resp.json();
+        const [respStat, respTopp] = await Promise.all([
+            fetch('/api/statistikk'),
+            fetch('/api/toppliste')
+        ]);
+        if (!respStat.ok) return;
+        const data = await respStat.json();
 
         document.getElementById('stat-antall').textContent = data.antall_oppdateringer_24t;
 
@@ -40,6 +60,11 @@ export async function lastStatistikk() {
         visPrisKort('stat-dyrest-bensin', data.dyrest.bensin);
         visPrisKort('stat-dyrest-bensin98', data.dyrest.bensin98);
         visPrisKort('stat-dyrest-diesel', data.dyrest.diesel);
+
+        if (respTopp.ok) {
+            const toppliste = await respTopp.json();
+            visToppliste(toppliste);
+        }
 
         lastet = true;
     } catch (e) {

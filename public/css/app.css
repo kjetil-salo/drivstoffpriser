@@ -1419,6 +1419,66 @@ html, body {
   color: var(--color-muted);
 }
 
+.stat-toppliste {
+  background: var(--color-card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.stat-toppliste-rad {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border-bottom: 1px solid var(--border-color);
+  font-size: var(--font-sm);
+}
+
+.stat-toppliste-rad:last-child {
+  border-bottom: none;
+}
+
+.stat-toppliste-medalje {
+  font-size: 1.1rem;
+  width: 2rem;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.stat-toppliste-nr {
+  width: 2rem;
+  text-align: center;
+  flex-shrink: 0;
+  font-size: var(--font-xs);
+  color: var(--color-muted);
+  font-weight: 600;
+}
+
+.stat-toppliste-navn {
+  flex: 1;
+  font-weight: 500;
+}
+
+.stat-toppliste-anonym {
+  color: var(--color-muted);
+  font-style: italic;
+}
+
+.stat-toppliste-antall {
+  font-weight: 700;
+  color: var(--color-accent);
+  font-size: var(--font-sm);
+}
+
+.stat-toppliste-tom {
+  padding: var(--space-md);
+  font-size: var(--font-sm);
+  color: var(--color-muted);
+  font-style: italic;
+  text-align: center;
+}
+
 /* ── Toast ───────────────────────────────────────── */
 #toast {
   position: fixed;

@@ -15,7 +15,7 @@ from db import (get_stasjoner_med_priser, lagre_pris, logg_visning,
                 antall_stasjoner_med_pris, finn_bruker_id, DB_PATH,
                 opprett_stasjon, hent_billigste_priser_24t,
                 antall_prisoppdateringer_24t, meld_stasjon_nedlagt,
-                get_conn, hent_innstilling)
+                get_conn, hent_innstilling, hent_toppliste)
 
 logger = logging.getLogger('drivstoff')
 
@@ -279,6 +279,18 @@ def nyhet():
         return jsonify({'tekst': None})
     nyhet_id = hashlib.md5(tekst.encode()).hexdigest()[:8]
     return jsonify({'tekst': tekst, 'utloper': utloper, 'id': nyhet_id})
+
+
+@api_bp.route('/toppliste')
+def toppliste():
+    liste = hent_toppliste(limit=10)
+    resultat = []
+    for rad in liste:
+        resultat.append({
+            'kallenavn': rad['kallenavn'] or None,
+            'antall': rad['antall']
+        })
+    return jsonify(resultat)
 
 
 @api_bp.route('/om')
