@@ -1,4 +1,14 @@
 const SETTINGS_KEY = 'drivstoff_innstillinger';
+
+let toastTimer;
+function visToast(tekst) {
+    const el = document.getElementById('toast');
+    el.textContent = tekst;
+    el.classList.add('toast-vis');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('toast-vis'), 2200);
+}
+
 const STANDARD = { bensin: true, bensin98: true, diesel: true, radius: 30 };
 
 export function getInnstillinger() {
@@ -61,12 +71,15 @@ export function initInnstillinger(onChange) {
     document.getElementById('del-btn').addEventListener('click', async () => {
         const data = { title: 'Drivstoffprisene', text: 'Finn billigste drivstoff i nærheten', url: 'https://drivstoffprisene.no' };
         if (navigator.share) {
-            try { await navigator.share(data); } catch { /* avbrutt av bruker */ }
+            try {
+                await navigator.share(data);
+                visToast('✓ Delt!');
+            } catch { /* avbrutt av bruker */ }
         } else {
-            await navigator.clipboard.writeText(data.url);
-            const btn = document.getElementById('del-btn');
-            btn.textContent = '✓ Kopiert!';
-            setTimeout(() => { btn.innerHTML = '<span aria-hidden="true">↗️</span> Del appen'; }, 2000);
+            try {
+                await navigator.clipboard.writeText(data.url);
+                visToast('✓ Lenke kopiert!');
+            } catch { visToast('drivstoffprisene.no'); }
         }
     });
 }

@@ -1418,3 +1418,27 @@ html, body {
   font-size: var(--font-sm);
   color: var(--color-muted);
 }
+
+/* ── Toast ───────────────────────────────────────── */
+#toast {
+  position: fixed;
+  bottom: calc(var(--tabs-height, 60px) + 16px);
+  left: 50%;
+  transform: translateX(-50%) translateY(12px);
+  background: var(--color-text);
+  color: var(--color-bg);
+  padding: 10px 20px;
+  border-radius: var(--radius-lg, 24px);
+  font-size: var(--font-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 2000;
+}
+
+#toast.toast-vis {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
