@@ -407,11 +407,22 @@ def om():
 
 <div class="kort">
   <h2>Versjonshistorikk</h2>
-  <p><strong>v1.1.0</strong> <span class="tag">25. mars 2026</span></p>
+  <p><strong>v1.2.0</strong> <span class="tag">28. mars 2026</span></p>
   <ul>
-    <li>Ny innstilling: velg s&#248;keradius (5&#8211;100 km) for kart og liste</li>
+    <li>Toppliste over mest aktive bidragsytere i statistikk-fanen</li>
+    <li>Del appen enkelt med venner via innstillinger-menyen</li>
+    <li>Prisanalyse-blogg: ukentlige analyser p&#229; <a href="/blogg/">/blogg/</a></li>
+  </ul>
+  <p style="margin-top:1rem"><strong>v1.1.2</strong> <span class="tag">26.&#8211;27. mars 2026</span></p>
+  <ul>
+    <li>Registrering er n&#229; &#229;pen for alle &#8212; ingen tilgangskode trengs</li>
+    <li>Ny kjede: Tanken</li>
+    <li>Du kan n&#229; melde fra om nedlagte stasjoner</li>
+  </ul>
+  <p style="margin-top:1rem"><strong>v1.1.0</strong> <span class="tag">25. mars 2026</span></p>
+  <ul>
+    <li>Ny innstilling: velg s&#248;keradius (5&#8211;100 km)</li>
     <li>Fikset s&#248;kefelt som ikke reagerte p&#229; klikk</li>
-    <li>Nedlagte stasjoner filtreres bort fra Overpass-import</li>
   </ul>
   <p style="margin-top:1rem"><strong>v1.0.0</strong> <span class="tag">mars 2026</span></p>
   <ul>
