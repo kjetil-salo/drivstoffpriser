@@ -554,14 +554,10 @@ def share_prices():
         rows = conn.execute('''
             SELECT s.id, s.navn,
                    p.bensin, p.diesel, p.bensin98, p.tidspunkt
-            FROM stasjoner s
-            JOIN priser p ON p.stasjon_id = s.id
-            WHERE p.id = (
-                SELECT p2.id FROM priser p2
-                WHERE p2.stasjon_id = s.id
-                ORDER BY p2.tidspunkt DESC LIMIT 1
-            )
-            AND p.tidspunkt >= ? AND p.tidspunkt <= ?
+            FROM priser p
+            JOIN stasjoner s ON s.id = p.stasjon_id
+            WHERE p.tidspunkt >= ? AND p.tidspunkt <= ?
+            ORDER BY p.tidspunkt DESC
         ''', (fra_dt.isoformat(), til_dt.isoformat())).fetchall()
 
     prices = [
