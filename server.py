@@ -78,6 +78,11 @@ def blogg_redirect():
     return redirect('/blogg/', code=301)
 
 
+@app.route('/blogg/')
+def blogg():
+    return app.send_static_file('blogg/index.html')
+
+
 if __name__ == '__main__':
     init_db()
     _migrer_db()
