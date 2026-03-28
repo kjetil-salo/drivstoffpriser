@@ -558,7 +558,7 @@ def share_prices():
             JOIN stasjoner s ON s.id = p.stasjon_id
             WHERE p.tidspunkt >= ? AND p.tidspunkt <= ?
             ORDER BY p.tidspunkt DESC
-        ''', (fra_dt.isoformat(), til_dt.isoformat())).fetchall()
+        ''', (fra_dt.strftime('%Y-%m-%d %H:%M:%S'), til_dt.strftime('%Y-%m-%d %H:%M:%S'))).fetchall()
 
     prices = [
         {
