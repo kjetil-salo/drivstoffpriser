@@ -73,6 +73,11 @@ def index():
     return app.send_static_file('index.html')
 
 
+@app.route('/kart2')
+def kart2():
+    return app.send_static_file('kart2.html')
+
+
 @app.route('/blogg')
 def blogg_redirect():
     return redirect('/blogg/', code=301)

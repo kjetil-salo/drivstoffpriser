@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <link rel="icon" type="image/svg+xml" href="/icon.svg">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#1a1a2e">
+  <title>Drivstoffprisene</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="/css/tokens.css">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+  <!--
+    Tilgjengelighet (UU / a11y):
+    - Skip-lenke for tastaturbrukere
+    - Alle ikon-knapper har aria-label, dekorative emojier har aria-hidden="true"
+    - Tabs: role="tablist/tab/tabpanel", aria-selected, aria-controls (piltaster i main.js)
+    - Dialoger: role="dialog/alertdialog", aria-modal, aria-labelledby, Escape-lukking, fokushåndtering
+    - Bannere: role="alert"
+    - Statuselementer: aria-live="polite"
+    - Søk: role="listbox/option", aria-expanded, aria-activedescendant, piltast-navigasjon
+    - Stasjonskort: role="listitem", tabindex="0", Enter/Space-aktivering
+    - Kart: aria-label, title/alt på markører. Listevisningen er tastaturalternativ til kartet.
+    - Fokus: :focus-visible outline, sr-only-klasse for skjermleser-labels
+    - Viewport tillater zoom (ingen user-scalable=no)
+  -->
+  <a href="#view-kart" class="skip-link">Hopp til hovedinnhold</a>
+
+  <!-- Offline-banner -->
+  <div id="offline-banner" role="alert">Ingen nettforbindelse — viser lagrede data</div>
+
+  <!-- Backup-banner -->
+  <div id="backup-banner" role="alert" hidden>
+    <span><span aria-hidden="true">⚠️</span> Reserveløsning — prisene kan være utdaterte</span>
+    <div id="backup-info" hidden>
+      Hovedserveren er midlertidig utilgjengelig. Prisene kan være inntil 6 timer gamle, og det er ikke mulig å registrere nye priser. Tjenesten er normalt tilbake i løpet av kort tid.
+    </div>
+  </div>
+
+  <!-- Topbar -->
+  <header id="topbar">
+    <button id="loc-btn"><span aria-hidden="true">📍</span> Hent posisjon</button>
+    <div id="search-wrap">
+      <button id="search-toggle" aria-label="Søk sted" aria-expanded="false"><span aria-hidden="true">🔍</span></button>
+      <div id="search-box" hidden>
+        <label for="search-input" class="sr-only">Søk sted</label>
+        <input id="search-input" type="search" placeholder="Søk sted, by …" autocomplete="off">
+        <div id="search-results" role="listbox" aria-label="Søkeresultater"></div>
+      </div>
+    </div>
+    <span id="loc-status" aria-live="polite"></span>
+    <button id="add-station-btn" hidden aria-label="Legg til stasjon">+</button>
+    <button id="innstillinger-btn" aria-label="Innstillinger" aria-expanded="false"><span aria-hidden="true">⚙️</span></button>
+    <a id="info-btn" href="/om" aria-label="Om appen"><span aria-hidden="true">ℹ️</span></a>
+    <a id="auth-lenke" href="/auth/logg-inn" hidden></a>
+  </header>
+
+  <!-- Innstillinger-panel -->
+  <div id="innstillinger-panel" hidden role="region" aria-label="Innstillinger">
+    <div class="innstilling-tittel">Vis drivstoff</div>
+    <label class="innstilling-rad"><input type="checkbox" id="sett-bensin"> 95 oktan</label>
+    <label class="innstilling-rad"><input type="checkbox" id="sett-bensin98"> 98 oktan</label>
+    <label class="innstilling-rad"><input type="checkbox" id="sett-diesel"> Diesel</label>
+    <div class="innstilling-tittel innstilling-separator">Søkeradius</div>
+    <label class="innstilling-rad">
+      <select id="sett-radius">
+        <option value="5">5 km</option>
+        <option value="10">10 km</option>
+        <option value="20">20 km</option>
+        <option value="30" selected>30 km</option>
+        <option value="50">50 km</option>
+        <option value="100">100 km</option>
+      </select>
+    </label>
+    <div class="innstilling-separator"></div>
+    <button id="del-btn" class="innstilling-del-btn"><span aria-hidden="true">↗️</span> Del appen</button>
+  </div>
+
+  <!-- Kartvisning -->
+  <main id="view-kart" class="view" role="tabpanel" aria-labelledby="tab-kart">
+    <div id="map"></div>
+  </main>
+
+  <!-- Listevisning -->
+  <main id="view-liste" class="view" role="tabpanel" aria-labelledby="tab-liste">
+    <p id="liste-info">Hent posisjon for å se bensinstasjoner i nærheten.</p>
+    <div id="liste" role="list" aria-label="Bensinstasjoner"></div>
+  </main>
+
+  <!-- Statistikkvisning -->
+  <main id="view-statistikk" class="view" role="tabpanel" aria-labelledby="tab-statistikk">
+    <div id="statistikk-innhold" class="statistikk-container">
+      <h2 class="statistikk-tittel">Statistikk</h2>
+
+      <h3 class="stat-seksjon-tittel">Priser siste 24 timer</h3>
+
+      <div class="stat-rad-header">
+        <span></span>
+        <span>Billigst</span>
+        <span>Dyrest</span>
+      </div>
+
+      <div class="stat-rad">
+        <div class="stat-rad-label">95 oktan</div>
+        <div id="stat-billigst-bensin" class="stat-pris-kort">
+          <div class="stat-pris-loading">Laster …</div>
+        </div>
+        <div id="stat-dyrest-bensin" class="stat-pris-kort stat-dyrest">
+          <div class="stat-pris-loading">Laster …</div>
+        </div>
+      </div>
+
+      <div class="stat-rad">
+        <div class="stat-rad-label">98 oktan</div>
+        <div id="stat-billigst-bensin98" class="stat-pris-kort">
+          <div class="stat-pris-loading">Laster …</div>
+        </div>
+        <div id="stat-dyrest-bensin98" class="stat-pris-kort stat-dyrest">
+          <div class="stat-pris-loading">Laster …</div>
+        </div>
+      </div>
+
+      <div class="stat-rad">
+        <div class="stat-rad-label">Diesel</div>
+        <div id="stat-billigst-diesel" class="stat-pris-kort">
+          <div class="stat-pris-loading">Laster …</div>
+        </div>
+        <div id="stat-dyrest-diesel" class="stat-pris-kort stat-dyrest">
+          <div class="stat-pris-loading">Laster …</div>
+        </div>
+      </div>
+
+      <h3 class="stat-seksjon-tittel">Mest aktive bidragsytere</h3>
+      <div id="stat-toppliste" class="stat-toppliste">
+        <div class="stat-pris-loading">Laster …</div>
+      </div>
+
+      <div class="stat-oppdateringer">
+        <span id="stat-antall" class="stat-tall">–</span>
+        <span class="stat-label">prisoppdateringer siste 24 timer</span>
+      </div>
+    </div>
+  </main>
+
+  <!-- Bunntabs -->
+  <nav id="tabs" role="tablist" aria-label="Hovednavigasjon">
+    <button id="tab-kart" class="tab active" role="tab" aria-selected="true" aria-controls="view-kart">
+      <span class="tab-icon" aria-hidden="true">🗺️</span>
+      Kart
+    </button>
+    <button id="tab-liste" class="tab" role="tab" aria-selected="false" aria-controls="view-liste">
+      <span class="tab-icon" aria-hidden="true">☰</span>
+      Liste
+    </button>
+    <button id="tab-statistikk" class="tab" role="tab" aria-selected="false" aria-controls="view-statistikk">
+      <span class="tab-icon" aria-hidden="true">📊</span>
+      Statistikk
+    </button>
+  </nav>
+
+  <!-- Velkomst-overlay (vises kun uten lagret posisjon) -->
+  <div id="velkomst" hidden role="dialog" aria-labelledby="velkomst-tittel">
+    <div id="velkomst-kort">
+      <div id="velkomst-ikon" aria-hidden="true">⛽</div>
+      <h2 id="velkomst-tittel">Drivstoffpriser i nærheten</h2>
+      <p>Hent posisjon eller søk etter et sted for å se bensinstasjoner og priser.</p>
+      <div id="velkomst-btns">
+        <button id="velkomst-posisjon-btn"><span aria-hidden="true">📍</span> Hent posisjon</button>
+        <button id="velkomst-sok-btn"><span aria-hidden="true">🔍</span> Søk etter sted</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Nyhet-dialog -->
+  <div id="nyhet-backdrop" hidden></div>
+  <div id="nyhet-dialog" hidden role="dialog" aria-modal="true" aria-labelledby="nyhet-tittel">
+    <div id="nyhet-stripe"></div>
+    <h2 id="nyhet-tittel">Nyhet</h2>
+    <div id="nyhet-tekst"></div>
+    <button id="nyhet-lukk">Lukk</button>
+  </div>
+
+  <!-- Lokasjonsfeil-dialog -->
+  <div id="lok-feil-backdrop" hidden></div>
+  <div id="lok-feil-dialog" hidden role="alertdialog" aria-modal="true" aria-labelledby="lok-feil-tittel" aria-describedby="lok-feil-tekst">
+    <div id="lok-feil-ikon" aria-hidden="true">📍</div>
+    <h2 id="lok-feil-tittel"></h2>
+    <p id="lok-feil-tekst"></p>
+    <div id="lok-feil-steg" hidden>
+      <div class="lok-steg"><span class="lok-steg-nr">1</span><span>Åpne <strong>Innstillinger</strong> på telefonen</span></div>
+      <div class="lok-steg"><span class="lok-steg-nr">2</span><span>Gå til <strong>Safari</strong> → <strong>Stedstjenester</strong></span></div>
+      <div class="lok-steg"><span class="lok-steg-nr">3</span><span>Velg <strong>Tillat</strong> og kom tilbake hit</span></div>
+    </div>
+    <button id="lok-feil-lukk">Lukk</button>
+  </div>
+
+  <!-- Legg til stasjon -->
+  <div id="add-station-backdrop"></div>
+  <div id="add-station-sheet" role="dialog" aria-modal="true" aria-labelledby="add-station-tittel">
+    <div class="sheet-handle"></div>
+    <div id="add-station-content">
+      <h3 id="add-station-tittel">Legg til stasjon</h3>
+      <p class="add-station-hint">Dra markøren til riktig posisjon</p>
+      <div id="add-station-map"></div>
+      <div class="pris-input-gruppe">
+        <label for="add-station-navn">Navn</label>
+        <input id="add-station-navn" type="text" placeholder="f.eks. Shell Storo" maxlength="100" autocomplete="off">
+      </div>
+      <div class="pris-input-gruppe">
+        <label for="add-station-kjede">Kjede (valgfritt)</label>
+        <select id="add-station-kjede">
+          <option value="">— Velg kjede —</option>
+          <option value="Circle K">Circle K</option>
+          <option value="Uno-X">Uno-X</option>
+          <option value="YX">YX</option>
+          <option value="Esso">Esso</option>
+          <option value="Shell">Shell</option>
+          <option value="Preem">Preem</option>
+          <option value="St1">St1</option>
+          <option value="Best">Best</option>
+          <option value="Oljeleverandøren">Oljeleverandøren</option>
+          <option value="Tanken">Tanken</option>
+        </select>
+      </div>
+      <div id="add-station-status" class="add-station-status" role="status" aria-live="polite"></div>
+      <div class="modal-btns">
+        <button id="add-station-avbryt" class="btn-avbryt">Avbryt</button>
+        <button id="add-station-opprett" class="btn-lagre">Opprett</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stasjon-sheet backdrop -->
+  <div id="sheet-backdrop"></div>
+
+  <!-- Stasjon-sheet -->
+  <div id="stasjon-sheet" role="dialog" aria-modal="true" aria-labelledby="sheet-navn">
+    <div class="sheet-handle"></div>
+    <div id="sheet-scroll">
+    <div id="sheet-content">
+
+      <!-- Visning -->
+      <div id="sheet-view">
+        <div class="sheet-header">
+          <div id="sheet-badge" class="sheet-badge"></div>
+          <div class="sheet-tittel">
+            <h2 id="sheet-navn" tabindex="-1"></h2>
+            <div id="sheet-kjede" class="sheet-kjede"></div>
+          </div>
+          <div id="sheet-avstand" class="sheet-avstand"></div>
+        </div>
+
+        <div id="sheet-priser" class="sheet-priser">
+          <div class="sheet-pris-blokk">
+            <div class="sheet-pris-label">95 oktan</div>
+            <div id="sheet-bensin" class="sheet-pris-verdi"></div>
+          </div>
+          <div class="sheet-divider"></div>
+          <div class="sheet-pris-blokk">
+            <div class="sheet-pris-label">98 oktan</div>
+            <div id="sheet-bensin98" class="sheet-pris-verdi"></div>
+          </div>
+          <div class="sheet-divider"></div>
+          <div class="sheet-pris-blokk">
+            <div class="sheet-pris-label">Diesel</div>
+            <div id="sheet-diesel" class="sheet-pris-verdi"></div>
+          </div>
+        </div>
+
+        <div id="sheet-tid" class="sheet-tid"></div>
+
+        <div class="sheet-nav-lenker">
+          <a id="sheet-naviger-btn" class="btn-naviger" target="_blank" rel="noopener">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+            Naviger hit
+          </a>
+          <a id="sheet-kart-btn" class="btn-naviger btn-kart" target="_blank" rel="noopener" style="display:none">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            Vis i kart
+          </a>
+        </div>
+
+        <div class="modal-btns">
+          <button id="sheet-bekreft-btn" class="btn-avbryt">Bekreft priser</button>
+          <button id="sheet-endre-btn" class="btn-lagre">Endre pris</button>
+        </div>
+        <button id="sheet-nedlagt-btn" class="btn-nedlagt" style="display:none">Meld som nedlagt</button>
+
+        <!-- Admin: tilknytt kjede -->
+        <div id="sheet-admin-kjede" hidden>
+          <div class="sheet-divider" style="margin:1rem 0"></div>
+          <div class="pris-input-gruppe">
+            <label for="sheet-kjede-select">Kjede (admin)</label>
+            <select id="sheet-kjede-select">
+              <option value="">— Ingen kjede —</option>
+              <option value="Circle K">Circle K</option>
+              <option value="Uno-X">Uno-X</option>
+              <option value="YX">YX</option>
+              <option value="Esso">Esso</option>
+              <option value="Shell">Shell</option>
+              <option value="Preem">Preem</option>
+              <option value="St1">St1</option>
+              <option value="Best">Best</option>
+              <option value="Oljeleverandøren">Oljeleverandøren</option>
+              <option value="Tanken">Tanken</option>
+            </select>
+          </div>
+          <div id="sheet-kjede-status" role="status" aria-live="polite" style="display:none"></div>
+          <button id="sheet-kjede-lagre-btn" class="btn-lagre" style="width:100%">Lagre kjede</button>
+        </div>
+      </div>
+
+      <!-- Redigering (inline) -->
+      <div id="sheet-edit" hidden>
+        <h3 class="sheet-edit-tittel">Endre pris</h3>
+        <div class="pris-input-gruppe">
+          <label for="sheet-bensin-input">95 oktan (kr/liter)</label>
+          <input id="sheet-bensin-input" type="text" inputmode="decimal" placeholder="f.eks. 21,35" autocomplete="off">
+        </div>
+        <div class="pris-input-gruppe">
+          <label for="sheet-bensin98-input">98 oktan (kr/liter)</label>
+          <input id="sheet-bensin98-input" type="text" inputmode="decimal" placeholder="f.eks. 22,50" autocomplete="off">
+        </div>
+        <div class="pris-input-gruppe">
+          <label for="sheet-diesel-input">Diesel (kr/liter)</label>
+          <input id="sheet-diesel-input" type="text" inputmode="decimal" placeholder="f.eks. 20,50" autocomplete="off">
+        </div>
+        <div id="sheet-edit-status" role="status" aria-live="polite"></div>
+        <div class="modal-btns">
+          <button id="sheet-edit-avbryt" class="btn-avbryt">Avbryt</button>
+          <button id="sheet-edit-lagre" class="btn-lagre">Lagre pris</button>
+        </div>
+      </div>
+
+    </div>
+    </div><!-- sheet-scroll -->
+  </div>
+
+  <!-- Toast-melding -->
+  <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script type="module" src="/js/main.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js');
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        window.location.reload();
+      });
+    }
+    (function() {
+      var banner = document.getElementById('offline-banner');
+      function oppdater() { banner.style.display = navigator.onLine ? 'none' : 'block'; }
+      window.addEventListener('online', oppdater);
+      window.addEventListener('offline', oppdater);
+      oppdater();
+    })();
+  </script>
+</body>
+</html>
