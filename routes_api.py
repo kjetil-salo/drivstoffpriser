@@ -281,7 +281,7 @@ def nyhet():
     return jsonify({'tekst': tekst, 'utloper': utloper, 'id': nyhet_id})
 
 
-@api_bp.route('/toppliste')
+@api_bp.route('/api/toppliste')
 def toppliste():
     liste = hent_toppliste(limit=10)
     resultat = []
