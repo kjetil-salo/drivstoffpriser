@@ -61,10 +61,8 @@ export async function lastStatistikk() {
         visPrisKort('stat-dyrest-bensin98', data.dyrest.bensin98);
         visPrisKort('stat-dyrest-diesel', data.dyrest.diesel);
 
-        if (respTopp.ok) {
-            const toppliste = await respTopp.json();
-            visToppliste(toppliste);
-        }
+        const toppliste = respTopp.ok ? await respTopp.json() : [];
+        visToppliste(toppliste);
 
         lastet = true;
     } catch (e) {
