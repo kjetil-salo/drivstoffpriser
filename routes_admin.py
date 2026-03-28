@@ -23,7 +23,8 @@ from db import (finn_bruker_id, hent_alle_brukere, slett_bruker,
                 slett_rapporter_for_stasjon, hent_deaktiverte_stasjoner,
                 hent_rapportorer_epost, finn_stasjoner_by_osm_ids,
                 lagre_pris, hent_eller_opprett_partner, hent_toppliste,
-                sett_kjede_for_stasjon, finn_naer_stasjon, opprett_stasjon)
+                sett_kjede_for_stasjon, finn_naer_stasjon, opprett_stasjon,
+                hent_blogg_stats)
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -672,6 +673,8 @@ def oversikt():
     stats = get_statistikk()
     med_pris = antall_stasjoner_med_pris()
     brukere = antall_brukere()
+    blogg_stats = hent_blogg_stats()
+    blogg_totalt = sum(r['antall'] for r in blogg_stats)
     labels = [d for d, _ in stats['trend_30d']]
     values = [c for _, c in stats['trend_30d']]
     _oslo = ZoneInfo('Europe/Oslo')
@@ -734,6 +737,7 @@ def oversikt():
     <div class="kort"><div class="kort-tal">{stats['totalt']}</div><div class="kort-label">Sidevisninger totalt</div></div>
     <div class="kort"><div class="kort-tal">{stats['unike_enheter']}</div><div class="kort-label">Unike enheter</div></div>
     <div class="kort"><div class="kort-tal">{brukere}</div><div class="kort-label">Registrerte brukere</div></div>
+    <div class="kort"><div class="kort-tal">{blogg_totalt}</div><div class="kort-label">Bloggvisninger totalt</div></div>
   </div>
   <div class="seksjon">
     <h2>Sidevisninger siste 30 dager</h2>
@@ -750,6 +754,15 @@ def oversikt():
   <div class="seksjon">
     <h2>Prisoppdateringer per time – siste 48 timer</h2>
     <canvas id="prisgraf48" style="width:100%;max-height:220px"></canvas>
+  </div>
+  <div class="seksjon">
+    <h2>Bloggvisninger per artikkel</h2>
+    <table>
+      <thead><tr><th>Slug</th><th>Visninger</th></tr></thead>
+      <tbody>
+        {''.join(f'<tr><td>{r["slug"]}</td><td>{r["antall"]}</td></tr>' for r in blogg_stats) or '<tr><td colspan="2" style="color:#94a3b8">Ingen data ennå</td></tr>'}
+      </tbody>
+    </table>
   </div>
 </div>
 <script>

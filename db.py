@@ -111,8 +111,15 @@ def _migrer_db():
         if 'godkjent' not in stasjon_kolonner:
             conn.execute("ALTER TABLE stasjoner ADD COLUMN godkjent INTEGER DEFAULT 1")
 
-        # Rapporter-tabell (migrering)
+        # Rapporter-tabell og blogg_visninger (migrering)
         tabeller = [r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
+        if 'blogg_visninger' not in tabeller:
+            conn.execute('''CREATE TABLE blogg_visninger (
+                id   INTEGER PRIMARY KEY AUTOINCREMENT,
+                slug TEXT NOT NULL,
+                ts   TEXT DEFAULT (datetime('now'))
+            )''')
+            conn.execute("CREATE INDEX idx_blogg_visninger_slug ON blogg_visninger(slug)")
         if 'rapporter' not in tabeller:
             conn.execute('''CREATE TABLE rapporter (
                 id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -428,6 +435,20 @@ def sett_kjede_for_stasjon(stasjon_id: int, kjede: str):
 def oppdater_passord(epost: str, passord_hash: str):
     with get_conn() as conn:
         conn.execute("UPDATE brukere SET passord_hash = ? WHERE brukernavn = ?", (passord_hash, epost))
+
+
+def logg_blogg_visning(slug: str):
+    with get_conn() as conn:
+        conn.execute('INSERT INTO blogg_visninger (slug) VALUES (?)', (slug,))
+
+
+def hent_blogg_stats() -> list:
+    with get_conn() as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            'SELECT slug, COUNT(*) as antall FROM blogg_visninger GROUP BY slug ORDER BY antall DESC'
+        ).fetchall()
+        return [dict(r) for r in rows]
 
 
 def logg_visning(device_id: str, user_agent: str):

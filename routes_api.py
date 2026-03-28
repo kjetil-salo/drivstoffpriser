@@ -15,7 +15,8 @@ from db import (get_stasjoner_med_priser, lagre_pris, logg_visning,
                 antall_stasjoner_med_pris, finn_bruker_id, DB_PATH,
                 opprett_stasjon, hent_billigste_priser_24t,
                 antall_prisoppdateringer_24t, meld_stasjon_nedlagt,
-                get_conn, hent_innstilling, hent_toppliste)
+                get_conn, hent_innstilling, hent_toppliste,
+                logg_blogg_visning)
 
 logger = logging.getLogger('drivstoff')
 
@@ -336,6 +337,7 @@ def om():
 <a class="tilbake" href="/">&#8592; Tilbake til appen</a>
 <h1>Drivstoffpriser</h1>
 <p class="undertittel">Finn billigst drivstoff i n&#230;rheten &#8212; gratis og drevet av brukerne.</p>
+<p style="margin-top:0.5rem"><a href="/blogg/" style="color:#93c5fd;font-weight:600">&#128211; Les prisanalyse-bloggen &#8594;</a></p>
 
 <div class="kort">
   <h2>Hva er dette?</h2>
@@ -604,3 +606,13 @@ def share_prices():
     return jsonify({'prices': prices})
 
 
+
+
+@api_bp.route('/api/blogg/vis', methods=['POST'])
+def blogg_vis():
+    data = request.get_json(silent=True) or {}
+    slug = (data.get('slug') or '').strip()[:100]
+    if not slug:
+        return jsonify({'ok': False}), 400
+    logg_blogg_visning(slug)
+    return jsonify({'ok': True})
