@@ -139,6 +139,17 @@ html, body {
   border-top: 1px solid var(--border-color);
 }
 
+.innstilling-del-btn {
+  width: 100%;
+  padding: 8px 0;
+  background: none;
+  border: none;
+  color: var(--color-accent);
+  font-size: var(--font-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
 #sett-radius {
   flex: 1;
   background: var(--color-bg);

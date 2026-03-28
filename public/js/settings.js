@@ -57,4 +57,16 @@ export function initInnstillinger(onChange) {
     cbBensin98.addEventListener('change', function () { oppdater(this); });
     cbDiesel.addEventListener('change', function () { oppdater(this); });
     radiusSelect.addEventListener('change', lagre);
+
+    document.getElementById('del-btn').addEventListener('click', async () => {
+        const data = { title: 'Drivstoffprisene', text: 'Finn billigste drivstoff i nærheten', url: 'https://drivstoffprisene.no' };
+        if (navigator.share) {
+            try { await navigator.share(data); } catch { /* avbrutt av bruker */ }
+        } else {
+            await navigator.clipboard.writeText(data.url);
+            const btn = document.getElementById('del-btn');
+            btn.textContent = '✓ Kopiert!';
+            setTimeout(() => { btn.innerHTML = '<span aria-hidden="true">↗️</span> Del appen'; }, 2000);
+        }
+    });
 }
