@@ -23,7 +23,7 @@ from db import (finn_bruker_id, hent_alle_brukere, slett_bruker,
                 slett_rapporter_for_stasjon, hent_deaktiverte_stasjoner,
                 hent_rapportorer_epost, finn_stasjoner_by_osm_ids,
                 lagre_pris, hent_eller_opprett_partner, hent_toppliste,
-                sett_kjede_for_stasjon)
+                sett_kjede_for_stasjon, finn_naer_stasjon, opprett_stasjon)
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -978,7 +978,7 @@ async function hentData() {
     importData = data.stasjoner || [];
     const forkastet = data.forkastet || 0;
     let info = importData.length + ' stasjoner hentet';
-    if (forkastet > 0) info += ' (' + forkastet + ' rader uten gyldig OSM-id forkastet)';
+    if (forkastet > 0) info += ' (' + forkastet + ' rader forkastet – mangler id og koordinater)';
     statusEl.textContent = info;
     visTabell();
   } catch(e) {
@@ -1009,11 +1009,21 @@ function visTabell() {
     const statusIkon = s._status === 'godkjent' ? '<span class="status-ikon">&#9989;</span>' :
                        s._status === 'underkjent' ? '<span class="status-ikon">&#10060;</span>' : '';
     const fmt = v => v != null ? parseFloat(v).toFixed(2) : '&#8211;';
-    const matchNavn = s.match ? s.match.navn + (s.match.kjede ? ' (' + s.match.kjede + ')' : '') : '<span style="color:#f59e0b">Ikke i vår DB</span>';
+    let matchNavn;
+    if (s.match) {
+      matchNavn = s.match.navn + (s.match.kjede ? ' (' + s.match.kjede + ')' : '');
+    } else if (s.ukjent) {
+      matchNavn = '<span style="color:#f59e0b">' + s.station_name + '</span>'
+               + '<br><span style="font-size:0.75rem;color:#6b7280">'
+               + s.lat.toFixed(4) + ', ' + s.lon.toFixed(4) + ' – fra partner</span>';
+    } else {
+      matchNavn = '<span style="color:#f59e0b">Ikke i vår DB</span>';
+    }
+    const osmVis = s.osm_id || '&#8211;';
     const tidKort = s.updated ? s.updated.replace('T', ' ').substring(0, 16) : '&#8211;';
 
     html += '<tr' + cls + '>';
-    html += '<td style="font-family:monospace;font-size:0.78rem;color:#94a3b8">' + statusIkon + s.osm_id + '</td>';
+    html += '<td style="font-family:monospace;font-size:0.78rem;color:#94a3b8">' + statusIkon + osmVis + '</td>';
     html += '<td>' + matchNavn + '</td>';
     html += '<td style="text-align:right">' + fmt(s.bensin) + '</td>';
     html += '<td style="text-align:right">' + fmt(s.bensin98) + '</td>';
@@ -1021,7 +1031,11 @@ function visTabell() {
     html += '<td style="text-align:right;color:#94a3b8;font-size:0.78rem">' + tidKort + '</td>';
     html += '<td style="white-space:nowrap">';
     if (!s._status) {
-      html += '<button class="btn-godkjenn" onclick="godkjenn(' + i + ')" ' + (s.match ? '' : 'disabled title="Ikke i vår DB"') + '>Godkjenn</button> ';
+      if (s.ukjent) {
+        html += '<button class="btn-godkjenn" style="border-color:#a78bfa;color:#a78bfa" onclick="importerStasjon(' + i + ')">Importer stasjon</button> ';
+      } else {
+        html += '<button class="btn-godkjenn" onclick="godkjenn(' + i + ')" ' + (s.match ? '' : 'disabled title="Ikke i vår DB"') + '>Godkjenn</button> ';
+      }
       html += '<button class="btn-underkjenn" onclick="underkjenn(' + i + ')">Underkjenn</button>';
     }
     html += '</td></tr>';
@@ -1081,6 +1095,23 @@ function underkjennAlle() {
   importData.forEach(s => { if (!s._status) s._status = 'underkjent'; });
   visTabell();
 }
+
+async function importerStasjon(idx) {
+  const s = importData[idx];
+  try {
+    const resp = await fetch('/admin/import/opprett-stasjon', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({navn: s.station_name, lat: s.lat, lon: s.lon})
+    });
+    const data = await resp.json();
+    if (resp.ok) {
+      s.match = {id: data.stasjon_id, navn: data.navn};
+      s.ukjent = false;
+      visTabell();
+    }
+  } catch(e) { console.error(e); }
+}
 </script>
 </body></html>'''
 
@@ -1115,43 +1146,66 @@ def admin_import_hent():
 
     rader = data.get('prices', [])
 
-    # Grupper per stasjon (osm_id) — bruk siste pris per drivstofftype
-    # Filtrer bort ugyldige id-er
-    ugyldige = {'ukjent_id', 'undefined', '', None}
+    # Grupper per stasjon — bruk siste pris per drivstofftype
+    ugyldige = {'ukjent_id', 'undefined', ''}
     forkastet = 0
     per_stasjon = {}
     for r in rader:
-        sid = r.get('station_id', '')
-        if sid in ugyldige:
-            forkastet += 1
-            continue
-        if sid not in per_stasjon:
-            per_stasjon[sid] = {'osm_id': sid, 'bensin': None, 'bensin98': None,
-                                'diesel': None, 'updated': None}
+        sid = r.get('station_id') or None
+        navn = (r.get('station_name') or '').strip()
+        lat = r.get('lat')
+        lon = r.get('lon')
+
+        if sid is None:
+            # Null ID: krever navn + koordinater for å håndteres
+            if not navn or lat is None or lon is None:
+                forkastet += 1
+                continue
+            key = f'coords:{round(float(lat), 4)}:{round(float(lon), 4)}'
+            if key not in per_stasjon:
+                per_stasjon[key] = {'osm_id': None, 'station_name': navn,
+                                    'lat': float(lat), 'lon': float(lon),
+                                    'bensin': None, 'bensin98': None,
+                                    'diesel': None, 'updated': None}
+        else:
+            if sid in ugyldige:
+                forkastet += 1
+                continue
+            key = sid
+            if key not in per_stasjon:
+                per_stasjon[key] = {'osm_id': sid, 'bensin': None, 'bensin98': None,
+                                    'diesel': None, 'updated': None}
+
         fuel = r.get('fuel_type', '')
         pris = r.get('price')
         oppdatert = r.get('updated', '')
         if fuel == 'bensin95':
-            per_stasjon[sid]['bensin'] = pris
+            per_stasjon[key]['bensin'] = pris
         elif fuel == 'bensin98':
-            per_stasjon[sid]['bensin98'] = pris
+            per_stasjon[key]['bensin98'] = pris
         elif fuel == 'diesel':
-            per_stasjon[sid]['diesel'] = pris
-        # Bruk siste tidspunkt
-        if oppdatert and (not per_stasjon[sid]['updated'] or oppdatert > per_stasjon[sid]['updated']):
-            per_stasjon[sid]['updated'] = oppdatert
+            per_stasjon[key]['diesel'] = pris
+        if oppdatert and (not per_stasjon[key]['updated'] or oppdatert > per_stasjon[key]['updated']):
+            per_stasjon[key]['updated'] = oppdatert
 
-    # Slå opp alle OSM-id-er mot vår database
-    osm_ids = list(per_stasjon.keys())
+    # Slå opp OSM-id-er mot vår database
+    osm_ids = [s['osm_id'] for s in per_stasjon.values() if s['osm_id']]
     match_map = finn_stasjoner_by_osm_ids(osm_ids)
 
     stasjoner = []
-    for sid, s in per_stasjon.items():
-        if sid in match_map:
-            s['match'] = match_map[sid]
+    for s in per_stasjon.values():
+        if s['osm_id'] and s['osm_id'] in match_map:
+            s['match'] = match_map[s['osm_id']]
+        elif s['osm_id'] is None:
+            # Prøv koordinat-matching med 150m radius
+            naer = finn_naer_stasjon(s['lat'], s['lon'], maks_avstand_m=150)
+            if naer:
+                s['match'] = naer
+            else:
+                s['ukjent'] = True
         stasjoner.append(s)
 
-    # Sorter: nyeste først, umatchede sist
+    # Sorter: matchede nyeste først, ukjente sist
     stasjoner.sort(key=lambda s: (0 if s.get('match') else 1, s.get('updated') or ''), reverse=True)
 
     return jsonify({'stasjoner': stasjoner, 'forkastet': forkastet})
@@ -1176,6 +1230,26 @@ def admin_import_godkjenn():
     partner_id = hent_eller_opprett_partner('drivstoffnorge')
     lagre_pris(stasjon_id, bensin, diesel, bensin98, partner_id)
     return jsonify({'ok': True})
+
+
+@admin_bp.route('/admin/import/opprett-stasjon', methods=['POST'])
+@krever_innlogging
+@krever_admin
+def admin_import_opprett_stasjon():
+    data = request.get_json(silent=True) or {}
+    navn = (data.get('navn') or '').strip()
+    kjede = (data.get('kjede') or '').strip() or None
+    lat = data.get('lat')
+    lon = data.get('lon')
+
+    if not navn or lat is None or lon is None:
+        return jsonify({'error': 'Mangler navn, lat eller lon'}), 400
+
+    partner_id = hent_eller_opprett_partner('partner-import')
+    stasjon_id, duplikat = opprett_stasjon(navn, kjede, float(lat), float(lon), partner_id)
+    if duplikat:
+        return jsonify({'stasjon_id': duplikat['id'], 'navn': duplikat['navn'], 'eksisterer': True})
+    return jsonify({'stasjon_id': stasjon_id, 'navn': navn})
 
 
 @admin_bp.route('/admin/toppliste')
