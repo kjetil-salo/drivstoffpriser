@@ -148,7 +148,7 @@ initAddStation((nyStasjon) => {
     const s = {
         ...nyStasjon,
         bensin: null, diesel: null, bensin98: null,
-        pris_tidspunkt: null, avstand_m: 0,
+        bensin_tidspunkt: null, diesel_tidspunkt: null, bensin98_tidspunkt: null, avstand_m: 0,
     };
     stasjoner.push(s);
     visStasjoner(stasjoner, visStasjonSheet);

@@ -167,11 +167,14 @@ function harRelevantPris(s) {
 
 function prisFarge(s) {
     if (!harRelevantPris(s)) return 'grey';
-    const alder = prisAlderTimer(s.pris_tidspunkt);
+    const tidspunkt = [s.bensin_tidspunkt, s.diesel_tidspunkt, s.bensin98_tidspunkt]
+        .filter(Boolean)
+        .reduce((a, b) => a > b ? a : b, null);
+    const alder = prisAlderTimer(tidspunkt);
     if (alder === null || alder >= 168) return 'grey';  // > 7 dager
-    if (alder >= 48) return 'violet';                     // 2–7 dager
-    if (alder >= 8) return 'orange';                      // 8–48 timer
-    return 'green';                                       // < 8 timer
+    if (alder >= 48) return 'violet';                    // 2–7 dager
+    if (alder >= 8) return 'orange';                     // 8–48 timer
+    return 'green';                                      // < 8 timer
 }
 
 function prisIkon(s) {

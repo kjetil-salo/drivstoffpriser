@@ -148,8 +148,11 @@ function fyllVisning(s) {
             <div class="sheet-pris-verdi ${t.v == null ? 'ingen' : ''}">${t.v != null ? formatPris(t.v) + ' kr' : '–'}</div>
         </div>`).join('');
 
-    if (s.pris_tidspunkt) {
-        tidEl.textContent = 'Sist oppdatert: ' + formaterTid(s.pris_tidspunkt);
+    const nyesteTidspunkt = [s.bensin_tidspunkt, s.diesel_tidspunkt, s.bensin98_tidspunkt]
+        .filter(Boolean)
+        .reduce((a, b) => a > b ? a : b, null);
+    if (nyesteTidspunkt) {
+        tidEl.textContent = 'Sist oppdatert: ' + formaterTid(nyesteTidspunkt);
         tidEl.style.display = '';
     } else {
         tidEl.style.display = 'none';
@@ -189,9 +192,12 @@ async function bekreftPris() {
             bekreftBtnEl.textContent = 'Bekreft priser';
             return;
         }
+        const naa = new Date().toISOString().slice(0, 19).replace('T', ' ');
         const oppdatert = {
             ...aktivStasjon,
-            pris_tidspunkt: new Date().toISOString().slice(0, 19).replace('T', ' '),
+            bensin_tidspunkt: aktivStasjon.bensin != null ? naa : aktivStasjon.bensin_tidspunkt,
+            diesel_tidspunkt: aktivStasjon.diesel != null ? naa : aktivStasjon.diesel_tidspunkt,
+            bensin98_tidspunkt: aktivStasjon.bensin98 != null ? naa : aktivStasjon.bensin98_tidspunkt,
         };
         aktivStasjon = oppdatert;
         fyllVisning(oppdatert);
@@ -267,12 +273,15 @@ async function lagrePris() {
             editLagreBtn.disabled = false;
             return;
         }
+        const naa = new Date().toISOString().slice(0, 19).replace('T', ' ');
         const oppdatert = {
             ...aktivStasjon,
             bensin,
             bensin98,
             diesel,
-            pris_tidspunkt: new Date().toISOString().slice(0, 19).replace('T', ' '),
+            bensin_tidspunkt: bensin != null ? naa : aktivStasjon.bensin_tidspunkt,
+            diesel_tidspunkt: diesel != null ? naa : aktivStasjon.diesel_tidspunkt,
+            bensin98_tidspunkt: bensin98 != null ? naa : aktivStasjon.bensin98_tidspunkt,
         };
         aktivStasjon = oppdatert;
         fyllVisning(oppdatert);
