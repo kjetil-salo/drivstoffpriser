@@ -150,15 +150,23 @@ function prisAlderKlasse(tidspunkt) {
     const timer = (Date.now() - new Date(tidspunkt.replace(' ', 'T')).getTime()) / 3600000;
     if (timer < 8) return 'alder-fersk';
     if (timer < 24) return 'alder-gammel';
-    return 'alder-utdatert';
+    if (timer < 48) return 'alder-utdatert';
+    return 'alder-kritisk';
+}
+
+function prisAlderBanner(tidspunkt) {
+    if (!tidspunkt) return null;
+    const dager = Math.floor((Date.now() - new Date(tidspunkt.replace(' ', 'T')).getTime()) / 86400000);
+    if (dager < 2) return null;
+    return `⚠ Prisen er ${dager} dager gammel`;
 }
 
 function kortHtml(s, billigste = {}, erHovedBilligst = false) {
     const inn = getInnstillinger();
     const rader = [
-        inn.bensin    ? { label: '95',     v: formatPris(s.bensin),   billigst: billigste.bensin   === s.id } : null,
-        inn.bensin98  ? { label: '98',     v: formatPris(s.bensin98), billigst: billigste.bensin98 === s.id } : null,
-        inn.diesel    ? { label: 'Diesel', v: formatPris(s.diesel),   billigst: billigste.diesel   === s.id } : null,
+        inn.bensin    ? { label: '95',     v: formatPris(s.bensin),   billigst: billigste.bensin   === s.id, type: 'bensin',   ts: s.bensin_tidspunkt   } : null,
+        inn.bensin98  ? { label: '98',     v: formatPris(s.bensin98), billigst: billigste.bensin98 === s.id, type: 'bensin98', ts: s.bensin98_tidspunkt } : null,
+        inn.diesel    ? { label: 'Diesel', v: formatPris(s.diesel),   billigst: billigste.diesel   === s.id, type: 'diesel',   ts: s.diesel_tidspunkt   } : null,
     ].filter(Boolean);
     const kjedeEllerNavn = s.kjede || s.navn;
     const logoUrl = getKjedeLogo(kjedeEllerNavn);
@@ -169,18 +177,34 @@ function kortHtml(s, billigste = {}, erHovedBilligst = false) {
                onerror="this.parentElement.style.background='${farge}';this.parentElement.style.border='';this.parentElement.textContent='${getKjedeInitials(s.kjede || s.navn)}'">
            </div>`
         : `<div class="sk-badge" style="background:${farge}">${getKjedeInitials(s.kjede || s.navn)}</div>`;
-    const alderTekst = prisAlderTekst(s.pris_tidspunkt);
-    const alderKlasse = prisAlderKlasse(s.pris_tidspunkt);
-    return `<div class="stasjon-kort${erHovedBilligst ? ' billigst-kort' : ''}" role="listitem" tabindex="0" aria-label="${s.navn}${s.kjede ? ', ' + s.kjede : ''}" data-id="${s.id}">
-        ${erHovedBilligst ? '<div class="sk-billigst-banner">★ billigste stasjon</div>' : ''}
+    // Nyeste oppdatering blant synlige priser → for alderTekst
+    const synligeTidspunkt = rader.filter(r => r.v && r.ts).map(r => r.ts);
+    const nyesteTidspunkt = synligeTidspunkt.length
+        ? synligeTidspunkt.reduce((a, b) => a > b ? a : b)
+        : null;
+    // Eldste oppdatering blant synlige priser → for ⚠-banner
+    const eldsteTidspunkt = synligeTidspunkt.length
+        ? synligeTidspunkt.reduce((a, b) => a < b ? a : b)
+        : null;
+    const alderTekst = prisAlderTekst(nyesteTidspunkt);
+    const alderKlasse = prisAlderKlasse(nyesteTidspunkt);
+    const alderBanner = prisAlderBanner(eldsteTidspunkt);
+    const erKritisk = alderBanner !== null;
+    const kortKlasse = erKritisk ? ' gammel-kort' : (erHovedBilligst ? ' billigst-kort' : '');
+    const bannerHtml = erKritisk
+        ? `<div class="sk-gammel-banner">${alderBanner}</div>`
+        : (erHovedBilligst ? '<div class="sk-billigst-banner">★ billigste stasjon</div>' : '');
+    return `<div class="stasjon-kort${kortKlasse}" role="listitem" tabindex="0" aria-label="${s.navn}${s.kjede ? ', ' + s.kjede : ''}" data-id="${s.id}">
+        ${bannerHtml}
         ${badgeHtml}
         <div class="sk-info">
             <div class="sk-navn">${s.navn}</div>
             ${s.kjede ? `<div class="sk-kjede">${s.kjede}</div>` : ''}
             <div class="sk-priser">
-                ${rader.map(r => `<div class="sk-pris-rad">
+                ${rader.map(r => `<div class="sk-pris-rad${r.type === aktivSort ? ' sort-aktiv' : ''}">
                     <span class="sk-pris-label">${r.label}</span>
                     <span class="sk-pris-verdi ${r.v ? (r.billigst ? 'billigst' : '') : 'ingen'}">${r.v ? r.v + ' kr' : '–'}</span>
+                    ${r.v ? `<span class="pris-alder-dot ${prisAlderKlasse(r.ts)}" title="${r.ts ? prisAlderTekst(r.ts) : 'ukjent alder'}"></span>` : ''}
                 </div>`).join('')}
             </div>
             ${alderTekst ? `<div class="sk-alder ${alderKlasse}">${alderTekst}</div>` : ''}

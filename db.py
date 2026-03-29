@@ -669,13 +669,13 @@ def get_stasjoner_med_priser(user_lat, user_lon, radius_m=30000, limit=30):
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
             '''SELECT s.id, s.navn, s.kjede, s.lat, s.lon, s.lagt_til_av,
-                      p.bensin, p.diesel, p.bensin98, p.tidspunkt
+                      (SELECT bensin   FROM priser WHERE stasjon_id=s.id AND bensin   IS NOT NULL ORDER BY id DESC LIMIT 1) AS bensin,
+                      (SELECT tidspunkt FROM priser WHERE stasjon_id=s.id AND bensin  IS NOT NULL ORDER BY id DESC LIMIT 1) AS bensin_tidspunkt,
+                      (SELECT diesel   FROM priser WHERE stasjon_id=s.id AND diesel   IS NOT NULL ORDER BY id DESC LIMIT 1) AS diesel,
+                      (SELECT tidspunkt FROM priser WHERE stasjon_id=s.id AND diesel  IS NOT NULL ORDER BY id DESC LIMIT 1) AS diesel_tidspunkt,
+                      (SELECT bensin98  FROM priser WHERE stasjon_id=s.id AND bensin98 IS NOT NULL ORDER BY id DESC LIMIT 1) AS bensin98,
+                      (SELECT tidspunkt FROM priser WHERE stasjon_id=s.id AND bensin98 IS NOT NULL ORDER BY id DESC LIMIT 1) AS bensin98_tidspunkt
                FROM stasjoner s
-               LEFT JOIN (
-                   SELECT stasjon_id, bensin, diesel, bensin98, tidspunkt
-                   FROM priser
-                   WHERE id IN (SELECT MAX(id) FROM priser GROUP BY stasjon_id)
-               ) p ON p.stasjon_id = s.id
                WHERE s.godkjent != 0
                  AND s.lat BETWEEN ? AND ? AND s.lon BETWEEN ? AND ?''',
             (user_lat - delta_lat, user_lat + delta_lat,
@@ -693,9 +693,11 @@ def get_stasjoner_med_priser(user_lat, user_lon, radius_m=30000, limit=30):
                 'lat': row['lat'],
                 'lon': row['lon'],
                 'bensin': row['bensin'],
+                'bensin_tidspunkt': row['bensin_tidspunkt'],
                 'diesel': row['diesel'],
+                'diesel_tidspunkt': row['diesel_tidspunkt'],
                 'bensin98': row['bensin98'],
-                'pris_tidspunkt': row['tidspunkt'],
+                'bensin98_tidspunkt': row['bensin98_tidspunkt'],
                 'avstand_m': round(dist),
                 'brukeropprettet': row['lagt_til_av'] is not None,
             })

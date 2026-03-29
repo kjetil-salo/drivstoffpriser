@@ -328,8 +328,8 @@ html, body {
 }
 .km-img {
   position: absolute;
-  top: 4px;
-  left: 4px;
+  top: 2px;
+  left: 2px;
   width: 28px;
   height: 28px;
   object-fit: contain;
@@ -707,6 +707,20 @@ html, body {
 .alder-utdatert { color: #ef4444; }
 .alder-kritisk { color: #f59e0b; }
 .alder-ingen { color: var(--color-muted); }
+
+.pris-alder-dot {
+  display: block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  margin-top: 2px;
+}
+.pris-alder-dot.alder-fersk { color: #22c55e; }
+.pris-alder-dot.alder-gammel { color: #f59e0b; }
+.pris-alder-dot.alder-utdatert { color: #ef4444; }
+.pris-alder-dot.alder-kritisk { color: #ef4444; }
+.pris-alder-dot.alder-ingen { display: none; }
 
 .sk-endre-btn {
   background: transparent;

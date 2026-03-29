@@ -79,7 +79,8 @@ class TestPriser:
         result = db_mod.get_stasjoner_med_priser(60.39, 5.33)
         assert result[0]['bensin'] is None
         assert result[0]['diesel'] is None
-        assert result[0]['pris_tidspunkt'] is None
+        assert result[0]['bensin_tidspunkt'] is None
+        assert result[0]['diesel_tidspunkt'] is None
 
     def test_antall_stasjoner_med_pris(self):
         db_mod.lagre_stasjon('Med', 'Test', 60.39, 5.33, 'node/1')
