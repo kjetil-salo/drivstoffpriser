@@ -280,9 +280,9 @@ async function lagrePris() {
             bensin,
             bensin98,
             diesel,
-            bensin_tidspunkt: bensin != null ? naa : aktivStasjon.bensin_tidspunkt,
-            diesel_tidspunkt: diesel != null ? naa : aktivStasjon.diesel_tidspunkt,
-            bensin98_tidspunkt: bensin98 != null ? naa : aktivStasjon.bensin98_tidspunkt,
+            bensin_tidspunkt: bensin !== aktivStasjon.bensin ? naa : aktivStasjon.bensin_tidspunkt,
+            diesel_tidspunkt: diesel !== aktivStasjon.diesel ? naa : aktivStasjon.diesel_tidspunkt,
+            bensin98_tidspunkt: bensin98 !== aktivStasjon.bensin98 ? naa : aktivStasjon.bensin98_tidspunkt,
         };
         aktivStasjon = oppdatert;
         fyllVisning(oppdatert);
