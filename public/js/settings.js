@@ -9,7 +9,7 @@ function visToast(tekst) {
     toastTimer = setTimeout(() => el.classList.remove('toast-vis'), 2200);
 }
 
-const STANDARD = { bensin: true, bensin98: true, diesel: true, radius: 30 };
+const STANDARD = { bensin: true, bensin98: true, diesel: true, radius: 30, kartvisning: 'vanlig' };
 
 export function getInnstillinger() {
     try {
@@ -25,12 +25,16 @@ export function initInnstillinger(onChange) {
     const cbBensin98 = document.getElementById('sett-bensin98');
     const cbDiesel = document.getElementById('sett-diesel');
     const radiusSelect = document.getElementById('sett-radius');
+    const radVanlig = document.getElementById('sett-kartvisning-vanlig');
+    const radKompakt = document.getElementById('sett-kartvisning-kompakt');
 
     const s = getInnstillinger();
     cbBensin.checked = s.bensin;
     cbBensin98.checked = s.bensin98;
     cbDiesel.checked = s.diesel;
     radiusSelect.value = String(s.radius);
+    if (s.kartvisning === 'kompakt') radKompakt.checked = true;
+    else radVanlig.checked = true;
 
     btn.addEventListener('click', () => {
         panel.toggleAttribute('hidden');
@@ -55,9 +59,11 @@ export function initInnstillinger(onChange) {
     }
 
     function lagre() {
+        const kartvisning = document.querySelector('input[name="sett-kartvisning"]:checked')?.value || 'vanlig';
         const ny = {
             bensin: cbBensin.checked, bensin98: cbBensin98.checked, diesel: cbDiesel.checked,
             radius: parseInt(radiusSelect.value, 10),
+            kartvisning,
         };
         localStorage.setItem(SETTINGS_KEY, JSON.stringify(ny));
         if (onChange) onChange(ny);
@@ -67,6 +73,8 @@ export function initInnstillinger(onChange) {
     cbBensin98.addEventListener('change', function () { oppdater(this); });
     cbDiesel.addEventListener('change', function () { oppdater(this); });
     radiusSelect.addEventListener('change', lagre);
+    radVanlig.addEventListener('change', lagre);
+    radKompakt.addEventListener('change', lagre);
 
     document.getElementById('del-btn').addEventListener('click', async () => {
         const data = { title: 'Drivstoffprisene', text: 'Finn billigste drivstoff i nærheten', url: 'https://drivstoffprisene.no' };

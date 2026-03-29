@@ -1,9 +1,12 @@
 import { getInnstillinger } from './settings.js';
+import { getKjedeLogo, getKjedeInitials, getKjedeFarge } from './kjede.js';
 
 let map = null;
 let userMarker = null;
 const stasjonMarkorer = new Map(); // id → marker
 const stasjonData = new Map();     // id → stasjon
+let stasjonOnKlikk = null;
+let sisteKartvisning = null;
 
 export function initMap(containerId, startPos) {
     const senter = startPos ? [startPos.lat, startPos.lon] : [59.91, 10.75];
@@ -75,6 +78,8 @@ export function visStasjoner(stasjoner, onKlikk) {
     stasjonMarkorer.clear();
     stasjonData.clear();
 
+    stasjonOnKlikk = onKlikk;
+    sisteKartvisning = getInnstillinger().kartvisning ?? 'vanlig';
     const billigsteId = finnBilligsteId(stasjoner);
     stasjoner.forEach(s => {
         stasjonData.set(s.id, s);
@@ -104,26 +109,46 @@ function finnBilligsteId(stasjoner) {
 }
 
 export function refreshKartInnstillinger() {
+    const inn = getInnstillinger();
+    const nyKartvisning = inn.kartvisning ?? 'vanlig';
+
+    // Kartvisning endret – full re-render
+    if (nyKartvisning !== sisteKartvisning && stasjonOnKlikk) {
+        sisteKartvisning = nyKartvisning;
+        visStasjoner([...stasjonData.values()], stasjonOnKlikk);
+        return;
+    }
+
     const billigsteId = finnBilligsteId([...stasjonData.values()]);
     stasjonData.forEach((s) => {
         const marker = stasjonMarkorer.get(s.id);
         if (!marker) return;
         const erBilligst = s.id === billigsteId;
-        oppdaterMarkerTooltip(marker, s, erBilligst);
-        marker.setIcon(prisIkon(s));
+        if (nyKartvisning === 'kompakt') {
+            marker.setIcon(kompaktIkon(s, erBilligst));
+        } else {
+            oppdaterMarkerTooltip(marker, s, erBilligst);
+            marker.setIcon(prisIkon(s));
+        }
         marker.setZIndexOffset(erBilligst ? 5000 : 0);
     });
 }
 
 export function oppdaterStasjonPriser(stasjon, onKlikk) {
     stasjonData.set(stasjon.id, stasjon);
+    const inn = getInnstillinger();
+    const kompakt = (inn.kartvisning ?? 'vanlig') === 'kompakt';
     const billigsteId = finnBilligsteId([...stasjonData.values()]);
     stasjonData.forEach((s) => {
         const m = stasjonMarkorer.get(s.id);
         if (!m) return;
         const erBilligst = s.id === billigsteId;
-        oppdaterMarkerTooltip(m, s, erBilligst);
-        m.setIcon(prisIkon(s));
+        if (kompakt) {
+            m.setIcon(kompaktIkon(s, erBilligst));
+        } else {
+            oppdaterMarkerTooltip(m, s, erBilligst);
+            m.setIcon(prisIkon(s));
+        }
         m.setZIndexOffset(erBilligst ? 5000 : 0);
     });
     const marker = stasjonMarkorer.get(stasjon.id);
@@ -172,19 +197,24 @@ function oppdaterMarkerTooltip(marker, s, erBilligst) {
 }
 
 function lagMarker(s, erBilligst = false) {
+    const inn = getInnstillinger();
+    const kompakt = (inn.kartvisning ?? 'vanlig') === 'kompakt';
+
     const marker = L.marker([s.lat, s.lon], {
-        icon: prisIkon(s),
+        icon: kompakt ? kompaktIkon(s, erBilligst) : prisIkon(s),
         zIndexOffset: erBilligst ? 5000 : 0,
         title: s.navn,
         alt: s.navn,
     }).addTo(map);
 
-    marker.bindTooltip(byggTooltip(s, erBilligst), {
-        permanent: true,
-        direction: 'top',
-        className: erBilligst ? 'station-tooltip billigst-tooltip' : `station-tooltip tooltip-${prisFarge(s)}${prisFarge(s) === 'grey' && harRelevantPris(s) ? ' tooltip-gammel' : ''}`,
-        offset: [0, -38],
-    });
+    if (!kompakt) {
+        marker.bindTooltip(byggTooltip(s, erBilligst), {
+            permanent: true,
+            direction: 'top',
+            className: erBilligst ? 'station-tooltip billigst-tooltip' : `station-tooltip tooltip-${prisFarge(s)}${prisFarge(s) === 'grey' && harRelevantPris(s) ? ' tooltip-gammel' : ''}`,
+            offset: [0, -38],
+        });
+    }
     return marker;
 }
 
@@ -196,6 +226,53 @@ function fargeIkon(farge, stor = false) {
         shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
         iconSize: size, iconAnchor: anchor,
         popupAnchor: [1, -34], shadowSize: [41, 41],
+    });
+}
+
+function getKompaktPris(s) {
+    const inn = getInnstillinger();
+    if (inn.bensin && s.bensin != null) return s.bensin;
+    if (inn.bensin98 && s.bensin98 != null) return s.bensin98;
+    if (inn.diesel && s.diesel != null) return s.diesel;
+    return null;
+}
+
+function kompaktIkon(s, erBilligst) {
+    const farge = prisFarge(s);
+    const borderFarge = erBilligst ? '#f59e0b'
+        : farge === 'green'  ? '#22c55e'
+        : farge === 'orange' ? '#f97316'
+        : farge === 'violet' ? '#a78bfa'
+        : '#9ca3af';
+
+    const kjedeEllerNavn = s.kjede || s.navn;
+    const logoUrl = getKjedeLogo(kjedeEllerNavn);
+    const initials = getKjedeInitials(kjedeEllerNavn);
+    const kjedeFarge = getKjedeFarge(kjedeEllerNavn);
+
+    const pris = getKompaktPris(s);
+    const prisStr = pris != null ? pris.toFixed(2).replace('.', ',') : null;
+
+    let innerHtml;
+    if (logoUrl) {
+        innerHtml = `<img src="${logoUrl}" class="km-img" ` +
+            `onerror="this.parentElement.style.background='${kjedeFarge}';this.outerHTML='<span class=\\"km-initials\\">${initials}</span>'">`;
+    } else {
+        innerHtml = `<span class="km-initials">${initials}</span>`;
+    }
+
+    const circleStyle = logoUrl ? '' : `background:${kjedeFarge}`;
+    const billigstKlass = erBilligst ? ' km-billigst' : '';
+
+    return L.divIcon({
+        className: '',
+        html: `<div class="km-root${billigstKlass}">` +
+            `<div class="km-circle" style="border-color:${borderFarge};${circleStyle}">${innerHtml}</div>` +
+            (prisStr ? `<div class="km-pris">${prisStr}</div>` : '') +
+            `</div>`,
+        iconSize: [44, 54],
+        iconAnchor: [22, 36],
+        popupAnchor: [0, -36],
     });
 }
 
