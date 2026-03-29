@@ -137,15 +137,16 @@ function fyllVisning(s) {
 
     const inn = getInnstillinger();
     const typer = [
-        inn.bensin   ? { label: '95 oktan', v: s.bensin }   : null,
-        inn.bensin98 ? { label: '98 oktan', v: s.bensin98 } : null,
-        inn.diesel   ? { label: 'Diesel',   v: s.diesel }   : null,
+        inn.bensin   ? { label: '95 oktan', v: s.bensin,   ts: s.bensin_tidspunkt   } : null,
+        inn.bensin98 ? { label: '98 oktan', v: s.bensin98, ts: s.bensin98_tidspunkt } : null,
+        inn.diesel   ? { label: 'Diesel',   v: s.diesel,   ts: s.diesel_tidspunkt   } : null,
     ].filter(Boolean);
     prisContainer.innerHTML = typer.map((t, i) => `
         ${i > 0 ? '<div class="sheet-divider"></div>' : ''}
         <div class="sheet-pris-blokk">
             <div class="sheet-pris-label">${t.label}</div>
             <div class="sheet-pris-verdi ${t.v == null ? 'ingen' : ''}">${t.v != null ? formatPris(t.v) + ' kr' : '–'}</div>
+            ${t.v != null ? `<span class="pris-alder-dot ${prisAlderKlasse(t.ts)}"></span>` : ''}
         </div>`).join('');
 
     const nyesteTidspunkt = [s.bensin_tidspunkt, s.diesel_tidspunkt, s.bensin98_tidspunkt]
@@ -304,6 +305,15 @@ function visPrisStatus(melding, erFeil) {
 
 function formatPris(v) {
     return v.toFixed(2).replace('.', ',');
+}
+
+function prisAlderKlasse(tidspunkt) {
+    if (!tidspunkt) return 'alder-ingen';
+    const timer = (Date.now() - new Date(tidspunkt.replace(' ', 'T')).getTime()) / 3600000;
+    if (timer < 8) return 'alder-fersk';
+    if (timer < 24) return 'alder-gammel';
+    if (timer < 48) return 'alder-utdatert';
+    return 'alder-kritisk';
 }
 
 function formatPrisInput(v) {
