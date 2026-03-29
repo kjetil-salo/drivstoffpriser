@@ -160,7 +160,7 @@ def statistikk():
     dyrest = {'bensin': None, 'diesel': None, 'bensin98': None}
     for p in priser_24t:
         for typ in ('bensin', 'diesel', 'bensin98'):
-            if p[typ] is not None:
+            if p[typ] is not None and p[typ] > 0:
                 entry = {
                     'pris': p[typ],
                     'stasjon': p['navn'],

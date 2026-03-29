@@ -669,12 +669,12 @@ def get_stasjoner_med_priser(user_lat, user_lon, radius_m=30000, limit=30):
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
             '''SELECT s.id, s.navn, s.kjede, s.lat, s.lon, s.lagt_til_av,
-                      (SELECT bensin   FROM priser WHERE stasjon_id=s.id AND bensin   IS NOT NULL ORDER BY id DESC LIMIT 1) AS bensin,
-                      (SELECT tidspunkt FROM priser WHERE stasjon_id=s.id AND bensin  IS NOT NULL ORDER BY id DESC LIMIT 1) AS bensin_tidspunkt,
-                      (SELECT diesel   FROM priser WHERE stasjon_id=s.id AND diesel   IS NOT NULL ORDER BY id DESC LIMIT 1) AS diesel,
-                      (SELECT tidspunkt FROM priser WHERE stasjon_id=s.id AND diesel  IS NOT NULL ORDER BY id DESC LIMIT 1) AS diesel_tidspunkt,
-                      (SELECT bensin98  FROM priser WHERE stasjon_id=s.id AND bensin98 IS NOT NULL ORDER BY id DESC LIMIT 1) AS bensin98,
-                      (SELECT tidspunkt FROM priser WHERE stasjon_id=s.id AND bensin98 IS NOT NULL ORDER BY id DESC LIMIT 1) AS bensin98_tidspunkt
+                      (SELECT NULLIF(bensin,   0) FROM priser WHERE stasjon_id=s.id ORDER BY id DESC LIMIT 1) AS bensin,
+                      (SELECT tidspunkt FROM priser WHERE stasjon_id=s.id AND bensin  IS NOT NULL AND bensin   > 0 ORDER BY id DESC LIMIT 1) AS bensin_tidspunkt,
+                      (SELECT NULLIF(diesel,   0) FROM priser WHERE stasjon_id=s.id ORDER BY id DESC LIMIT 1) AS diesel,
+                      (SELECT tidspunkt FROM priser WHERE stasjon_id=s.id AND diesel  IS NOT NULL AND diesel   > 0 ORDER BY id DESC LIMIT 1) AS diesel_tidspunkt,
+                      (SELECT NULLIF(bensin98, 0) FROM priser WHERE stasjon_id=s.id ORDER BY id DESC LIMIT 1) AS bensin98,
+                      (SELECT tidspunkt FROM priser WHERE stasjon_id=s.id AND bensin98 IS NOT NULL AND bensin98 > 0 ORDER BY id DESC LIMIT 1) AS bensin98_tidspunkt
                FROM stasjoner s
                WHERE s.godkjent != 0
                  AND s.lat BETWEEN ? AND ? AND s.lon BETWEEN ? AND ?''',
