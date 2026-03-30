@@ -43,7 +43,7 @@ export function visListe(stasjoner, onKlikk) {
     });
 
     const billigste = finnBilligste(stasjoner, inn);
-    const billigsteId = finnBilligsteId(stasjoner, inn);
+    const billigsteId = finnBilligsteId(stasjoner, inn, aktivSort);
     const sortert = sorter(stasjoner, aktivSort, billigsteId);
     container.innerHTML = sortert.map(s => kortHtml(s, billigste, s.id === billigsteId)).join('');
 
@@ -74,7 +74,7 @@ export function oppdaterKort(stasjon, onKlikk) {
     if (!kort) return;
     const inn = getInnstillinger();
     const billigste = finnBilligste(sisteStasjoner, inn);
-    const billigsteId = finnBilligsteId(sisteStasjoner, inn);
+    const billigsteId = finnBilligsteId(sisteStasjoner, inn, aktivSort);
     const nytt = document.createElement('div');
     nytt.innerHTML = kortHtml(stasjon, billigste, stasjon.id === billigsteId);
     const nyttKort = nytt.firstElementChild;
@@ -95,14 +95,16 @@ function finnBilligste(stasjoner, inn) {
     return billigste;
 }
 
-function finnBilligsteId(stasjoner, inn) {
+function finnBilligsteId(stasjoner, inn, felt) {
     let minPris = Infinity, minId = null;
     for (const s of stasjoner) {
-        const priser = [
-            inn.bensin   ? s.bensin   : null,
-            inn.bensin98 ? s.bensin98 : null,
-            inn.diesel   ? s.diesel   : null,
-        ].filter(v => v != null);
+        const priser = felt && felt !== 'avstand'
+            ? (inn[felt] && s[felt] != null ? [s[felt]] : [])
+            : [
+                inn.bensin   ? s.bensin   : null,
+                inn.bensin98 ? s.bensin98 : null,
+                inn.diesel   ? s.diesel   : null,
+              ].filter(v => v != null);
         if (!priser.length) continue;
         const min = Math.min(...priser);
         if (min < minPris) { minPris = min; minId = s.id; }
@@ -171,12 +173,11 @@ function kortHtml(s, billigste = {}, erHovedBilligst = false) {
     const kjedeEllerNavn = s.kjede || s.navn;
     const logoUrl = getKjedeLogo(kjedeEllerNavn);
     const farge = getKjedeFarge(kjedeEllerNavn);
-    const badgeHtml = logoUrl
-        ? `<div class="sk-badge" style="background:#1e293b;border:1px solid rgba(148,163,184,0.2)">
-             <img src="${logoUrl}" alt="${s.kjede || ''}" style="width:28px;height:28px;object-fit:contain"
-               onerror="this.parentElement.style.background='${farge}';this.parentElement.style.border='';this.parentElement.textContent='${getKjedeInitials(s.kjede || s.navn)}'">
-           </div>`
-        : `<div class="sk-badge" style="background:${farge}">${getKjedeInitials(s.kjede || s.navn)}</div>`;
+    const initials = getKjedeInitials(s.kjede || s.navn);
+    const badgeHtml = `<div class="sk-badge" style="background:${farge};position:relative">` +
+        `<span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#fff">${initials}</span>` +
+        (logoUrl ? `<img src="${logoUrl}" alt="${s.kjede || ''}" style="position:relative;width:28px;height:28px;object-fit:contain" onerror="this.style.display='none'">` : '') +
+        `</div>`;
     // Nyeste oppdatering blant synlige priser → for alderTekst
     const synligeTidspunkt = rader.filter(r => r.v && r.ts).map(r => r.ts);
     const nyesteTidspunkt = synligeTidspunkt.length

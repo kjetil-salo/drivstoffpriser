@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v20';
+const CACHE_VERSION = 'v24';
 const STATIC_CACHE = `drivstoff-static-${CACHE_VERSION}`;
 const DATA_CACHE = `drivstoff-data-${CACHE_VERSION}`;
 
@@ -20,6 +20,16 @@ const STATIC_ASSETS = [
   '/icon.svg',
   '/apple-touch-icon.png',
   '/favicon.ico',
+  '/img/kjeder/circlek.png',
+  '/img/kjeder/uno-x.png',
+  '/img/kjeder/yx.png',
+  '/img/kjeder/esso.png',
+  '/img/kjeder/shell.png',
+  '/img/kjeder/preem.png',
+  '/img/kjeder/st1.png',
+  '/img/kjeder/best.png',
+  '/img/kjeder/oljeleverandoren.png',
+  '/img/kjeder/tanken.png',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
 ];
