@@ -135,6 +135,34 @@ if (window.__innlogget) {
     authLenke.removeAttribute('hidden');
 }
 
+// ── Velkomst-splash ───────────────────────────────
+if (!window.__innlogget && !localStorage.getItem('velkommen_vist')) {
+    const nyheter = document.getElementById('nyhet-backdrop');
+    if (!nyheter || nyheter.hasAttribute('hidden')) {
+        localStorage.setItem('velkommen_vist', '1');
+        const backdrop = document.getElementById('velkommen-backdrop');
+        const dialog = document.getElementById('velkommen-dialog');
+        const tidligereFokus = document.activeElement;
+        backdrop.removeAttribute('hidden');
+        dialog.removeAttribute('hidden');
+        setTimeout(() => document.getElementById('velkommen-lukk').focus(), 100);
+        function lukkVelkommen() {
+            backdrop.setAttribute('hidden', '');
+            dialog.setAttribute('hidden', '');
+            if (tidligereFokus) tidligereFokus.focus();
+        }
+        document.getElementById('velkommen-lukk').addEventListener('click', lukkVelkommen);
+        backdrop.addEventListener('click', lukkVelkommen);
+        const escVelkommen = (e) => {
+            if (e.key === 'Escape' && !dialog.hasAttribute('hidden')) {
+                lukkVelkommen();
+                document.removeEventListener('keydown', escVelkommen);
+            }
+        };
+        document.addEventListener('keydown', escVelkommen);
+    }
+}
+
 // ── Legg til stasjon ─────────────────────────────
 const addStationBtn = document.getElementById('add-station-btn');
 if (window.__innlogget) {
