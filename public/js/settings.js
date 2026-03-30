@@ -9,7 +9,7 @@ function visToast(tekst) {
     toastTimer = setTimeout(() => el.classList.remove('toast-vis'), 2200);
 }
 
-const STANDARD = { bensin: true, bensin98: true, diesel: true, radius: 30, kartvisning: 'vanlig' };
+const STANDARD = { bensin: true, bensin98: true, diesel: true, radius: 30, kartvisning: 'kompakt' };
 
 export function getInnstillinger() {
     try {
@@ -59,7 +59,7 @@ export function initInnstillinger(onChange) {
     }
 
     function lagre() {
-        const kartvisning = document.querySelector('input[name="sett-kartvisning"]:checked')?.value || 'vanlig';
+        const kartvisning = document.querySelector('input[name="sett-kartvisning"]:checked')?.value || 'kompakt';
         const ny = {
             bensin: cbBensin.checked, bensin98: cbBensin98.checked, diesel: cbDiesel.checked,
             radius: parseInt(radiusSelect.value, 10),

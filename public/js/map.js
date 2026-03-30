@@ -79,7 +79,7 @@ export function visStasjoner(stasjoner, onKlikk) {
     stasjonData.clear();
 
     stasjonOnKlikk = onKlikk;
-    sisteKartvisning = getInnstillinger().kartvisning ?? 'vanlig';
+    sisteKartvisning = getInnstillinger().kartvisning ?? 'kompakt';
     const billigsteId = finnBilligsteId(stasjoner);
     stasjoner.forEach(s => {
         stasjonData.set(s.id, s);
@@ -110,7 +110,7 @@ function finnBilligsteId(stasjoner) {
 
 export function refreshKartInnstillinger() {
     const inn = getInnstillinger();
-    const nyKartvisning = inn.kartvisning ?? 'vanlig';
+    const nyKartvisning = inn.kartvisning ?? 'kompakt';
 
     // Kartvisning endret – full re-render
     if (nyKartvisning !== sisteKartvisning && stasjonOnKlikk) {
@@ -137,7 +137,7 @@ export function refreshKartInnstillinger() {
 export function oppdaterStasjonPriser(stasjon, onKlikk) {
     stasjonData.set(stasjon.id, stasjon);
     const inn = getInnstillinger();
-    const kompakt = (inn.kartvisning ?? 'vanlig') === 'kompakt';
+    const kompakt = (inn.kartvisning ?? 'kompakt') === 'kompakt';
     const billigsteId = finnBilligsteId([...stasjonData.values()]);
     stasjonData.forEach((s) => {
         const m = stasjonMarkorer.get(s.id);
@@ -201,7 +201,7 @@ function oppdaterMarkerTooltip(marker, s, erBilligst) {
 
 function lagMarker(s, erBilligst = false) {
     const inn = getInnstillinger();
-    const kompakt = (inn.kartvisning ?? 'vanlig') === 'kompakt';
+    const kompakt = (inn.kartvisning ?? 'kompakt') === 'kompakt';
 
     const marker = L.marker([s.lat, s.lon], {
         icon: kompakt ? kompaktIkon(s, erBilligst) : prisIkon(s),
@@ -256,15 +256,12 @@ function kompaktIkon(s, erBilligst) {
     const pris = getKompaktPris(s);
     const prisStr = pris != null ? pris.toFixed(2).replace('.', ',') : null;
 
-    let innerHtml;
+    let innerHtml = `<span class="km-initials">${initials}</span>`;
     if (logoUrl) {
-        innerHtml = `<img src="${logoUrl}" class="km-img" ` +
-            `onerror="this.parentElement.style.background='${kjedeFarge}';this.outerHTML='<span class=\\"km-initials\\">${initials}</span>'">`;
-    } else {
-        innerHtml = `<span class="km-initials">${initials}</span>`;
+        innerHtml += `<img src="${logoUrl}" class="km-img" onerror="this.style.display='none'">`;
     }
 
-    const circleStyle = logoUrl ? '' : `background:${kjedeFarge}`;
+    const circleStyle = `background:${kjedeFarge}`;
     const billigstKlass = erBilligst ? ' km-billigst' : '';
 
     return L.divIcon({
