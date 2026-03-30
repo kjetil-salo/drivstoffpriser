@@ -61,6 +61,33 @@ def tving_https():
         return redirect(request.url.replace('http://', 'https://', 1), code=301)
 
 
+_CSP = (
+    "default-src 'self'; "
+    "script-src 'self' 'unsafe-inline' https://unpkg.com; "
+    "style-src 'self' 'unsafe-inline' https://unpkg.com; "
+    "img-src 'self' data: blob: https://cdnjs.cloudflare.com https://raw.githubusercontent.com "
+    "https://*.openstreetmap.org https://www.google.com; "
+    "connect-src 'self'; "
+    "font-src 'self'; "
+    "worker-src 'self'; "
+    "frame-ancestors 'none'; "
+    "object-src 'none'; "
+    "base-uri 'self'; "
+    "form-action 'self'"
+)
+
+
+@app.after_request
+def security_headers(response):
+    response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    response.headers['Permissions-Policy'] = 'geolocation=(self), camera=(), microphone=()'
+    response.headers['Content-Security-Policy'] = _CSP
+    return response
+
+
 @app.after_request
 def cache_headers(response):
     path = request.path
