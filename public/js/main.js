@@ -292,6 +292,19 @@ document.addEventListener('vis-pa-kart', (e) => {
     sentrerKart(s.lat, s.lon, 16);
 });
 
+document.addEventListener('naviger-til-stasjon', async (e) => {
+    const { id, lat, lon } = e.detail;
+    byttTab('kart');
+    sentrerKart(lat, lon, 16);
+    try {
+        const nye = await hentStasjoner(lat, lon);
+        stasjoner = nye;
+        visStasjoner(stasjoner, visStasjonSheet);
+        const stasjon = stasjoner.find(s => s.id === id);
+        if (stasjon) visStasjonSheet(stasjon);
+    } catch {}
+});
+
 // ── Geolokasjon ───────────────────────────────────
 locBtn.addEventListener('click', startLokasjon);
 

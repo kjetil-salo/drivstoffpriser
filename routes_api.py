@@ -166,6 +166,9 @@ def statistikk():
                     'stasjon': p['navn'],
                     'kjede': p['kjede'] or '',
                     'tidspunkt': p['tidspunkt'],
+                    'stasjon_id': p['id'],
+                    'lat': p['lat'],
+                    'lon': p['lon'],
                 }
                 if billigst[typ] is None or p[typ] < billigst[typ]['pris']:
                     billigst[typ] = entry

@@ -22,6 +22,15 @@ function visPrisKort(elementId, data) {
         <div class="stat-pris-stasjon">${data.stasjon}</div>
         <div class="stat-pris-tid">${formaterTid(data.tidspunkt)}</div>
     `;
+    el.style.cursor = 'pointer';
+    el.title = `Vis ${data.stasjon} på kartet`;
+    el.setAttribute('role', 'button');
+    el.setAttribute('tabindex', '0');
+    const naviger = () => document.dispatchEvent(new CustomEvent('naviger-til-stasjon', {
+        detail: { id: data.stasjon_id, lat: data.lat, lon: data.lon, navn: data.stasjon }
+    }));
+    el.onclick = naviger;
+    el.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); naviger(); } };
 }
 
 function visToppliste(liste) {

@@ -1487,6 +1487,14 @@ html, body {
   border-radius: var(--radius-md);
   padding: var(--space-md);
   min-width: 0;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.stat-pris-kort[role="button"]:hover,
+.stat-pris-kort[role="button"]:focus-visible {
+  border-color: var(--color-primary, #2563eb);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary, #2563eb) 20%, transparent);
+  outline: none;
 }
 
 .stat-pris-verdi {

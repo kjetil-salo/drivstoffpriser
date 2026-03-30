@@ -243,7 +243,7 @@ def hent_billigste_priser_24t() -> list:
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
             '''SELECT p.bensin, p.diesel, p.bensin98, p.tidspunkt,
-                      s.navn, s.kjede
+                      s.id, s.navn, s.kjede, s.lat, s.lon
                FROM priser p
                JOIN stasjoner s ON s.id = p.stasjon_id
                WHERE s.godkjent != 0
