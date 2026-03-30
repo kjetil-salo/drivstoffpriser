@@ -63,8 +63,49 @@ def tving_https():
 
 @app.after_request
 def cache_headers(response):
-    if request.path == '/sw.js':
+    path = request.path
+    method = request.method
+
+    # Service Worker: alltid revalidér
+    if path == '/sw.js':
         response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        return response
+
+    # Skriveoperasjoner: aldri cache
+    if method in ('POST', 'PUT', 'DELETE', 'PATCH'):
+        response.headers['Cache-Control'] = 'no-store'
+        return response
+
+    # API-endepunkter
+    if path.startswith('/api/'):
+        if path.startswith('/api/stasjoner') or path in ('/api/meg', '/api/instance', '/api/share/prices'):
+            # Priser er ferskvare – aldri cache
+            response.headers['Cache-Control'] = 'no-store'
+        elif path in ('/api/statistikk', '/api/totalt-med-pris'):
+            response.headers['Cache-Control'] = 'public, max-age=300'
+        elif path in ('/api/toppliste', '/api/nyhet'):
+            response.headers['Cache-Control'] = 'public, max-age=3600'
+        elif path.startswith('/api/stedssok'):
+            response.headers['Cache-Control'] = 'public, max-age=86400'
+        else:
+            response.headers['Cache-Control'] = 'no-store'
+        return response
+
+    # HTML: revalidér alltid (bruker ETags/304)
+    if response.content_type and 'html' in response.content_type:
+        response.headers['Cache-Control'] = 'no-cache'
+        return response
+
+    # Ikoner og bilder: 30 dager
+    if any(path.endswith(ext) for ext in ('.ico', '.png', '.svg', '.webp', '.jpg')):
+        response.headers['Cache-Control'] = 'public, max-age=2592000, immutable'
+        return response
+
+    # JS og CSS: revalidér (ingen content-hashing, no-cache er tryggest)
+    if any(path.endswith(ext) for ext in ('.js', '.css')):
+        response.headers['Cache-Control'] = 'no-cache'
+        return response
+
     return response
 
 
