@@ -245,6 +245,8 @@ initSearch(async (sted) => {
     try {
         stasjoner = await hentStasjoner(sted.lat, sted.lon);
         locStatus.textContent = '';
+        lagrePosisjon({ lat: sted.lat, lon: sted.lon });
+        velkomst.setAttribute('hidden', '');
         visStasjoner(stasjoner, visStasjonSheet);
         if (viewListe.style.display !== 'none') visListe(stasjoner, visStasjonSheet);
     } catch (e) {
