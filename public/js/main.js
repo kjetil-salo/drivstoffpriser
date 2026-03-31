@@ -291,11 +291,14 @@ function byttTab(tab) {
         tabStatistikk.setAttribute('aria-selected', 'true');
         lastStatistikk();
     }
+    localStorage.setItem('aktivTab', tab);
 }
 
 tabKart.addEventListener('click', () => byttTab('kart'));
 tabListe.addEventListener('click', () => byttTab('liste'));
 tabStatistikk.addEventListener('click', () => byttTab('statistikk'));
+
+byttTab(localStorage.getItem('aktivTab') || 'kart');
 
 // Keyboard-navigasjon for tabs (WAI-ARIA tab pattern)
 const tabListe_ = [tabKart, tabListe, tabStatistikk];
