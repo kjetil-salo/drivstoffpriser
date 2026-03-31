@@ -373,7 +373,7 @@ def toggle_registrering():
 @krever_admin
 def generer_invitasjon():
     token = secrets.token_urlsafe(32)
-    utloper = (datetime.utcnow() + timedelta(hours=24)).strftime('%Y-%m-%d %H:%M:%S')
+    utloper = (datetime.now(datetime.UTC) + timedelta(hours=24)).strftime('%Y-%m-%d %H:%M:%S')
     opprett_invitasjon(token, utloper)
     base_url = os.environ.get('BASE_URL', request.host_url.rstrip('/'))
     return jsonify({'url': f'{base_url}/invitasjon?token={token}'})
