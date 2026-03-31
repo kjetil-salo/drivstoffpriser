@@ -114,9 +114,11 @@ function finnBilligsteId(stasjoner, inn, felt) {
 
 function sorter(stasjoner, felt, billigsteId) {
     return [...stasjoner].sort((a, b) => {
-        // Billigste alltid øverst
-        if (a.id === billigsteId) return -1;
-        if (b.id === billigsteId) return 1;
+        // Billigste øverst kun ved prissortering
+        if (felt !== 'avstand') {
+            if (a.id === billigsteId) return -1;
+            if (b.id === billigsteId) return 1;
+        }
         if (felt === 'avstand') return (a.avstand_m ?? Infinity) - (b.avstand_m ?? Infinity);
         const av = a[felt] ?? Infinity;
         const bv = b[felt] ?? Infinity;
@@ -204,7 +206,7 @@ function kortHtml(s, billigste = {}, erHovedBilligst = false) {
             <div class="sk-priser">
                 ${rader.map(r => `<div class="sk-pris-rad${r.type === aktivSort ? ' sort-aktiv' : ''}">
                     <span class="sk-pris-label">${r.label}</span>
-                    <span class="sk-pris-verdi ${r.v ? (r.billigst ? 'billigst' : '') : 'ingen'}">${r.v ? r.v + ' kr' : '–'}</span>
+                    <span class="sk-pris-verdi ${r.v ? (r.billigst ? 'billigst' : '') : 'ingen'}">${r.v ?? '–'}</span>
                     ${r.v ? `<span class="pris-alder-dot ${prisAlderKlasse(r.ts)}" title="${r.ts ? prisAlderTekst(r.ts) : 'ukjent alder'}"></span>` : ''}
                 </div>`).join('')}
             </div>
