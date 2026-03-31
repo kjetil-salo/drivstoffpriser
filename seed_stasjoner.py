@@ -81,8 +81,9 @@ def hent_alle_stasjoner_norge():
         navn = tags.get('name') or tags.get('brand') or 'Bensinstasjon'
         kjede = tags.get('brand') or tags.get('operator') or ''
         osm_id = f"{el['type']}/{el['id']}"
+        land = tags.get('addr:country') or None
 
-        lagre_stasjon(navn, kjede, lat, lon, osm_id)
+        lagre_stasjon(navn, kjede, lat, lon, osm_id, land)
         count += 1
 
     if hoppet_over:

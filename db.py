@@ -110,6 +110,8 @@ def _migrer_db():
             conn.execute("ALTER TABLE stasjoner ADD COLUMN lagt_til_av INTEGER REFERENCES brukere(id)")
         if 'godkjent' not in stasjon_kolonner:
             conn.execute("ALTER TABLE stasjoner ADD COLUMN godkjent INTEGER DEFAULT 1")
+        if 'land' not in stasjon_kolonner:
+            conn.execute("ALTER TABLE stasjoner ADD COLUMN land TEXT")
 
         # Rapporter-tabell og blogg_visninger (migrering)
         tabeller = [r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
@@ -156,16 +158,17 @@ def _haversine(lat1, lon1, lat2, lon2):
 
 
 
-def lagre_stasjon(navn, kjede, lat, lon, osm_id):
+def lagre_stasjon(navn, kjede, lat, lon, osm_id, land=None):
     with get_conn() as conn:
         conn.execute(
-            '''INSERT INTO stasjoner (navn, kjede, lat, lon, osm_id)
-               VALUES (?, ?, ?, ?, ?)
+            '''INSERT INTO stasjoner (navn, kjede, lat, lon, osm_id, land)
+               VALUES (?, ?, ?, ?, ?, ?)
                ON CONFLICT(osm_id) DO UPDATE SET
                  navn=excluded.navn, kjede=excluded.kjede,
                  lat=excluded.lat, lon=excluded.lon,
+                 land=COALESCE(excluded.land, stasjoner.land),
                  sist_oppdatert=datetime('now')''',
-            (navn, kjede, lat, lon, osm_id)
+            (navn, kjede, lat, lon, osm_id, land)
         )
 
 
