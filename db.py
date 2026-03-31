@@ -14,6 +14,19 @@ def get_conn():
 
 
 def init_db():
+    try:
+        conn_test = sqlite3.connect(DB_PATH, timeout=5)
+        conn_test.execute("PRAGMA journal_mode=WAL")
+        conn_test.close()
+    except sqlite3.DatabaseError:
+        if os.path.exists(DB_PATH):
+            os.remove(DB_PATH)
+        wal = DB_PATH + '-wal'
+        shm = DB_PATH + '-shm'
+        if os.path.exists(wal):
+            os.remove(wal)
+        if os.path.exists(shm):
+            os.remove(shm)
     with get_conn() as conn:
         conn.executescript('''
             CREATE TABLE IF NOT EXISTS stasjoner (
