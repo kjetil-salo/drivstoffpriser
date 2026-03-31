@@ -65,10 +65,12 @@ export async function lastStatistikk() {
         visPrisKort('stat-billigst-bensin', data.billigst.bensin);
         visPrisKort('stat-billigst-bensin98', data.billigst.bensin98);
         visPrisKort('stat-billigst-diesel', data.billigst.diesel);
+        visPrisKort('stat-billigst-diesel_avgiftsfri', data.billigst.diesel_avgiftsfri);
 
         visPrisKort('stat-dyrest-bensin', data.dyrest.bensin);
         visPrisKort('stat-dyrest-bensin98', data.dyrest.bensin98);
         visPrisKort('stat-dyrest-diesel', data.dyrest.diesel);
+        visPrisKort('stat-dyrest-diesel_avgiftsfri', data.dyrest.diesel_avgiftsfri);
 
         const toppliste = respTopp.ok ? await respTopp.json() : [];
         visToppliste(toppliste);

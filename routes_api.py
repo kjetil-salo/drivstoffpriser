@@ -156,10 +156,10 @@ def statistikk():
     priser_24t = hent_billigste_priser_24t()
     antall_oppdateringer = antall_prisoppdateringer_24t()
 
-    billigst = {'bensin': None, 'diesel': None, 'bensin98': None}
-    dyrest = {'bensin': None, 'diesel': None, 'bensin98': None}
+    billigst = {'bensin': None, 'diesel': None, 'bensin98': None, 'diesel_avgiftsfri': None}
+    dyrest = {'bensin': None, 'diesel': None, 'bensin98': None, 'diesel_avgiftsfri': None}
     for p in priser_24t:
-        for typ in ('bensin', 'diesel', 'bensin98'):
+        for typ in ('bensin', 'diesel', 'bensin98', 'diesel_avgiftsfri'):
             if p[typ] is not None and p[typ] > 0:
                 entry = {
                     'pris': p[typ],
@@ -194,6 +194,7 @@ def oppdater_pris():
     bensin_raw = data.get('bensin')
     diesel_raw = data.get('diesel')
     bensin98_raw = data.get('bensin98')
+    diesel_avgiftsfri_raw = data.get('diesel_avgiftsfri')
 
     def til_float(v):
         if v is None or v == '':
@@ -207,10 +208,11 @@ def oppdater_pris():
     bensin = til_float(bensin_raw)
     diesel = til_float(diesel_raw)
     bensin98 = til_float(bensin98_raw)
+    diesel_avgiftsfri = til_float(diesel_avgiftsfri_raw)
 
     bruker_id = session.get('bruker_id')
-    lagre_pris(stasjon_id, bensin, diesel, bensin98, bruker_id=bruker_id)
-    logger.info(f'Pris lagret: stasjon={stasjon_id} bensin={bensin} diesel={diesel} bensin98={bensin98} bruker={bruker_id}')
+    lagre_pris(stasjon_id, bensin, diesel, bensin98, bruker_id=bruker_id, diesel_avgiftsfri=diesel_avgiftsfri)
+    logger.info(f'Pris lagret: stasjon={stasjon_id} bensin={bensin} diesel={diesel} bensin98={bensin98} diesel_avgiftsfri={diesel_avgiftsfri} bruker={bruker_id}')
     return jsonify({'ok': True})
 
 
@@ -345,7 +347,7 @@ def om():
 <div class="kort">
   <h2>Hva er dette?</h2>
   <p>En gratis webapp der brukerne selv registrerer og oppdaterer drivstoffpriser. Jo flere som bidrar, jo bedre og ferskere priser f&#229;r alle.</p>
-  <p>Appen st&#248;tter <strong>95 oktan</strong>, <strong>98 oktan</strong> og <strong>Diesel</strong>.</p>
+  <p>Appen st&#248;tter <strong>95 oktan</strong>, <strong>98 oktan</strong>, <strong>Diesel</strong> og <strong>Avgiftsfri diesel</strong>.</p>
   <p style="margin-top:0.5rem;font-size:0.85rem;color:#94a3b8">Liker du appen? En liten donasjon hjelper med &#229; dekke serverdrift.</p>
   <a class="donasjon" href="https://qr.vipps.no/box/4aa50659-cefa-415b-b638-fa1f73e65d1e/pay-in" target="_blank" rel="noopener">
     <svg viewBox="0 0 128 32" fill="none" xmlns="http://www.w3.org/2000/svg">

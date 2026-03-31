@@ -9,7 +9,7 @@ function visToast(tekst) {
     toastTimer = setTimeout(() => el.classList.remove('toast-vis'), 2200);
 }
 
-const STANDARD = { bensin: true, bensin98: true, diesel: true, radius: 30, kartvisning: 'kompakt' };
+const STANDARD = { bensin: true, bensin98: true, diesel: true, diesel_avgiftsfri: false, radius: 30, kartvisning: 'kompakt' };
 
 export function getInnstillinger() {
     try {
@@ -24,6 +24,7 @@ export function initInnstillinger(onChange) {
     const cbBensin = document.getElementById('sett-bensin');
     const cbBensin98 = document.getElementById('sett-bensin98');
     const cbDiesel = document.getElementById('sett-diesel');
+    const cbDieselAvgiftsfri = document.getElementById('sett-diesel-avgiftsfri');
     const radiusSelect = document.getElementById('sett-radius');
     const radVanlig = document.getElementById('sett-kartvisning-vanlig');
     const radKompakt = document.getElementById('sett-kartvisning-kompakt');
@@ -32,6 +33,7 @@ export function initInnstillinger(onChange) {
     cbBensin.checked = s.bensin;
     cbBensin98.checked = s.bensin98;
     cbDiesel.checked = s.diesel;
+    cbDieselAvgiftsfri.checked = s.diesel_avgiftsfri;
     radiusSelect.value = String(s.radius);
     if (s.kartvisning === 'kompakt') radKompakt.checked = true;
     else radVanlig.checked = true;
@@ -51,7 +53,7 @@ export function initInnstillinger(onChange) {
     });
 
     function oppdater(cb) {
-        if (!cbBensin.checked && !cbBensin98.checked && !cbDiesel.checked) {
+        if (!cbBensin.checked && !cbBensin98.checked && !cbDiesel.checked && !cbDieselAvgiftsfri.checked) {
             cb.checked = true;
             return;
         }
@@ -62,6 +64,7 @@ export function initInnstillinger(onChange) {
         const kartvisning = document.querySelector('input[name="sett-kartvisning"]:checked')?.value || 'kompakt';
         const ny = {
             bensin: cbBensin.checked, bensin98: cbBensin98.checked, diesel: cbDiesel.checked,
+            diesel_avgiftsfri: cbDieselAvgiftsfri.checked,
             radius: parseInt(radiusSelect.value, 10),
             kartvisning,
         };
@@ -72,6 +75,7 @@ export function initInnstillinger(onChange) {
     cbBensin.addEventListener('change', function () { oppdater(this); });
     cbBensin98.addEventListener('change', function () { oppdater(this); });
     cbDiesel.addEventListener('change', function () { oppdater(this); });
+    cbDieselAvgiftsfri.addEventListener('change', function () { oppdater(this); });
     radiusSelect.addEventListener('change', lagre);
     radVanlig.addEventListener('change', lagre);
     radKompakt.addEventListener('change', lagre);

@@ -100,6 +100,8 @@ def _migrer_db():
             conn.execute("ALTER TABLE priser ADD COLUMN bensin98 REAL")
         if 'bruker_id' not in kolonner:
             conn.execute("ALTER TABLE priser ADD COLUMN bruker_id INTEGER REFERENCES brukere(id)")
+        if 'diesel_avgiftsfri' not in kolonner:
+            conn.execute("ALTER TABLE priser ADD COLUMN diesel_avgiftsfri REAL")
 
         bruker_kolonner = [r[1] for r in conn.execute("PRAGMA table_info(brukere)").fetchall()]
         if 'kallenavn' not in bruker_kolonner:
@@ -172,11 +174,11 @@ def lagre_stasjon(navn, kjede, lat, lon, osm_id, land=None):
         )
 
 
-def lagre_pris(stasjon_id, bensin, diesel, bensin98=None, bruker_id=None):
+def lagre_pris(stasjon_id, bensin, diesel, bensin98=None, bruker_id=None, diesel_avgiftsfri=None):
     with get_conn() as conn:
         conn.execute(
-            'INSERT INTO priser (stasjon_id, bensin, diesel, bensin98, bruker_id) VALUES (?, ?, ?, ?, ?)',
-            (stasjon_id, bensin, diesel, bensin98, bruker_id)
+            'INSERT INTO priser (stasjon_id, bensin, diesel, bensin98, bruker_id, diesel_avgiftsfri) VALUES (?, ?, ?, ?, ?, ?)',
+            (stasjon_id, bensin, diesel, bensin98, bruker_id, diesel_avgiftsfri)
         )
 
 
@@ -184,7 +186,7 @@ def hent_siste_prisoppdateringer(limit=100) -> list:
     with get_conn() as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
-            '''SELECT p.id, p.bensin, p.diesel, p.bensin98, p.tidspunkt,
+            '''SELECT p.id, p.bensin, p.diesel, p.bensin98, p.diesel_avgiftsfri, p.tidspunkt,
                       s.navn, s.kjede, s.lat, s.lon,
                       b.brukernavn
                FROM priser p
@@ -245,7 +247,7 @@ def hent_billigste_priser_24t() -> list:
     with get_conn() as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
-            '''SELECT p.bensin, p.diesel, p.bensin98, p.tidspunkt,
+            '''SELECT p.bensin, p.diesel, p.bensin98, p.diesel_avgiftsfri, p.tidspunkt,
                       s.id, s.navn, s.kjede, s.lat, s.lon
                FROM priser p
                JOIN stasjoner s ON s.id = p.stasjon_id
@@ -316,7 +318,7 @@ def antall_stasjoner_med_pris() -> int:
     with get_conn() as conn:
         return conn.execute(
             '''SELECT COUNT(DISTINCT stasjon_id) FROM priser
-               WHERE bensin IS NOT NULL OR diesel IS NOT NULL OR bensin98 IS NOT NULL'''
+               WHERE bensin IS NOT NULL OR diesel IS NOT NULL OR bensin98 IS NOT NULL OR diesel_avgiftsfri IS NOT NULL'''
         ).fetchone()[0]
 
 
@@ -325,11 +327,11 @@ def stasjoner_med_pris_koordinater() -> list:
         conn.row_factory = sqlite3.Row
         return [dict(r) for r in conn.execute(
             '''SELECT s.navn, s.kjede, s.lat, s.lon,
-                      p.bensin, p.diesel, p.bensin98, p.tidspunkt
+                      p.bensin, p.diesel, p.bensin98, p.diesel_avgiftsfri, p.tidspunkt
                FROM stasjoner s
                JOIN priser p ON p.stasjon_id = s.id
                WHERE p.id = (SELECT MAX(p2.id) FROM priser p2 WHERE p2.stasjon_id = s.id)
-                 AND (p.bensin IS NOT NULL OR p.diesel IS NOT NULL OR p.bensin98 IS NOT NULL)'''
+                 AND (p.bensin IS NOT NULL OR p.diesel IS NOT NULL OR p.bensin98 IS NOT NULL OR p.diesel_avgiftsfri IS NOT NULL)'''
         ).fetchall()]
 
 
@@ -695,7 +697,9 @@ def get_stasjoner_med_priser(user_lat, user_lon, radius_m=30000, limit=30):
                       (SELECT NULLIF(diesel,   0) FROM priser WHERE stasjon_id=s.id ORDER BY id DESC LIMIT 1) AS diesel,
                       (SELECT tidspunkt FROM priser WHERE stasjon_id=s.id AND diesel  IS NOT NULL AND diesel   > 0 ORDER BY id DESC LIMIT 1) AS diesel_tidspunkt,
                       (SELECT NULLIF(bensin98, 0) FROM priser WHERE stasjon_id=s.id ORDER BY id DESC LIMIT 1) AS bensin98,
-                      (SELECT tidspunkt FROM priser WHERE stasjon_id=s.id AND bensin98 IS NOT NULL AND bensin98 > 0 ORDER BY id DESC LIMIT 1) AS bensin98_tidspunkt
+                      (SELECT tidspunkt FROM priser WHERE stasjon_id=s.id AND bensin98 IS NOT NULL AND bensin98 > 0 ORDER BY id DESC LIMIT 1) AS bensin98_tidspunkt,
+                      (SELECT NULLIF(diesel_avgiftsfri, 0) FROM priser WHERE stasjon_id=s.id ORDER BY id DESC LIMIT 1) AS diesel_avgiftsfri,
+                      (SELECT tidspunkt FROM priser WHERE stasjon_id=s.id AND diesel_avgiftsfri IS NOT NULL AND diesel_avgiftsfri > 0 ORDER BY id DESC LIMIT 1) AS diesel_avgiftsfri_tidspunkt
                FROM stasjoner s
                WHERE s.godkjent != 0
                  AND s.lat BETWEEN ? AND ? AND s.lon BETWEEN ? AND ?''',
@@ -719,6 +723,8 @@ def get_stasjoner_med_priser(user_lat, user_lon, radius_m=30000, limit=30):
                 'diesel_tidspunkt': row['diesel_tidspunkt'],
                 'bensin98': row['bensin98'],
                 'bensin98_tidspunkt': row['bensin98_tidspunkt'],
+                'diesel_avgiftsfri': row['diesel_avgiftsfri'],
+                'diesel_avgiftsfri_tidspunkt': row['diesel_avgiftsfri_tidspunkt'],
                 'avstand_m': round(dist),
                 'brukeropprettet': row['lagt_til_av'] is not None,
             })

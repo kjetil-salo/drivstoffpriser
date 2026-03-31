@@ -51,11 +51,11 @@ export async function settKjede(stasjonId, kjede) {
     return resp.json();
 }
 
-export async function oppdaterPris(stasjonId, bensin, diesel, bensin98) {
+export async function oppdaterPris(stasjonId, bensin, diesel, bensin98, diesel_avgiftsfri) {
     const resp = await fetch('/api/pris', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ stasjon_id: stasjonId, bensin, diesel, bensin98 }),
+        body: JSON.stringify({ stasjon_id: stasjonId, bensin, diesel, bensin98, diesel_avgiftsfri }),
     });
     if (resp.status === 401) return { status: 401 };
     if (!resp.ok) throw new Error('Feil ved lagring av pris');

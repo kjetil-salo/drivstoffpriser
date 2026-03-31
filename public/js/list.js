@@ -19,12 +19,13 @@ export function visListe(stasjoner, onKlikk) {
     }
 
     const inn = getInnstillinger();
-    const medPris = stasjoner.filter(s => s.bensin != null || s.bensin98 != null || s.diesel != null).length;
+    const medPris = stasjoner.filter(s => s.bensin != null || s.bensin98 != null || s.diesel != null || s.diesel_avgiftsfri != null).length;
 
     // Tilbakestill aktivSort hvis valgt type ikke lenger er synlig
     if (aktivSort === 'bensin' && !inn.bensin) aktivSort = 'avstand';
     if (aktivSort === 'bensin98' && !inn.bensin98) aktivSort = 'avstand';
     if (aktivSort === 'diesel' && !inn.diesel) aktivSort = 'avstand';
+    if (aktivSort === 'diesel_avgiftsfri' && !inn.diesel_avgiftsfri) aktivSort = 'avstand';
 
     info.innerHTML = `
         <span id="sort-label">${stasjoner.length} stasjoner (${medPris} med pris) – sorter:</span>
@@ -33,6 +34,7 @@ export function visListe(stasjoner, onKlikk) {
             ${inn.bensin ? `<button class="sort-btn ${aktivSort === 'bensin' ? 'aktiv' : ''}" data-sort="bensin">95 oktan</button>` : ''}
             ${inn.bensin98 ? `<button class="sort-btn ${aktivSort === 'bensin98' ? 'aktiv' : ''}" data-sort="bensin98">98 oktan</button>` : ''}
             ${inn.diesel ? `<button class="sort-btn ${aktivSort === 'diesel' ? 'aktiv' : ''}" data-sort="diesel">Diesel</button>` : ''}
+            ${inn.diesel_avgiftsfri ? `<button class="sort-btn ${aktivSort === 'diesel_avgiftsfri' ? 'aktiv' : ''}" data-sort="diesel_avgiftsfri">Avg.fri</button>` : ''}
         </div>`;
 
     info.querySelectorAll('.sort-btn').forEach(btn => {
@@ -84,7 +86,7 @@ export function oppdaterKort(stasjon, onKlikk) {
 
 function finnBilligste(stasjoner, inn) {
     const billigste = {};
-    for (const type of ['bensin', 'bensin98', 'diesel']) {
+    for (const type of ['bensin', 'bensin98', 'diesel', 'diesel_avgiftsfri']) {
         if (!inn[type]) continue;
         let min = Infinity, minId = null;
         for (const s of stasjoner) {
@@ -101,9 +103,10 @@ function finnBilligsteId(stasjoner, inn, felt) {
         const priser = felt && felt !== 'avstand'
             ? (inn[felt] && s[felt] != null ? [s[felt]] : [])
             : [
-                inn.bensin   ? s.bensin   : null,
-                inn.bensin98 ? s.bensin98 : null,
-                inn.diesel   ? s.diesel   : null,
+                inn.bensin              ? s.bensin              : null,
+                inn.bensin98            ? s.bensin98            : null,
+                inn.diesel              ? s.diesel              : null,
+                inn.diesel_avgiftsfri   ? s.diesel_avgiftsfri   : null,
               ].filter(v => v != null);
         if (!priser.length) continue;
         const min = Math.min(...priser);
@@ -168,9 +171,10 @@ function prisAlderBanner(tidspunkt) {
 function kortHtml(s, billigste = {}, erHovedBilligst = false) {
     const inn = getInnstillinger();
     const rader = [
-        inn.bensin    ? { label: '95',     v: formatPris(s.bensin),   billigst: billigste.bensin   === s.id, type: 'bensin',   ts: s.bensin_tidspunkt   } : null,
-        inn.bensin98  ? { label: '98',     v: formatPris(s.bensin98), billigst: billigste.bensin98 === s.id, type: 'bensin98', ts: s.bensin98_tidspunkt } : null,
-        inn.diesel    ? { label: 'Diesel', v: formatPris(s.diesel),   billigst: billigste.diesel   === s.id, type: 'diesel',   ts: s.diesel_tidspunkt   } : null,
+        inn.bensin              ? { label: '95',     v: formatPris(s.bensin),              billigst: billigste.bensin              === s.id, type: 'bensin',              ts: s.bensin_tidspunkt              } : null,
+        inn.bensin98            ? { label: '98',     v: formatPris(s.bensin98),            billigst: billigste.bensin98            === s.id, type: 'bensin98',            ts: s.bensin98_tidspunkt            } : null,
+        inn.diesel              ? { label: 'Diesel', v: formatPris(s.diesel),              billigst: billigste.diesel              === s.id, type: 'diesel',              ts: s.diesel_tidspunkt              } : null,
+        inn.diesel_avgiftsfri   ? { label: 'Avg.fri', v: formatPris(s.diesel_avgiftsfri),  billigst: billigste.diesel_avgiftsfri   === s.id, type: 'diesel_avgiftsfri',   ts: s.diesel_avgiftsfri_tidspunkt   } : null,
     ].filter(Boolean);
     const kjedeEllerNavn = s.kjede || s.navn;
     const logoUrl = getKjedeLogo(kjedeEllerNavn);

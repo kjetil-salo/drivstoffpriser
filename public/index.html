@@ -68,6 +68,7 @@
     <label class="innstilling-rad"><input type="checkbox" id="sett-bensin"> 95 oktan</label>
     <label class="innstilling-rad"><input type="checkbox" id="sett-bensin98"> 98 oktan</label>
     <label class="innstilling-rad"><input type="checkbox" id="sett-diesel"> Diesel</label>
+    <label class="innstilling-rad"><input type="checkbox" id="sett-diesel-avgiftsfri"> Avgiftsfri diesel</label>
     <div class="innstilling-tittel innstilling-separator">Søkeradius</div>
     <label class="innstilling-rad">
       <select id="sett-radius">
@@ -136,6 +137,16 @@
           <div class="stat-pris-loading">Laster …</div>
         </div>
         <div id="stat-dyrest-diesel" class="stat-pris-kort stat-dyrest">
+          <div class="stat-pris-loading">Laster …</div>
+        </div>
+      </div>
+
+      <div class="stat-rad">
+        <div class="stat-rad-label">Avg.fri diesel</div>
+        <div id="stat-billigst-diesel_avgiftsfri" class="stat-pris-kort">
+          <div class="stat-pris-loading">Laster …</div>
+        </div>
+        <div id="stat-dyrest-diesel_avgiftsfri" class="stat-pris-kort stat-dyrest">
           <div class="stat-pris-loading">Laster …</div>
         </div>
       </div>
@@ -346,6 +357,10 @@ Vil du hjelpe til? Opprett en gratis bruker og oppdater priser på stasjoner næ
         <div class="pris-input-gruppe">
           <label for="sheet-diesel-input">Diesel (kr/liter)</label>
           <input id="sheet-diesel-input" type="text" inputmode="decimal" placeholder="f.eks. 20,50" autocomplete="off">
+        </div>
+        <div class="pris-input-gruppe">
+          <label for="sheet-diesel-avgiftsfri-input">Avgiftsfri diesel (kr/liter)</label>
+          <input id="sheet-diesel-avgiftsfri-input" type="text" inputmode="decimal" placeholder="f.eks. 14,50" autocomplete="off">
         </div>
         <div id="sheet-edit-status" role="status" aria-live="polite"></div>
         <div class="modal-btns">

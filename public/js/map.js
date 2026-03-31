@@ -97,9 +97,10 @@ function finnBilligsteId(stasjoner) {
     let minPris = Infinity, minId = null;
     for (const s of stasjoner) {
         const priser = [
-            inn.bensin   ? s.bensin   : null,
-            inn.bensin98 ? s.bensin98 : null,
-            inn.diesel   ? s.diesel   : null,
+            inn.bensin              ? s.bensin              : null,
+            inn.bensin98            ? s.bensin98            : null,
+            inn.diesel              ? s.diesel              : null,
+            inn.diesel_avgiftsfri   ? s.diesel_avgiftsfri   : null,
         ].filter(v => v != null);
         if (!priser.length) continue;
         const min = Math.min(...priser);
