@@ -859,13 +859,19 @@ def admin_kart():
   .info{{background:#111827;border:1px solid #1f2937;border-radius:8px;padding:0.75rem 1rem;
          margin:0 1rem 1rem;font-size:0.85rem;color:#94a3b8;display:inline-block}}
   .legend{{display:inline-block;margin-left:1rem;background:#111827;border:1px solid #1f2937;border-radius:8px;padding:0.75rem 1rem;font-size:0.85rem;color:#94a3b8}}
-  .legend span{{display:inline-flex;align-items:center;margin-right:1rem}}
+  .legend span{{display:inline-flex;align-items:center;margin-right:1rem;cursor:pointer;user-select:none}}
+  .legend span.inaktiv{{opacity:0.3;text-decoration:line-through}}
   .legend .dot{{width:12px;height:12px;border-radius:50%;display:inline-block;margin-right:0.4rem}}
 </style></head><body>
 <nav><a href="/admin">← Admin</a></nav>
 <h1>Registrerte priser i Norge</h1>
 <div class="info">{len(stasjoner)} stasjoner med pris</div>
-<div class="legend"><span><span class="dot" style="background:#22c55e"></span>&lt; 8 timer</span><span><span class="dot" style="background:#f59e0b"></span>8–48 timer</span><span><span class="dot" style="background:#3b82f6"></span>2–7 dager</span><span><span class="dot" style="background:#6b7280"></span>&gt; 7 dager</span></div>
+<div class="legend">
+  <span data-kat="fersk"><span class="dot" style="background:#22c55e"></span>&lt; 8 timer</span>
+  <span data-kat="ny"><span class="dot" style="background:#f59e0b"></span>8–48 timer</span>
+  <span data-kat="gammel"><span class="dot" style="background:#3b82f6"></span>2–7 dager</span>
+  <span data-kat="gammel7"><span class="dot" style="background:#6b7280"></span>&gt; 7 dager</span>
+</div>
 <div id="map"></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
@@ -882,6 +888,15 @@ function prisFarge(tidspunkt) {{
   if (timer < 168) return '#3b82f6';
   return '#6b7280';
 }}
+function prisKat(tidspunkt) {{
+  if (!tidspunkt) return 'gammel7';
+  const timer = (Date.now() - new Date(tidspunkt.replace(' ', 'T')).getTime()) / 3600000;
+  if (timer < 8) return 'fersk';
+  if (timer < 48) return 'ny';
+  if (timer < 168) return 'gammel';
+  return 'gammel7';
+}}
+const markorer = {{}};
 stasjoner.forEach(s => {{
   const priser = [
     s.bensin ? '95: ' + s.bensin.toFixed(2) : null,
@@ -890,17 +905,28 @@ stasjoner.forEach(s => {{
   ].filter(Boolean).join('<br>');
   const dato = s.tidspunkt ? s.tidspunkt.slice(0, 10) : '';
   const farge = prisFarge(s.tidspunkt);
-  L.circleMarker([s.lat, s.lon], {{
+  const kat = prisKat(s.tidspunkt);
+  const m = L.circleMarker([s.lat, s.lon], {{
     radius: 7, fillColor: farge, color: '#1e3a5f', weight: 1, fillOpacity: 0.8
   }}).addTo(map).bindPopup(
     '<b>' + s.navn + '</b>' + (s.kjede ? ' (' + s.kjede + ')' : '') +
     '<br>' + priser + '<br><span style="color:#888;font-size:0.8em">' + dato + '</span>'
   );
+  if (!markorer[kat]) markorer[kat] = [];
+  markorer[kat].push(m);
 }});
 if (stasjoner.length) {{
   const bounds = L.latLngBounds(stasjoner.map(s => [s.lat, s.lon]));
   map.fitBounds(bounds, {{ padding: [30, 30] }});
 }}
+document.querySelectorAll('.legend span[data-kat]').forEach(el => {{
+  el.addEventListener('click', () => {{
+    const kat = el.dataset.kat;
+    const aktiv = !el.classList.contains('inaktiv');
+    el.classList.toggle('inaktiv', aktiv);
+    (markorer[kat] || []).forEach(m => aktiv ? map.removeLayer(m) : map.addLayer(m));
+  }});
+}});
 </script></body></html>'''
 
 
