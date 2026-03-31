@@ -63,8 +63,8 @@ def tving_https():
 
 _CSP = (
     "default-src 'self'; "
-    "script-src 'self' 'unsafe-inline' https://unpkg.com; "
-    "style-src 'self' 'unsafe-inline' https://unpkg.com; "
+    "script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net; "
+    "style-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net; "
     "img-src 'self' data: blob: https://cdnjs.cloudflare.com https://raw.githubusercontent.com "
     "https://*.openstreetmap.org https://www.google.com; "
     "connect-src 'self'; "
