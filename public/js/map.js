@@ -242,7 +242,7 @@ function getKompaktPris(s) {
 
 function kompaktIkon(s, erBilligst) {
     const farge = prisFarge(s);
-    const borderFarge = erBilligst ? '#f59e0b'
+    const borderFarge = erBilligst ? '#4ade80'
         : farge === 'green'  ? '#22c55e'
         : farge === 'orange' ? '#f97316'
         : farge === 'violet' ? '#a78bfa'
@@ -256,6 +256,19 @@ function kompaktIkon(s, erBilligst) {
     const pris = getKompaktPris(s);
     const prisStr = pris != null ? pris.toFixed(2).replace('.', ',') : null;
 
+    const tidspunkt = [s.bensin_tidspunkt, s.diesel_tidspunkt, s.bensin98_tidspunkt]
+        .filter(Boolean)
+        .reduce((a, b) => a > b ? a : b, null);
+    const alder = prisAlderTimer(tidspunkt);
+    let alderHtml = '';
+    if (alder !== null && alder >= 8) {
+        let alderTekst, alderKlass;
+        if (alder >= 168) { alderTekst = '>7d'; alderKlass = 'grey'; }
+        else if (alder >= 48) { alderTekst = Math.round(alder / 24) + 'd'; alderKlass = 'violet'; }
+        else { alderTekst = Math.round(alder) + 't'; alderKlass = 'orange'; }
+        alderHtml = `<span class="km-alder km-alder--${alderKlass}">${alderTekst}</span>`;
+    }
+
     let innerHtml = `<span class="km-initials">${initials}</span>`;
     if (logoUrl) {
         innerHtml += `<img src="${logoUrl}" class="km-img" onerror="this.style.display='none'">`;
@@ -268,11 +281,11 @@ function kompaktIkon(s, erBilligst) {
         className: '',
         html: `<div class="km-root${billigstKlass}">` +
             `<div class="km-circle" style="border-color:${borderFarge};${circleStyle}">${innerHtml}</div>` +
-            (prisStr ? `<div class="km-pris">${prisStr}</div>` : '') +
+            (prisStr ? `<div class="km-pris">${prisStr}${alderHtml}</div>` : '') +
             `</div>`,
-        iconSize: [44, 54],
-        iconAnchor: [22, 36],
-        popupAnchor: [0, -36],
+        iconSize: [44, 60],
+        iconAnchor: [22, 38],
+        popupAnchor: [0, -38],
     });
 }
 
