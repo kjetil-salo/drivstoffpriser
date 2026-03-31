@@ -43,7 +43,13 @@ export function openAddStation(senter) {
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 maxZoom: 19,
             }).addTo(miniMap);
-            pin = L.marker([senter.lat, senter.lon], { draggable: true }).addTo(miniMap);
+            const pinIkon = L.icon({
+                iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+                shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+                iconSize: [25, 41], iconAnchor: [12, 41],
+                popupAnchor: [1, -34], shadowSize: [41, 41],
+            });
+            pin = L.marker([senter.lat, senter.lon], { draggable: true, icon: pinIkon }).addTo(miniMap);
         } else {
             miniMap.setView([senter.lat, senter.lon], 16);
             pin.setLatLng([senter.lat, senter.lon]);

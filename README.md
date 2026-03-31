@@ -67,6 +67,11 @@ Alle kan se priser. For å rapportere priser trenger du en konto:
                    ▼           ▼           ▼
                Overpass    Nominatim    Fly.io
                API (OSM)  (geocoding)  (failover)
+                                          ▲
+                                          │ DB-synk
+                                          │ (systemd, hver 4. time)
+                                          │
+                                     Raspberry Pi
 ```
 
 ### Stack
@@ -80,7 +85,7 @@ Alle kan se priser. For å rapportere priser trenger du en konto:
 | Geocoding | Nominatim |
 | E-post | Resend (passordreset) |
 | Hosting | Raspberry Pi + Docker + Cloudflare Tunnel |
-| Failover | Fly.io med automatisk DB-synk |
+| Failover | Fly.io — DB synkes automatisk fra Pi hver 4. time |
 | PWA | Service Worker, manifest, offline-støtte |
 | Tester | pytest (enhetstester), Playwright (E2E) |
 
@@ -233,6 +238,26 @@ npx playwright test
 ./deploy.sh staging   # Pi staging (port 3004)
 ./deploy.sh fly       # Fly.io (backup)
 ./deploy.sh all       # Pi prod + Fly.io
+```
+
+### Failover — Fly.io DB-synk
+
+Databasen synkes automatisk fra Pi til Fly.io hver 4. time via en systemd timer på Pi:
+
+- **Script:** `/usr/local/bin/sync-db-to-fly.py`
+- **Timer:** `sync-db-fly.timer` (systemd, `OnUnitActiveSec=4h`, `Persistent=true`)
+- **Logg:** `/var/log/sync-db-fly.log`
+- **Auth:** Fly.io deploy-token i `/etc/sync-db-fly.env` (kun lesbar av root)
+
+Sikkerhetsgardene:
+1. `sqlite3.backup()` — konsistent kopi, håndterer WAL korrekt
+2. `PRAGMA integrity_check` — verifiserer filen **før** upload
+3. Fly.io-databasen røres aldri hvis integrity check feiler
+
+Manuell synk:
+```bash
+sudo systemctl start sync-db-fly.service
+sudo journalctl -u sync-db-fly.service -n 20
 ```
 
 ### Miljøvariabler
