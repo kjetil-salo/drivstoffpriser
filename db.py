@@ -603,6 +603,23 @@ def hent_toppliste(limit=50) -> list:
         return [dict(r) for r in rows]
 
 
+def hent_toppliste_admin(limit=50) -> list:
+    """Toppliste med navn og epost, kun for admin-visning."""
+    with get_conn() as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            '''SELECT b.id, b.brukernavn, b.kallenavn, COUNT(p.id) as antall
+               FROM priser p
+               JOIN brukere b ON b.id = p.bruker_id
+               WHERE b.brukernavn NOT LIKE 'partner:%'
+               GROUP BY p.bruker_id
+               ORDER BY antall DESC
+               LIMIT ?''',
+            (limit,)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
 def finn_stasjoner_by_navn(navn: str) -> list:
     """Søk etter stasjoner med navn som matcher (case-insensitive)."""
     with get_conn() as conn:

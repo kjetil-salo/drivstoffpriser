@@ -22,7 +22,7 @@ from db import (finn_bruker_id, hent_alle_brukere, slett_bruker,
                 deaktiver_stasjon, reaktiver_stasjon,
                 slett_rapporter_for_stasjon, hent_deaktiverte_stasjoner,
                 hent_rapportorer_epost, finn_stasjoner_by_osm_ids,
-                lagre_pris, hent_eller_opprett_partner, hent_toppliste,
+                lagre_pris, hent_eller_opprett_partner, hent_toppliste, hent_toppliste_admin,
                 sett_kjede_for_stasjon, finn_naer_stasjon, opprett_stasjon,
                 hent_blogg_stats)
 
@@ -1312,22 +1312,20 @@ def admin_import_opprett_stasjon():
 @krever_innlogging
 @krever_admin
 def admin_toppliste():
-    liste = hent_toppliste(limit=20)
+    liste = hent_toppliste_admin(limit=50)
     medaljer = ['&#127947;', '&#129352;', '&#129353;']
     rader = []
     for i, rad in enumerate(liste):
         plass = medaljer[i] if i < 3 else str(i + 1) + '.'
-        if rad['kallenavn']:
-            visningsnavn = rad['kallenavn']
-            navn_stil = ''
-        else:
-            visningsnavn = f'Bruker #{rad["id"]}'
-            navn_stil = ' style="color:#94a3b8;font-style:italic"'
+        brukernavn = rad['brukernavn'] or ''
+        kallenavn = rad['kallenavn'] or ''
+        navnlinje = f'<span style="font-size:0.78rem;color:#94a3b8">{brukernavn}</span>'
+        kallenavnlinje = f'<br><span style="font-size:0.78rem;color:#64748b">@{kallenavn}</span>' if kallenavn else ''
         rader.append(
             f'<tr>'
             f'<td style="text-align:center;font-size:{"1.2rem" if i < 3 else "0.88rem"};width:2.5rem">{plass}</td>'
-            f'<td{navn_stil}>{visningsnavn}</td>'
-            f'<td style="text-align:right;font-weight:600;color:#3b82f6">{rad["antall"]}</td>'
+            f'<td>{navnlinje}{kallenavnlinje}</td>'
+            f'<td style="text-align:right;font-weight:600;color:#3b82f6;white-space:nowrap">{rad["antall"]}</td>'
             f'</tr>'
         )
     rader_html = ''.join(rader) or '<tr><td colspan="3" style="color:#94a3b8;text-align:center">Ingen registreringer ennå</td></tr>'
@@ -1337,19 +1335,19 @@ def admin_toppliste():
 <style>
   *{{box-sizing:border-box;margin:0;padding:0}}
   body{{font-family:system-ui,sans-serif;background:#0f172a;color:#e5e7eb;padding:2rem 1rem}}
-  .container{{max-width:480px;margin:0 auto}}
+  .container{{max-width:560px;margin:0 auto}}
   h1{{font-size:1.3rem;margin-bottom:0.5rem;color:#f1f5f9}}
   p.info{{font-size:0.85rem;color:#94a3b8;margin-bottom:1.5rem}}
   nav{{margin-bottom:1.5rem;font-size:0.85rem}}
   nav a{{color:#94a3b8}}
   .kort{{background:#111827;border:1px solid #1f2937;border-radius:10px;padding:1.5rem}}
   table{{width:100%;border-collapse:collapse;font-size:0.9rem}}
-  td{{padding:10px 8px;border-bottom:1px solid #1f2937}}
+  td{{padding:10px 8px;border-bottom:1px solid #1f2937;vertical-align:top}}
   tr:last-child td{{border-bottom:none}}
 </style></head><body><div class="container">
 <nav><a href="/admin">← Admin</a></nav>
 <h1>Toppliste</h1>
-<p class="info">Alle brukere. Uten kallenavn vises som Bruker #id. Partnere ekskludert.</p>
+<p class="info">Topp 50 bidragsytere. Partnere ekskludert.</p>
 <div class="kort">
   <table>{rader_html}</table>
 </div>
