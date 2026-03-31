@@ -16,7 +16,7 @@ usage() {
 }
 
 kjor_tester() {
-    echo "[test] Kjører tester før deploy..."
+    echo "[test] Kjører backend-tester..."
 
     if [ -f ".venv/bin/pytest" ]; then
         PYTEST=".venv/bin/pytest"
@@ -25,6 +25,10 @@ kjor_tester() {
     fi
 
     $PYTEST tests/test_db.py tests/test_auth.py tests/test_api.py tests/test_admin.py -q --tb=short
+
+    echo "[test] Kjører Playwright-tester..."
+    npx playwright test --reporter=line
+
     echo "[test] Alle tester OK."
 }
 
