@@ -90,6 +90,27 @@ class TestPrisAPI:
         # 0 skal tolkes som "ikke oppgitt"
         assert result[0]['bensin'] is None
 
+    def test_lagre_diesel_avgiftsfri(self, innlogget_client):
+        db_mod.lagre_stasjon('S', 'T', 60.39, 5.33, 'node/1')
+        stasjoner = db_mod.get_stasjoner_med_priser(60.39, 5.33)
+        resp = innlogget_client.post('/api/pris', json={
+            'stasjon_id': stasjoner[0]['id'], 'diesel_avgiftsfri': 14.50,
+        })
+        assert resp.status_code == 200
+        result = db_mod.get_stasjoner_med_priser(60.39, 5.33)
+        assert result[0]['diesel_avgiftsfri'] == 14.50
+
+    def test_statistikk_inkluderer_diesel_avgiftsfri(self, client):
+        db_mod.lagre_stasjon('S', 'T', 60.39, 5.33, 'node/1')
+        stasjoner = db_mod.get_stasjoner_med_priser(60.39, 5.33)
+        db_mod.lagre_pris(stasjoner[0]['id'], None, None, diesel_avgiftsfri=14.50)
+        resp = client.get('/api/statistikk')
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert 'diesel_avgiftsfri' in data['billigst']
+        assert 'diesel_avgiftsfri' in data['dyrest']
+        assert data['billigst']['diesel_avgiftsfri']['pris'] == 14.50
+
 
 # ── /api/meg ───────────────────────────────────────
 
