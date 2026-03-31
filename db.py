@@ -250,6 +250,7 @@ def hent_billigste_priser_24t() -> list:
                FROM priser p
                JOIN stasjoner s ON s.id = p.stasjon_id
                WHERE s.godkjent != 0
+                 AND (s.land IS NULL OR s.land = 'NO')
                  AND p.tidspunkt > datetime('now', '-24 hours')
                  AND p.id IN (SELECT MAX(p2.id) FROM priser p2
                               WHERE p2.tidspunkt > datetime('now', '-24 hours')
