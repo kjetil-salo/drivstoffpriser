@@ -115,15 +115,12 @@ function fyllVisning(s) {
     const kjedeEllerNavn = s.kjede || s.navn;
     const logoUrl = getKjedeLogo(kjedeEllerNavn);
     const farge = getKjedeFarge(kjedeEllerNavn);
-    badgeEl.style.background = logoUrl ? '#1e293b' : farge;
-    badgeEl.style.border = logoUrl ? `1px solid rgba(148,163,184,0.2)` : '';
-    if (logoUrl) {
-        badgeEl.innerHTML = `<img src="${logoUrl}" alt="${s.kjede || ''}"
-            style="width:32px;height:32px;object-fit:contain"
-            onerror="this.parentElement.style.background='${farge}';this.parentElement.style.border='';this.parentElement.textContent='${getKjedeInitials(s.kjede || s.navn)}'">`;
-    } else {
-        badgeEl.textContent = getKjedeInitials(s.kjede || s.navn);
-    }
+    const initials = getKjedeInitials(s.kjede || s.navn);
+    badgeEl.style.background = farge;
+    badgeEl.style.border = '';
+    badgeEl.style.position = 'relative';
+    badgeEl.innerHTML = `<span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#fff">${initials}</span>` +
+        (logoUrl ? `<img src="${logoUrl}" alt="${s.kjede || ''}" style="position:relative;width:32px;height:32px;object-fit:contain" onerror="this.style.display='none'">` : '');
 
     avstandEl.textContent = s.avstand_m != null ? avstandTekst(s.avstand_m) : '';
     navigerBtnEl.href = `https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lon}`;

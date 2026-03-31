@@ -1,16 +1,17 @@
-export const KJEDE_NAVN = ['Circle K', 'Uno-X', 'YX', 'Esso', 'Shell', 'Preem', 'St1', 'Best', 'Oljeleverandøren', 'Tanken'];
+export const KJEDE_NAVN = ['Circle K', 'Uno-X', 'YX', 'Esso', 'Shell', 'Preem', 'St1', 'Best', 'Oljeleverandøren', 'Tanken', 'Haltbakk Express'];
 
 const KJEDE_DOMENER = [
-    { match: ['circle k', 'circlek'],          domene: 'circlek.no',           farge: '#f97316' },
-    { match: ['uno-x', 'unox', 'uno x'],       domene: 'uno-x.no',            farge: '#16a34a' },
-    { match: ['yx'],                            domene: 'yx.no',               farge: '#dc2626' },
-    { match: ['esso'],                          domene: 'esso.no',             farge: '#2563eb' },
-    { match: ['shell'],                         domene: 'shell.no',            farge: '#ca8a04' },
-    { match: ['preem'],                         domene: 'preem.no',            farge: '#059669' },
-    { match: ['st1', 'st 1'],                   domene: 'st1.no',              farge: '#7c3aed' },
-    { match: ['best'],                          domene: 'best.no',             farge: '#0284c7' },
-    { match: ['oljeleverandøren', 'oljeleverandoren'], domene: 'oljeleverandoren.no', farge: '#0d9488' },
-    { match: ['tanken'],                            domene: 'tanken.no',           farge: '#e11d48' },
+    { match: ['circle k', 'circlek'],          logo: 'circlek',              farge: '#f97316' },
+    { match: ['uno-x', 'unox', 'uno x'],       logo: 'uno-x',                farge: '#16a34a' },
+    { match: ['yx'],                            logo: 'yx',                   farge: '#dc2626' },
+    { match: ['esso'],                          logo: 'esso',                 farge: '#2563eb' },
+    { match: ['shell'],                         logo: 'shell',                farge: '#ca8a04' },
+    { match: ['preem'],                         logo: 'preem',                farge: '#059669' },
+    { match: ['st1', 'st 1'],                   logo: 'st1',                  farge: '#7c3aed' },
+    { match: ['best'],                          logo: 'best',                 farge: '#0284c7' },
+    { match: ['oljeleverandøren', 'oljeleverandoren'], logo: 'oljeleverandoren', farge: '#0d9488' },
+    { match: ['tanken'],                        logo: 'tanken',               farge: '#e11d48' },
+    { match: ['haltbakk'],                      logo: 'haltbakk.webp',        farge: '#b91c1c' },
 ];
 
 function _finn(kjede) {
@@ -32,5 +33,6 @@ export function getKjedeInitials(tekst) {
 export function getKjedeLogo(kjede) {
     const treff = _finn(kjede);
     if (!treff) return null;
-    return `https://www.google.com/s2/favicons?domain=${treff.domene}&sz=64`;
+    const fil = treff.logo.includes('.') ? treff.logo : `${treff.logo}.png`;
+    return `/img/kjeder/${fil}`;
 }
