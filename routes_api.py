@@ -2,7 +2,7 @@
 
 import logging
 import os
-import shutil
+import sqlite3
 import tempfile
 import uuid
 from datetime import datetime, timedelta
@@ -50,14 +50,32 @@ def sync_db():
     try:
         os.write(fd, data)
         os.close(fd)
-        shutil.move(tmp_path, DB_PATH)
+
+        # Verifiser at mottatt DB er gyldig
+        tmp_conn = sqlite3.connect(tmp_path)
+        integrity = tmp_conn.execute('PRAGMA integrity_check').fetchone()[0]
+        tmp_conn.close()
+        if integrity != 'ok':
+            logger.error(f'Mottatt DB feilet integritetssjekk: {integrity}')
+            return jsonify({'error': f'Korrupt DB mottatt: {integrity}'}), 400
+
+        # Kopier inn i eksisterende DB-fil via sqlite3.backup().
+        # Dette håndterer WAL-modus korrekt og unngår at gamle WAL/SHM-filer
+        # fra Fly.io forurenser den nye databasen.
+        src = sqlite3.connect(tmp_path)
+        dst = sqlite3.connect(DB_PATH)
+        src.backup(dst)
+        src.close()
+        dst.close()
+
         logger.info(f'Database synkronisert ({len(data)} bytes)')
         return jsonify({'ok': True, 'bytes': len(data)})
     except Exception as e:
         logger.error(f'Sync feilet: {e}')
+        return jsonify({'error': 'Sync feilet'}), 500
+    finally:
         if os.path.exists(tmp_path):
             os.unlink(tmp_path)
-        return jsonify({'error': 'Sync feilet'}), 500
 
 
 def er_i_norge(lat, lon):

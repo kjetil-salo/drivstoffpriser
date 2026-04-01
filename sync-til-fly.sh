@@ -14,8 +14,27 @@ if [ -z "$SYNC_KEY" ]; then
     exit 1
 fi
 
-# Sikker backup med sqlite3 .backup (unngår korrupt kopi ved skriving)
-sqlite3 "$DB_PATH" ".backup '$TMP_BACKUP'"
+# Rydd opp eventuell gammel tempfil
+rm -f "$TMP_BACKUP"
+
+# Sikker backup via python3 sqlite3.backup() — håndterer WAL-modus korrekt
+python3 - <<EOF
+import sqlite3, sys
+src = sqlite3.connect('$DB_PATH')
+dst = sqlite3.connect('$TMP_BACKUP')
+src.backup(dst)
+src.close()
+dst.close()
+
+# Integritetssjekk av backup
+conn = sqlite3.connect('$TMP_BACKUP')
+ok = conn.execute('PRAGMA integrity_check').fetchone()[0]
+conn.close()
+if ok != 'ok':
+    print(f'Backup feilet integritetssjekk: {ok}', file=sys.stderr)
+    sys.exit(1)
+print(f'Backup OK, integritetssjekk: {ok}')
+EOF
 
 # Send til Fly.io
 HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' \
