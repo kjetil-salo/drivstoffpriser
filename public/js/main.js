@@ -88,33 +88,36 @@ fetch('/api/instance').then(r => r.json()).then(d => {
 }).catch(() => {});
 
 // ── Nyhet-splash ─────────────────────────────────
-fetch('/api/nyhet').then(r => r.json()).then(d => {
-    if (!d.tekst) return;
-    const cookieName = `nyhet_lest_${d.id}`;
-    if (document.cookie.split(';').some(c => c.trim().startsWith(cookieName + '='))) return;
-    const backdrop = document.getElementById('nyhet-backdrop');
-    const dialog = document.getElementById('nyhet-dialog');
-    const tekst = document.getElementById('nyhet-tekst');
-    tekst.textContent = d.tekst;
-    const tidligereFokus = document.activeElement;
-    backdrop.removeAttribute('hidden');
-    dialog.removeAttribute('hidden');
-    setTimeout(() => document.getElementById('nyhet-lukk').focus(), 100);
-    function lukk() {
-        backdrop.setAttribute('hidden', '');
-        dialog.setAttribute('hidden', '');
-        const utloper = new Date(d.utloper);
-        const maxAge = Math.max(0, Math.floor((utloper - Date.now()) / 1000));
-        document.cookie = `${cookieName}=1;max-age=${maxAge};path=/;SameSite=Lax`;
-        if (tidligereFokus) tidligereFokus.focus();
+let nyhetVises = false;
+const nyhetData = await fetch('/api/nyhet').then(r => r.json()).catch(() => ({}));
+if (nyhetData.tekst) {
+    const cookieName = `nyhet_lest_${nyhetData.id}`;
+    if (!document.cookie.split(';').some(c => c.trim().startsWith(cookieName + '='))) {
+        nyhetVises = true;
+        const d = nyhetData;
+        const backdrop = document.getElementById('nyhet-backdrop');
+        const dialog = document.getElementById('nyhet-dialog');
+        document.getElementById('nyhet-tekst').textContent = d.tekst;
+        const tidligereFokus = document.activeElement;
+        backdrop.removeAttribute('hidden');
+        dialog.removeAttribute('hidden');
+        setTimeout(() => document.getElementById('nyhet-lukk').focus(), 100);
+        function lukk() {
+            backdrop.setAttribute('hidden', '');
+            dialog.setAttribute('hidden', '');
+            const utloper = new Date(d.utloper);
+            const maxAge = Math.max(0, Math.floor((utloper - Date.now()) / 1000));
+            document.cookie = `${cookieName}=1;max-age=${maxAge};path=/;SameSite=Lax`;
+            if (tidligereFokus) tidligereFokus.focus();
+        }
+        document.getElementById('nyhet-lukk').addEventListener('click', lukk);
+        backdrop.addEventListener('click', lukk);
+        const escHandler = (e) => {
+            if (e.key === 'Escape' && !dialog.hasAttribute('hidden')) { lukk(); document.removeEventListener('keydown', escHandler); }
+        };
+        document.addEventListener('keydown', escHandler);
     }
-    document.getElementById('nyhet-lukk').addEventListener('click', lukk);
-    backdrop.addEventListener('click', lukk);
-    const escHandler = (e) => {
-        if (e.key === 'Escape' && !dialog.hasAttribute('hidden')) { lukk(); document.removeEventListener('keydown', escHandler); }
-    };
-    document.addEventListener('keydown', escHandler);
-}).catch(() => {});
+}
 
 // ── Statistikk ────────────────────────────────────
 fetch('/api/logview', { method: 'POST' }).catch(() => {});
@@ -137,8 +140,7 @@ if (window.__innlogget) {
 
 // ── Velkomst-splash ───────────────────────────────
 if (!window.__innlogget && !localStorage.getItem('velkommen_vist')) {
-    const nyheter = document.getElementById('nyhet-backdrop');
-    if (!nyheter || nyheter.hasAttribute('hidden')) {
+    if (!nyhetVises) {
         localStorage.setItem('velkommen_vist', '1');
         const backdrop = document.getElementById('velkommen-backdrop');
         const dialog = document.getElementById('velkommen-dialog');
@@ -197,7 +199,7 @@ if (!lagretPos) {
     });
     document.getElementById('velkomst-sok-btn').addEventListener('click', () => {
         velkomst.setAttribute('hidden', '');
-        setTimeout(() => document.getElementById('search-toggle').click(), 0);
+        setTimeout(() => document.getElementById('search-input').focus(), 0);
     });
 }
 
