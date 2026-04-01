@@ -1,4 +1,4 @@
-export const KJEDE_NAVN = ['Circle K', 'Uno-X', 'YX', 'Esso', 'Shell', 'Preem', 'St1', 'Best', 'Oljeleverandøren', 'Tanken', 'Haltbakk Express'];
+export const KJEDE_NAVN = ['Circle K', 'Uno-X', 'YX', 'Esso', 'Shell', 'Preem', 'St1', 'Best', 'Oljeleverandøren', 'Tanken', 'Driv', 'Haltbakk Express'];
 
 const KJEDE_DOMENER = [
     { match: ['circle k', 'circlek'],          logo: 'circlek',              farge: '#f97316' },
@@ -11,6 +11,7 @@ const KJEDE_DOMENER = [
     { match: ['best'],                          logo: 'best',                 farge: '#0284c7' },
     { match: ['oljeleverandøren', 'oljeleverandoren'], logo: 'oljeleverandoren', farge: '#0d9488' },
     { match: ['tanken'],                        logo: 'tanken',               farge: '#e11d48' },
+    { match: ['driv'],                          logo: 'driv.svg',             farge: '#cf1130' },
     { match: ['haltbakk'],                      logo: 'haltbakk.webp',        farge: '#b91c1c' },
 ];
 

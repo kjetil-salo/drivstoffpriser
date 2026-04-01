@@ -8,6 +8,8 @@ import uuid
 from datetime import datetime, timedelta
 from functools import wraps
 
+import time
+
 import httpx
 from flask import Blueprint, request, jsonify, make_response, session
 
@@ -122,23 +124,43 @@ def stasjoner():
     return jsonify({'stasjoner': data})
 
 
+_stedssok_cache: dict[str, tuple[float, list]] = {}
+_STEDSSOK_TTL = 600  # sekunder
+
+
 @api_bp.route('/api/stedssok')
 def stedssok():
-    q = request.args.get('q', '').strip()
+    q = request.args.get('q', '').strip().lower()
     if len(q) < 2:
         return jsonify([])
+
+    now = time.monotonic()
+    cached = _stedssok_cache.get(q)
+    if cached and now - cached[0] < _STEDSSOK_TTL:
+        return jsonify(cached[1])
+
     try:
         resp = httpx.get(
-            'https://nominatim.openstreetmap.org/search',
-            params={'q': q, 'format': 'json', 'limit': 5, 'countrycodes': 'no', 'accept-language': 'no'},
+            'https://photon.komoot.io/api/',
+            params={'q': q, 'limit': 5, 'bbox': '4.0,57.0,31.5,71.5'},
             headers={'User-Agent': 'drivstoffpriser/1.0 (hobby)'},
             timeout=8,
         )
-        data = resp.json()
-        return jsonify([
-            {'navn': r['display_name'], 'lat': float(r['lat']), 'lon': float(r['lon'])}
-            for r in data
-        ])
+        features = resp.json().get('features', [])
+        results = []
+        for f in features:
+            props = f.get('properties', {})
+            if props.get('countrycode', '').upper() != 'NO':
+                continue
+            coords = f.get('geometry', {}).get('coordinates', [])
+            if len(coords) < 2:
+                continue
+            deler = [props.get(k) for k in ('name', 'county', 'state', 'country') if props.get(k)]
+            navn = ', '.join(dict.fromkeys(deler))
+            results.append({'navn': navn, 'lat': float(coords[1]), 'lon': float(coords[0])})
+
+        _stedssok_cache[q] = (now, results)
+        return jsonify(results)
     except Exception as e:
         logger.warning(f'Stedssøk feilet: {e}')
         return jsonify([])
