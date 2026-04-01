@@ -46,16 +46,15 @@
 
   <!-- Topbar -->
   <header id="topbar">
-    <button id="loc-btn"><span aria-hidden="true">📍</span> Hent posisjon</button>
     <div id="search-wrap">
-      <button id="search-toggle" aria-label="Søk sted" aria-expanded="false"><span aria-hidden="true">🔍</span></button>
-      <div id="search-box" hidden>
-        <label for="search-input" class="sr-only">Søk sted</label>
-        <input id="search-input" type="search" placeholder="Søk sted, by …" autocomplete="off">
-        <div id="search-results" role="listbox" aria-label="Søkeresultater"></div>
+      <label for="search-input" class="sr-only">Søk sted</label>
+      <div id="search-pill">
+        <span id="search-icon" aria-hidden="true">🔍</span>
+        <input id="search-input" type="search" placeholder="Søk sted, by …" autocomplete="off" aria-autocomplete="list" aria-controls="search-results">
       </div>
+      <div id="search-results" role="listbox" aria-label="Søkeresultater" hidden></div>
     </div>
-    <span id="loc-status" aria-live="polite"></span>
+    <span id="loc-status" class="sr-only" aria-live="polite"></span>
     <button id="add-station-btn" hidden aria-label="Legg til stasjon">+</button>
     <button id="innstillinger-btn" aria-label="Innstillinger" aria-expanded="false"><span aria-hidden="true">⚙️</span></button>
     <a id="info-btn" href="/om" aria-label="Om appen"><span aria-hidden="true">ℹ️</span></a>
@@ -90,6 +89,7 @@
   <!-- Kartvisning -->
   <main id="view-kart" class="view" role="tabpanel" aria-labelledby="tab-kart">
     <div id="map"></div>
+    <button id="loc-btn" aria-label="Hent posisjon"><span aria-hidden="true">📍</span></button>
   </main>
 
   <!-- Listevisning -->
@@ -207,6 +207,8 @@
     <div id="velkommen-stripe"></div>
     <h2 id="velkommen-tittel">Velkommen!</h2>
     <div id="velkommen-tekst">Du kan se alle priser uten å logge inn.
+
+Tips: Del siden til hjemskjermen på mobilen for å bruke den som en app — raskere tilgang og fullskjermmodus.
 
 Vil du hjelpe til? Opprett en gratis bruker og oppdater priser på stasjoner nær deg — det tar bare noen sekunder.</div>
     <a id="velkommen-registrer" href="/registrer">Registrer deg gratis</a>
@@ -376,6 +378,15 @@ Vil du hjelpe til? Opprett en gratis bruker og oppdater priser på stasjoner næ
 
   <!-- Toast-melding -->
   <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+
+  <!-- Del-modal (desktop) -->
+  <div id="del-modal-backdrop" hidden></div>
+  <div id="del-modal" hidden role="dialog" aria-modal="true" aria-labelledby="del-modal-tittel">
+    <div id="del-modal-tittel">Del appen</div>
+    <p id="del-modal-tekst">Lenken er kopiert til utklippstavlen.</p>
+    <div id="del-modal-url">drivstoffprisene.no</div>
+    <button id="del-modal-lukk">Lukk</button>
+  </div>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script type="module" src="/js/main.js"></script>
