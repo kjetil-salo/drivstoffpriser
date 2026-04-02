@@ -260,6 +260,38 @@ sudo systemctl start sync-db-fly.service
 sudo journalctl -u sync-db-fly.service -n 20
 ```
 
+### Backup
+
+Databasen sikkerhetskopieres daglig til lokal disk og eksternt til Cloudflare R2.
+
+- **Script:** `/home/kjetil/drivstoffpriser/backup.sh`
+- **Cron:** kjetil sin crontab, `0 3 * * *` (kl 03:00 hver natt)
+- **Logg:** `/tmp/drivstoff-backup.log`
+
+**Lokal backup:**
+
+| Type | Mappe | Oppbevaring |
+|------|-------|-------------|
+| Daglig | `/home/kjetil/backups/drivstoffpriser/daglig/` | 7 filer |
+| Ukentlig (søndager) | `/home/kjetil/backups/drivstoffpriser/ukentlig/` | 4 filer |
+
+**Ekstern backup (Cloudflare R2):**
+
+| | |
+|--|--|
+| Bucket | `drivstoffpriser-backup` |
+| Mappe | `daglig/` |
+| Oppbevaring | 30 dager rullerende |
+| Verktøy | rclone v1.73.1+ |
+
+Backup bruker `python3 sqlite3.backup()` for WAL-sikker kopi uten låsningsproblemer.
+
+Manuell kjøring:
+```bash
+bash /home/kjetil/drivstoffpriser/backup.sh
+rclone --config ~/.config/rclone/rclone.conf ls r2:drivstoffpriser-backup/daglig/
+```
+
 ### Miljøvariabler
 
 | Variabel | Standard | Beskrivelse |
