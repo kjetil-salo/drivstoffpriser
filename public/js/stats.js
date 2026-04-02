@@ -13,6 +13,7 @@ function formaterTid(tidspunkt) {
 
 function visPrisKort(elementId, data) {
     const el = document.getElementById(elementId);
+    if (!el) return;
     if (!data) {
         el.innerHTML = `<div class="stat-pris-ingen">Ingen data</div>`;
         return;
@@ -33,8 +34,10 @@ function visPrisKort(elementId, data) {
     el.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); naviger(); } };
 }
 
-function visToppliste(liste) {
+function visToppliste(data) {
     const el = document.getElementById('stat-toppliste');
+    const liste = Array.isArray(data) ? data : (data.liste || []);
+    const minPlass = Array.isArray(data) ? null : data.min_plass;
     if (!liste || liste.length === 0) {
         el.innerHTML = '<div class="stat-toppliste-tom">Ingen registreringer ennå</div>';
         return;
@@ -44,9 +47,15 @@ function visToppliste(liste) {
         const plass = i < 3 ? `<span class="stat-toppliste-medalje">${medaljer[i]}</span>` : `<span class="stat-toppliste-nr">${i + 1}.</span>`;
         const navn = rad.kallenavn
             ? `<span class="stat-toppliste-navn">${rad.kallenavn}</span>`
-            : `<span class="stat-toppliste-navn stat-toppliste-anonym">Anonym bidragsyter</span>`;
-        return `<div class="stat-toppliste-rad">${plass}${navn}<span class="stat-toppliste-antall">${rad.antall}</span></div>`;
+            : rad.er_meg
+                ? `<span class="stat-toppliste-navn">Deg</span>`
+                : `<span class="stat-toppliste-navn stat-toppliste-anonym">Anonym bidragsyter</span>`;
+        const megKlasse = rad.er_meg ? ' stat-toppliste-meg' : '';
+        return `<div class="stat-toppliste-rad${megKlasse}">${plass}${navn}<span class="stat-toppliste-antall">${rad.antall}</span></div>`;
     });
+    if (minPlass) {
+        rader.push(`<div class="stat-toppliste-rad stat-toppliste-meg stat-toppliste-utenfor"><span class="stat-toppliste-nr">${minPlass.plass}.</span><span class="stat-toppliste-navn">Deg</span><span class="stat-toppliste-antall">${minPlass.antall}</span></div>`);
+    }
     el.innerHTML = rader.join('');
 }
 

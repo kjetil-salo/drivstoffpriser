@@ -79,7 +79,7 @@ def hent_alle_stasjoner_norge():
             continue
 
         navn = tags.get('name') or tags.get('brand') or 'Bensinstasjon'
-        kjede = tags.get('brand') or tags.get('operator') or ''
+        kjede = tags.get('brand') or tags.get('operator') or None
         osm_id = f"{el['type']}/{el['id']}"
         land = tags.get('addr:country') or None
 
