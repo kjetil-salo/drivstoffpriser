@@ -85,7 +85,7 @@ Alle kan se priser. For å rapportere priser trenger du en konto:
 | Geocoding | Nominatim |
 | E-post | Resend (passordreset) |
 | Hosting | Raspberry Pi + Docker + Cloudflare Tunnel |
-| Failover | Fly.io — DB synkes automatisk fra Pi hver 4. time |
+| Failover | Fly.io — DB synkes automatisk fra Pi hver 4. time (kl 00, 04, 08, 12, 16, 20) |
 | PWA | Service Worker, manifest, offline-støtte |
 | Tester | pytest (enhetstester), Playwright (E2E) |
 
@@ -242,22 +242,15 @@ npx playwright test
 
 ### Failover — Fly.io DB-synk
 
-Databasen synkes automatisk fra Pi til Fly.io hver 4. time via en systemd timer på Pi:
+Databasen synkes automatisk fra Pi til Fly.io hver 4. time (kl 00, 04, 08, 12, 16, 20):
 
-- **Script:** `/usr/local/bin/sync-db-to-fly.py`
-- **Timer:** `sync-db-fly.timer` (systemd, `OnUnitActiveSec=4h`, `Persistent=true`)
-- **Logg:** `/var/log/sync-db-fly.log`
-- **Auth:** Fly.io deploy-token i `/etc/sync-db-fly.env` (kun lesbar av root)
-
-Sikkerhetsgardene:
-1. `sqlite3.backup()` — konsistent kopi, håndterer WAL korrekt
-2. `PRAGMA integrity_check` — verifiserer filen **før** upload
-3. Fly.io-databasen røres aldri hvis integrity check feiler
+- **Script:** `/home/kjetil/drivstoffpriser/sync-til-fly.sh`
+- **Cron:** root sin crontab (`0 */4 * * *`)
+- **Logg:** `/tmp/drivstoff-sync.log`
 
 Manuell synk:
 ```bash
-sudo systemctl start sync-db-fly.service
-sudo journalctl -u sync-db-fly.service -n 20
+sudo bash /home/kjetil/drivstoffpriser/sync-til-fly.sh
 ```
 
 ### Backup
