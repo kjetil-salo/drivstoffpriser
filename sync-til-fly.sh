@@ -36,8 +36,12 @@ if ok != 'ok':
 print(f'Backup OK, integritetssjekk: {ok}')
 EOF
 
-# Send til Fly.io
+# Send til Fly.io (maks 90 sek, 3 forsøk ved feil)
 HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' \
+    --max-time 90 \
+    --retry 3 \
+    --retry-delay 15 \
+    --retry-all-errors \
     -X PUT \
     -H "X-Sync-Key: $SYNC_KEY" \
     -H "Content-Type: application/octet-stream" \
