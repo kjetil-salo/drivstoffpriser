@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v29';
+const CACHE_VERSION = 'v37';
 const STATIC_CACHE = `drivstoff-static-${CACHE_VERSION}`;
 const DATA_CACHE = `drivstoff-data-${CACHE_VERSION}`;
 
@@ -30,6 +30,7 @@ const STATIC_ASSETS = [
   '/img/kjeder/best.png',
   '/img/kjeder/oljeleverandoren.png',
   '/img/kjeder/tanken.png',
+  '/img/kjeder/bunker-oil.svg',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
 ];
