@@ -7,6 +7,13 @@ import pytest
 
 # Sett DB_PATH til temp-fil FØR import av app/db
 @pytest.fixture(autouse=True)
+def nullstill_rate_limit():
+    import routes_api
+    routes_api._pris_rate_limit.clear()
+    yield
+
+
+@pytest.fixture(autouse=True)
 def test_db(tmp_path):
     db_path = str(tmp_path / 'test.db')
     os.environ['DB_PATH'] = db_path
