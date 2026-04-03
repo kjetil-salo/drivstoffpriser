@@ -1,4 +1,4 @@
-import { oppdaterPris, meldNedlagt, settKjede } from './api.js';
+import { oppdaterPris, meldNedlagt, settKjede, endreNavn } from './api.js';
 import { getInnstillinger } from './settings.js';
 import { getKjedeFarge, getKjedeInitials, getKjedeLogo } from './kjede.js';
 
@@ -29,6 +29,9 @@ const adminKjedeEl = document.getElementById('sheet-admin-kjede');
 const kjedeSelectEl = document.getElementById('sheet-kjede-select');
 const kjedeStatusEl = document.getElementById('sheet-kjede-status');
 const kjedelagreBtnEl = document.getElementById('sheet-kjede-lagre-btn');
+const navnInputEl = document.getElementById('sheet-navn-input');
+const navnStatusEl = document.getElementById('sheet-navn-status');
+const navnlagreBtnEl = document.getElementById('sheet-navn-lagre-btn');
 
 // Edit-elementer
 const bensinInput = document.getElementById('sheet-bensin-input');
@@ -52,6 +55,7 @@ export function initSheet(onOppdatert) {
     editLagreBtn.addEventListener('click', lagrePris);
     nedlagtBtnEl.addEventListener('click', rapporterNedlagt);
     kjedelagreBtnEl.addEventListener('click', lagreKjede);
+    navnlagreBtnEl.addEventListener('click', lagreNavn);
 
     const enterLagre = (e) => { if (e.key === 'Enter') lagrePris(); };
     bensinInput.addEventListener('keydown', enterLagre);
@@ -84,6 +88,10 @@ export function visStasjonSheet(stasjon) {
         kjedeStatusEl.style.display = 'none';
         kjedelagreBtnEl.disabled = false;
         kjedelagreBtnEl.textContent = 'Lagre kjede';
+        navnInputEl.value = stasjon.navn || '';
+        navnStatusEl.style.display = 'none';
+        navnlagreBtnEl.disabled = false;
+        navnlagreBtnEl.textContent = 'Lagre navn';
     } else {
         adminKjedeEl.setAttribute('hidden', '');
     }
@@ -196,7 +204,9 @@ async function bekreftPris() {
             bekreftBtnEl.textContent = 'Bekreft priser';
             return;
         }
-        const naa = new Date().toISOString().slice(0, 19).replace('T', ' ');
+        const _nd = new Date(), _p = n => String(n).padStart(2, '0');
+        const naa = `${_nd.getFullYear()}-${_p(_nd.getMonth()+1)}-${_p(_nd.getDate())} ${_p(_nd.getHours())}:${_p(_nd.getMinutes())}:${_p(_nd.getSeconds())}`;
+
         const oppdatert = {
             ...aktivStasjon,
             bensin_tidspunkt: aktivStasjon.bensin != null ? naa : aktivStasjon.bensin_tidspunkt,
@@ -257,6 +267,32 @@ async function lagreKjede() {
     kjedelagreBtnEl.textContent = 'Lagre kjede';
 }
 
+async function lagreNavn() {
+    const navn = navnInputEl.value.trim();
+    if (!navn) return;
+    navnlagreBtnEl.disabled = true;
+    navnlagreBtnEl.textContent = 'Lagrer …';
+    navnStatusEl.style.display = 'none';
+    try {
+        await endreNavn(aktivStasjon.id, navn);
+        const oppdatert = { ...aktivStasjon, navn };
+        aktivStasjon = oppdatert;
+        fyllVisning(oppdatert);
+        if (onPrisOppdatert) onPrisOppdatert(oppdatert);
+        navnStatusEl.textContent = 'Navn lagret!';
+        navnStatusEl.style.display = 'block';
+        navnStatusEl.style.background = 'rgba(34,197,94,0.2)';
+        navnStatusEl.style.color = '#22c55e';
+    } catch {
+        navnStatusEl.textContent = 'Feil ved lagring. Prøv igjen.';
+        navnStatusEl.style.display = 'block';
+        navnStatusEl.style.background = 'rgba(239,68,68,0.2)';
+        navnStatusEl.style.color = '#ef4444';
+    }
+    navnlagreBtnEl.disabled = false;
+    navnlagreBtnEl.textContent = 'Lagre navn';
+}
+
 async function lagrePris() {
     const bensin = parsePris(bensinInput.value);
     const bensin98 = parsePris(bensin98Input.value);
@@ -279,7 +315,9 @@ async function lagrePris() {
             editLagreBtn.disabled = false;
             return;
         }
-        const naa = new Date().toISOString().slice(0, 19).replace('T', ' ');
+        const _nd = new Date(), _p = n => String(n).padStart(2, '0');
+        const naa = `${_nd.getFullYear()}-${_p(_nd.getMonth()+1)}-${_p(_nd.getDate())} ${_p(_nd.getHours())}:${_p(_nd.getMinutes())}:${_p(_nd.getSeconds())}`;
+
         const oppdatert = {
             ...aktivStasjon,
             bensin,
@@ -395,6 +433,7 @@ function formaterTid(tidStr) {
         const dager = Math.floor(diffMs / 86400000);
         if (min < 1) return 'akkurat nå';
         if (min < 60) return `for ${min} min siden`;
+        if (timer < 3) { const restMin = min - timer * 60; return `for ${timer} time${timer === 1 ? '' : 'r'}${restMin > 0 ? ` og ${restMin} min` : ''} siden`; }
         if (timer < 24) return `for ${timer} time${timer === 1 ? '' : 'r'} siden`;
         if (dager < 7) return `for ${dager} dag${dager === 1 ? '' : 'er'} siden`;
         return d.toLocaleDateString('no', { day: 'numeric', month: 'short', year: 'numeric' });

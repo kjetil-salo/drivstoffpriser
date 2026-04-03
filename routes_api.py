@@ -18,11 +18,15 @@ from db import (get_stasjoner_med_priser, lagre_pris, logg_visning,
                 opprett_stasjon, hent_billigste_priser_24t,
                 antall_prisoppdateringer_24t, meld_stasjon_nedlagt,
                 get_conn, hent_innstilling, hent_toppliste,
-                logg_blogg_visning)
+                hent_min_plassering, logg_blogg_visning)
 
 logger = logging.getLogger('drivstoff')
 
 api_bp = Blueprint('api', __name__)
+
+# Rate limiting for prisoppdateringer: (bruker_id, stasjon_id) -> siste tidspunkt
+_pris_rate_limit: dict = {}
+_PRIS_MIN_INTERVALL = 300  # sekunder (5 min)
 
 NORGE_BBOX = {'lat_min': 57.0, 'lat_max': 71.5, 'lon_min': 4.0, 'lon_max': 31.5}
 
@@ -251,6 +255,15 @@ def oppdater_pris():
     diesel_avgiftsfri = til_float(diesel_avgiftsfri_raw)
 
     bruker_id = session.get('bruker_id')
+
+    nå = time.time()
+    nøkkel = (bruker_id, stasjon_id)
+    sist = _pris_rate_limit.get(nøkkel, 0)
+    if nå - sist < _PRIS_MIN_INTERVALL:
+        logger.info(f'Pris ignorert (rate limit): stasjon={stasjon_id} bruker={bruker_id} sekunder_siden={int(nå - sist)}')
+        return jsonify({'ok': True})
+    _pris_rate_limit[nøkkel] = nå
+
     lagre_pris(stasjon_id, bensin, diesel, bensin98, bruker_id=bruker_id, diesel_avgiftsfri=diesel_avgiftsfri)
     logger.info(f'Pris lagret: stasjon={stasjon_id} bensin={bensin} diesel={diesel} bensin98={bensin98} diesel_avgiftsfri={diesel_avgiftsfri} bruker={bruker_id}')
     return jsonify({'ok': True})
@@ -329,14 +342,23 @@ def nyhet():
 
 @api_bp.route('/api/toppliste')
 def toppliste():
-    liste = hent_toppliste(limit=15)
+    bruker_id = session.get('bruker_id')
+    liste = hent_toppliste(limit=20)
+    bruker_i_liste = False
     resultat = []
     for rad in liste:
+        er_meg = bruker_id is not None and rad['id'] == bruker_id
+        if er_meg:
+            bruker_i_liste = True
         resultat.append({
             'kallenavn': rad['kallenavn'] or None,
-            'antall': rad['antall']
+            'antall': rad['antall'],
+            'er_meg': er_meg
         })
-    return jsonify(resultat)
+    min_plass = None
+    if bruker_id and not bruker_i_liste:
+        min_plass = hent_min_plassering(bruker_id)
+    return jsonify({'liste': resultat, 'min_plass': min_plass})
 
 
 @api_bp.route('/om')

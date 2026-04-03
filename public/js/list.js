@@ -147,6 +147,7 @@ function prisAlderTekst(tidspunkt) {
     const dager = Math.floor(diffMs / 86400000);
     if (min < 1) return 'akkurat nå';
     if (min < 60) return `${min} min siden`;
+    if (timer < 3) { const restMin = min - timer * 60; return `${timer} t${restMin > 0 ? ` ${restMin} min` : ''} siden`; }
     if (timer < 24) return `${timer} t siden`;
     if (dager < 7) return `${dager} d siden`;
     return d.toLocaleDateString('no', { day: 'numeric', month: 'short' });
