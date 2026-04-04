@@ -24,7 +24,7 @@ from db import (finn_bruker_id, hent_alle_brukere, slett_bruker,
                 hent_rapportorer_epost, finn_stasjoner_by_osm_ids,
                 lagre_pris, hent_eller_opprett_partner, hent_toppliste, hent_toppliste_admin,
                 sett_kjede_for_stasjon, finn_naer_stasjon, opprett_stasjon,
-                hent_blogg_stats)
+                hent_blogg_stats, finn_stasjoner_by_navn, endre_navn_stasjon)
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -168,6 +168,11 @@ def admin():
     <div class="tile-ikon">&#127942;</div>
     <div class="tile-tittel">Toppliste</div>
     <div class="tile-info">Prisregistreringer</div>
+  </a>
+  <a href="/admin/endre-stasjon" class="tile">
+    <div class="tile-ikon">&#9998;&#65039;</div>
+    <div class="tile-tittel">Endre stasjon</div>
+    <div class="tile-info">S&#248;k og endre navn</div>
   </a>
 </div>
 
@@ -399,6 +404,104 @@ def admin_slett_stasjon():
     return redirect('/admin/steder')
 
 
+@admin_bp.route('/admin/endre-stasjon', methods=['GET', 'POST'])
+@krever_innlogging
+@krever_admin
+def admin_endre_stasjon():
+    melding = ''
+    resultater = []
+    sok = ''
+    if request.method == 'POST':
+        if 'sok' in request.form:
+            sok = request.form.get('sok', '').strip()
+            if sok:
+                resultater = finn_stasjoner_by_navn(sok)
+                if not resultater:
+                    melding = f'Ingen stasjoner funnet for «{sok}».'
+        elif 'stasjon_id' in request.form:
+            stasjon_id = request.form.get('stasjon_id', type=int)
+            nytt_navn = request.form.get('nytt_navn', '').strip()
+            gammelt_navn = request.form.get('gammelt_navn', '').strip()
+            sok = request.form.get('sok', '').strip()
+            if stasjon_id and nytt_navn:
+                ok = endre_navn_stasjon(stasjon_id, nytt_navn)
+                if ok:
+                    melding = f'✓ «{gammelt_navn}» ble omdøpt til «{nytt_navn}».'
+                else:
+                    melding = f'Feil: Fant ikke stasjon med id {stasjon_id}.'
+            else:
+                melding = 'Mangler stasjon-id eller nytt navn.'
+            if sok:
+                resultater = finn_stasjoner_by_navn(sok)
+
+    resultat_rader = ''
+    for s in resultater:
+        kart_url = f'https://www.google.com/maps?q={s["lat"]},{s["lon"]}'
+        kjede_txt = f' ({s["kjede"]})' if s['kjede'] else ''
+        resultat_rader += (
+            f'<tr>'
+            f'<td><a href="{kart_url}" target="_blank" style="color:#93c5fd;text-decoration:none">'
+            f'{s["navn"]}{kjede_txt}</a></td>'
+            f'<td>'
+            f'<form method="post" style="display:flex;gap:6px;align-items:center;margin:0">'
+            f'<input type="hidden" name="stasjon_id" value="{s["id"]}">'
+            f'<input type="hidden" name="gammelt_navn" value="{s["navn"]}">'
+            f'<input type="hidden" name="sok" value="{sok}">'
+            f'<input type="text" name="nytt_navn" value="{s["navn"]}" required '
+            f'style="background:#1f2937;border:1px solid #374151;border-radius:4px;'
+            f'color:#e5e7eb;padding:4px 8px;font-size:0.82rem;flex:1;min-width:160px">'
+            f'<button style="background:transparent;border:1px solid #3b82f6;color:#3b82f6;'
+            f'font-size:0.75rem;padding:4px 10px;border-radius:4px;cursor:pointer;white-space:nowrap">'
+            f'Lagre</button>'
+            f'</form>'
+            f'</td>'
+            f'</tr>'
+        )
+
+    tabell_html = (
+        f'<table><tr><th>Stasjon</th><th>Nytt navn</th></tr>{resultat_rader}</table>'
+        if resultat_rader else ''
+    )
+    melding_html = (
+        f'<p style="margin-bottom:1rem;color:{"#22c55e" if "✓" in melding else "#f59e0b"}">{melding}</p>'
+        if melding else ''
+    )
+
+    return f'''<!DOCTYPE html><html lang="no"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Endre stasjon – Admin</title>
+<style>
+  *{{box-sizing:border-box;margin:0;padding:0}}
+  body{{font-family:system-ui,sans-serif;background:#0f172a;color:#e5e7eb;padding:2rem 1rem}}
+  .container{{max-width:700px;margin:0 auto}}
+  h1{{font-size:1.3rem;margin-bottom:2rem;color:#f1f5f9}}
+  .kort{{background:#111827;border:1px solid #1f2937;border-radius:10px;padding:1.5rem;margin-bottom:1.5rem}}
+  table{{width:100%;border-collapse:collapse;font-size:0.88rem;margin-top:1rem}}
+  td,th{{padding:8px 10px;border-bottom:1px solid #1f2937;text-align:left}}
+  th{{color:#94a3b8;font-weight:500}}
+  nav{{margin-bottom:1.5rem;font-size:0.85rem}}
+  nav a{{color:#94a3b8}}
+  .sok-rad{{display:flex;gap:8px;align-items:center}}
+  .sok-felt{{background:#1f2937;border:1px solid #374151;border-radius:6px;color:#e5e7eb;
+             padding:8px 12px;font-size:0.9rem;flex:1}}
+  .sok-btn{{background:transparent;border:1px solid #3b82f6;color:#3b82f6;
+            font-size:0.85rem;padding:8px 16px;border-radius:6px;cursor:pointer;white-space:nowrap}}
+</style></head><body><div class="container">
+<nav><a href="/admin">&#8592; Admin</a></nav>
+<h1>Endre stasjonsnavn</h1>
+<div class="kort">
+  <form method="post">
+    <div class="sok-rad">
+      <input class="sok-felt" type="text" name="sok" placeholder="S&#248;k etter stasjonsnavn..." value="{sok}" required>
+      <button class="sok-btn" type="submit">S&#248;k</button>
+    </div>
+  </form>
+  {melding_html}
+  {tabell_html}
+</div>
+</div></body></html>'''
+
+
 @admin_bp.route('/admin/rapporter')
 @krever_innlogging
 @krever_admin
@@ -539,6 +642,21 @@ def admin_sett_kjede():
     return {'ok': True}
 
 
+@admin_bp.route('/admin/endre-navn', methods=['POST'])
+@krever_innlogging
+@krever_admin
+def admin_endre_navn():
+    data = request.get_json()
+    stasjon_id = data.get('stasjon_id') if data else None
+    nytt_navn = (data.get('navn', '') if data else '').strip()
+    if not stasjon_id or not nytt_navn:
+        return {'error': 'Mangler stasjon_id eller navn'}, 400
+    ok = endre_navn_stasjon(int(stasjon_id), nytt_navn)
+    if not ok:
+        return {'error': 'Stasjon ikke funnet'}, 404
+    return {'ok': True, 'navn': nytt_navn}
+
+
 @admin_bp.route('/admin/avvis-rapport', methods=['POST'])
 @krever_innlogging
 @krever_admin
@@ -666,6 +784,21 @@ oppdater();
 </body></html>'''
 
 
+@admin_bp.route('/admin/api/priser-historikk')
+@krever_innlogging
+@krever_admin
+def priser_historikk():
+    from db import get_conn
+    with get_conn() as conn:
+        rader = conn.execute(
+            "SELECT strftime('%Y-%m-%d', tidspunkt) as dato, COUNT(*) as antall "
+            "FROM priser "
+            "WHERE tidspunkt >= date('now', '-9 days') "
+            "GROUP BY dato ORDER BY dato"
+        ).fetchall()
+    return jsonify([{'dato': r[0], 'antall': r[1]} for r in rader])
+
+
 @admin_bp.route('/admin/oversikt')
 @krever_innlogging
 @krever_admin
@@ -756,6 +889,10 @@ def oversikt():
     <canvas id="prisgraf48" style="width:100%;max-height:220px"></canvas>
   </div>
   <div class="seksjon">
+    <h2>Prisregistreringer per dag – siste 10 dager <span id="historikk-oppdatert" style="font-size:0.75rem;color:#64748b;margin-left:0.5rem"></span></h2>
+    <canvas id="historikkgraf" style="width:100%;max-height:220px"></canvas>
+  </div>
+  <div class="seksjon">
     <h2>Bloggvisninger per artikkel</h2>
     <table>
       <thead><tr><th>Slug</th><th>Visninger</th></tr></thead>
@@ -834,6 +971,61 @@ new Chart(document.getElementById('prisgraf48'), {{
     }}
   }}
 }});
+
+// Prisregistreringer per dag – siste 10 dager (live)
+const historikkChart = new Chart(document.getElementById('historikkgraf'), {{
+  type: 'bar',
+  data: {{ labels: [], datasets: [{{ label: 'Registreringer', data: [],
+    backgroundColor: 'rgba(251,146,60,0.6)',
+    borderColor: 'rgba(251,146,60,1)', borderWidth: 1 }}] }},
+  options: {{
+    responsive: true,
+    plugins: {{ legend: {{ display: false }} }},
+    scales: {{
+      x: {{ ticks: {{ color: '#94a3b8', font: {{ size: 10 }} }}, grid: {{ color: '#1f2937' }} }},
+      y: {{ beginAtZero: true, ticks: {{ stepSize: 1, color: '#94a3b8' }}, grid: {{ color: '#1f2937' }} }}
+    }}
+  }}
+}});
+
+function fyllInnDager(data, dager) {{
+  const map = new Map(data.map(d => [d.dato, d.antall]));
+  const result = [];
+  for (let i = dager - 1; i >= 0; i--) {{
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() - i);
+    const dato = d.toISOString().slice(0, 10);
+    result.push({{ dato, antall: map.get(dato) ?? 0 }});
+  }}
+  return result;
+}}
+
+async function oppdaterHistorikk() {{
+  try {{
+    const resp = await fetch('/admin/api/priser-historikk');
+    if (!resp.ok) {{
+      document.getElementById('historikk-oppdatert').textContent = `(HTTP ${{resp.status}})`;
+      return;
+    }}
+    const raw = await resp.json();
+    const data = fyllInnDager(raw, 10);
+    historikkChart.data.labels = data.map(d => d.dato.slice(5).replace('-', '.'));
+    historikkChart.data.datasets[0].data = data.map(d => d.antall);
+    historikkChart.data.datasets[0].backgroundColor = data.map(d => {{
+      return d.dato === new Date().toISOString().slice(0, 10)
+        ? 'rgba(251,146,60,0.9)' : 'rgba(251,146,60,0.45)';
+    }});
+    historikkChart.update();
+    const nå = new Date().toLocaleTimeString('no-NO', {{ hour: '2-digit', minute: '2-digit' }});
+    document.getElementById('historikk-oppdatert').textContent = `(oppdatert ${{nå}})`;
+  }} catch (e) {{
+    document.getElementById('historikk-oppdatert').textContent = `(feil: ${{e.message}})`;
+    console.warn('historikk-feil:', e);
+  }}
+}}
+
+oppdaterHistorikk();
+setInterval(oppdaterHistorikk, 60_000);
 </script>
 </body>
 </html>'''
@@ -844,7 +1036,31 @@ new Chart(document.getElementById('prisgraf48'), {{
 @krever_admin
 def admin_kart():
     import json
+    from datetime import datetime, timezone
     stasjoner = stasjoner_med_pris_koordinater()
+    nå = datetime.now(timezone.utc)
+    tell = {'fersk': 0, 'dagsgammel': 0, 'ny': 0, 'gammel': 0, 'gammel7': 0}
+    for s in stasjoner:
+        t = s.get('tidspunkt')
+        if not t:
+            tell['gammel7'] += 1
+            continue
+        try:
+            ts = datetime.fromisoformat(t.replace(' ', 'T')).replace(tzinfo=timezone.utc)
+            timer = (nå - ts).total_seconds() / 3600
+        except Exception:
+            tell['gammel7'] += 1
+            continue
+        if timer < 8:
+            tell['fersk'] += 1
+        elif timer < 24:
+            tell['dagsgammel'] += 1
+        elif timer < 48:
+            tell['ny'] += 1
+        elif timer < 168:
+            tell['gammel'] += 1
+        else:
+            tell['gammel7'] += 1
     return f'''<!DOCTYPE html><html lang="no"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Priskart – Admin</title>
@@ -867,10 +1083,11 @@ def admin_kart():
 <h1>Registrerte priser i Norge</h1>
 <div class="info">{len(stasjoner)} stasjoner med pris</div>
 <div class="legend">
-  <span data-kat="fersk"><span class="dot" style="background:#22c55e"></span>&lt; 8 timer</span>
-  <span data-kat="ny"><span class="dot" style="background:#f59e0b"></span>8–48 timer</span>
-  <span data-kat="gammel"><span class="dot" style="background:#3b82f6"></span>2–7 dager</span>
-  <span data-kat="gammel7"><span class="dot" style="background:#6b7280"></span>&gt; 7 dager</span>
+  <span data-kat="fersk"><span class="dot" style="background:#22c55e"></span>&lt; 8 timer ({tell['fersk']})</span>
+  <span data-kat="dagsgammel"><span class="dot" style="background:#a3e635"></span>8–24 timer ({tell['dagsgammel']})</span>
+  <span data-kat="ny"><span class="dot" style="background:#facc15"></span>24–48 timer ({tell['ny']})</span>
+  <span data-kat="gammel"><span class="dot" style="background:#4b5563"></span>2–7 dager ({tell['gammel']})</span>
+  <span data-kat="gammel7"><span class="dot" style="background:#9ca3af"></span>&gt; 7 dager ({tell['gammel7']})</span>
 </div>
 <div id="map"></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -881,17 +1098,19 @@ L.tileLayer('https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png', {{
   attribution: '© OpenStreetMap'
 }}).addTo(map);
 function prisFarge(tidspunkt) {{
-  if (!tidspunkt) return '#6b7280';
+  if (!tidspunkt) return '#9ca3af';
   const timer = (Date.now() - new Date(tidspunkt.replace(' ', 'T')).getTime()) / 3600000;
   if (timer < 8) return '#22c55e';
-  if (timer < 48) return '#f59e0b';
-  if (timer < 168) return '#3b82f6';
-  return '#6b7280';
+  if (timer < 24) return '#a3e635';
+  if (timer < 48) return '#facc15';
+  if (timer < 168) return '#4b5563';
+  return '#9ca3af';
 }}
 function prisKat(tidspunkt) {{
   if (!tidspunkt) return 'gammel7';
   const timer = (Date.now() - new Date(tidspunkt.replace(' ', 'T')).getTime()) / 3600000;
   if (timer < 8) return 'fersk';
+  if (timer < 24) return 'dagsgammel';
   if (timer < 48) return 'ny';
   if (timer < 168) return 'gammel';
   return 'gammel7';
