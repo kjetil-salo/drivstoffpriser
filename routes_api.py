@@ -58,9 +58,13 @@ def sync_db():
         os.close(fd)
 
         # Verifiser at mottatt DB er gyldig
-        tmp_conn = sqlite3.connect(tmp_path)
-        integrity = tmp_conn.execute('PRAGMA integrity_check').fetchone()[0]
-        tmp_conn.close()
+        try:
+            tmp_conn = sqlite3.connect(tmp_path)
+            integrity = tmp_conn.execute('PRAGMA integrity_check').fetchone()[0]
+            tmp_conn.close()
+        except sqlite3.DatabaseError as e:
+            logger.error(f'Mottatt fil er ikke en gyldig SQLite-database: {e}')
+            return jsonify({'error': 'Korrupt DB mottatt: ikke en gyldig database'}), 400
         if integrity != 'ok':
             logger.error(f'Mottatt DB feilet integritetssjekk: {integrity}')
             return jsonify({'error': f'Korrupt DB mottatt: {integrity}'}), 400
