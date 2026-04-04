@@ -33,6 +33,11 @@
   -->
   <a href="#view-kart" class="skip-link">Hopp til hovedinnhold</a>
 
+  <!-- Facebook-nettleser-banner -->
+  <div id="fb-banner" role="alert" hidden>
+    <span aria-hidden="true">⚠️</span> GPS virker ikke i Facebook — <strong>åpne i Safari eller Chrome</strong> for å bruke appen fullt ut.
+  </div>
+
   <!-- Offline-banner -->
   <div id="offline-banner" role="alert">Ingen nettforbindelse — viser lagrede data</div>
 
@@ -348,6 +353,12 @@ Vil du hjelpe til? Opprett en gratis bruker og oppdater priser på stasjoner næ
           </div>
           <div id="sheet-kjede-status" role="status" aria-live="polite" style="display:none"></div>
           <button id="sheet-kjede-lagre-btn" class="btn-lagre" style="width:100%">Lagre kjede</button>
+          <div style="margin-top:0.75rem" class="pris-input-gruppe">
+            <label for="sheet-navn-input">Navn (admin)</label>
+            <input id="sheet-navn-input" type="text" autocomplete="off" style="width:100%">
+          </div>
+          <div id="sheet-navn-status" role="status" aria-live="polite" style="display:none"></div>
+          <button id="sheet-navn-lagre-btn" class="btn-lagre" style="width:100%;margin-top:0.5rem">Lagre navn</button>
         </div>
       </div>
 

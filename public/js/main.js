@@ -76,6 +76,11 @@ document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && !lokFeilDialog.hasAttribute('hidden')) lukkLokFeil();
 });
 
+// ── Facebook-nettleser-sjekk ──────────────────────
+if (/FBAN|FBAV|FB_IAB/i.test(navigator.userAgent)) {
+    document.getElementById('fb-banner').removeAttribute('hidden');
+}
+
 // ── Backup-sjekk ─────────────────────────────────
 fetch('/api/instance').then(r => r.json()).then(d => {
     if (d.backup) {
