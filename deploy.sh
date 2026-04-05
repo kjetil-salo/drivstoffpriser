@@ -52,21 +52,37 @@ deploy_fly() {
     echo "[fly] Ferdig!"
 }
 
+bekreft_staging() {
+    echo ""
+    echo "ADVARSEL: Du er i ferd med å deploye til PRODUKSJON."
+    echo "Har du testet endringene på staging (port 3003)?"
+    read -r -p "Skriv 'ja' for å fortsette: " svar
+    if [ "$svar" != "ja" ]; then
+        echo "Deploy avbrutt."
+        exit 1
+    fi
+}
+
 case "${1:-}" in
     prod)
         kjor_tester
+        bekreft_staging
         deploy_pi "prod" "docker-compose.yml" "~/drivstoffpriser"
         ;;
     staging)
         kjor_tester
         deploy_pi "staging" "docker-compose.staging.yml" "~/drivstoffpriser-staging"
+        echo ""
+        echo "[staging] Test på http://raspberrypi:3003 — deploy til prod med: ./deploy.sh prod"
         ;;
     fly)
         kjor_tester
+        bekreft_staging
         deploy_fly
         ;;
     all)
         kjor_tester
+        bekreft_staging
         deploy_pi "prod" "docker-compose.yml" "~/drivstoffpriser"
         deploy_fly
         ;;
