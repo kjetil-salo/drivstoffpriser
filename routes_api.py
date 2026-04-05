@@ -59,29 +59,58 @@ def sync_db():
         # Verifiser at mottatt DB er gyldig
         try:
             tmp_conn = sqlite3.connect(tmp_path)
-            integrity = tmp_conn.execute('PRAGMA integrity_check').fetchone()[0]
+            integrity_inn = tmp_conn.execute('PRAGMA integrity_check').fetchone()[0]
+            antall_inn = tmp_conn.execute('SELECT COUNT(*) FROM stasjoner').fetchone()[0]
             tmp_conn.close()
         except sqlite3.DatabaseError as e:
             logger.error(f'Mottatt fil er ikke en gyldig SQLite-database: {e}')
             return jsonify({'error': 'Korrupt DB mottatt: ikke en gyldig database'}), 400
-        if integrity != 'ok':
-            logger.error(f'Mottatt DB feilet integritetssjekk: {integrity}')
-            return jsonify({'error': f'Korrupt DB mottatt: {integrity}'}), 400
+        if integrity_inn != 'ok':
+            logger.error(f'Mottatt DB feilet integritetssjekk: {integrity_inn}')
+            return jsonify({'error': f'Korrupt DB mottatt: {integrity_inn}'}), 400
 
-        # Kopier inn i eksisterende DB-fil via sqlite3.backup().
+        # Sjekk om eksisterende destinasjons-DB er korrupt.
+        # Hvis korrupt: flytt unna og la backup() lage ny fra scratch.
+        if os.path.exists(DB_PATH):
+            try:
+                dst_check = sqlite3.connect(DB_PATH, timeout=5)
+                dst_integrity = dst_check.execute('PRAGMA integrity_check').fetchone()[0]
+                dst_check.close()
+                if dst_integrity != 'ok':
+                    raise sqlite3.DatabaseError(f'integrity: {dst_integrity}')
+            except sqlite3.DatabaseError as e:
+                logger.warning(f'Destinasjons-DB er korrupt ({e}) – rydder opp før synk')
+                corrupt_path = DB_PATH + '.corrupt'
+                if os.path.exists(corrupt_path):
+                    os.unlink(corrupt_path)
+                os.rename(DB_PATH, corrupt_path)
+                for ext in ('-wal', '-shm'):
+                    p = DB_PATH + ext
+                    if os.path.exists(p):
+                        os.unlink(p)
+
+        # Kopier inn via sqlite3.backup() — håndterer WAL korrekt.
+        # timeout=30: vent på evt. aktive write-transaksjoner fra Flask-workers.
         src = sqlite3.connect(tmp_path)
-        dst = sqlite3.connect(DB_PATH)
+        dst = sqlite3.connect(DB_PATH, timeout=30)
         src.backup(dst)
         src.close()
-        # Checkpoint og slå av WAL-modus så DB-filen er self-contained.
-        # Fly.io kan drepe prosessen når som helst — uten dette kan
-        # uncommittede WAL-filer gjøre DB korrupt ved neste oppstart.
-        dst.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-        dst.execute("PRAGMA journal_mode=DELETE")
+        # PASSIVE checkpoint: skriv WAL-sider til hoveddatabasen uten å blokkere
+        # andre connections. WAL-modus forblir aktiv.
+        dst.execute("PRAGMA wal_checkpoint(PASSIVE)")
         dst.close()
 
-        logger.info(f'Database synkronisert ({len(data)} bytes)')
-        return jsonify({'ok': True, 'bytes': len(data)})
+        # Verifiser at resultatet er en gyldig DB
+        verify = sqlite3.connect(DB_PATH)
+        result = verify.execute('PRAGMA integrity_check').fetchone()[0]
+        antall_ut = verify.execute('SELECT COUNT(*) FROM stasjoner').fetchone()[0]
+        verify.close()
+        if result != 'ok':
+            logger.error(f'Synkronisert DB feilet verifisering: {result}')
+            return jsonify({'error': 'Sync fullført men DB feilet verifisering'}), 500
+
+        logger.info(f'Database synkronisert OK: {len(data)} bytes, {antall_inn} → {antall_ut} stasjoner')
+        return jsonify({'ok': True, 'bytes': len(data), 'stasjoner': antall_ut})
     except Exception as e:
         logger.error(f'Sync feilet: {e}')
         return jsonify({'error': 'Sync feilet'}), 500
@@ -115,7 +144,8 @@ def meg():
         return jsonify({'innlogget': False})
     return jsonify({'innlogget': True, 'brukernavn': bruker['brukernavn'],
                     'kallenavn': bruker.get('kallenavn') or '', 'bruker_id': bruker['id'],
-                    'er_admin': bool(bruker['er_admin'])})
+                    'er_admin': bool(bruker['er_admin']),
+                    'roller': (bruker.get('roller') or '').split()})
 
 
 @api_bp.route('/api/stasjoner')
