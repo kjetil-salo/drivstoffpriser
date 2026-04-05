@@ -24,7 +24,8 @@ from db import (finn_bruker_id, hent_alle_brukere, slett_bruker,
                 hent_rapportorer_epost, finn_stasjoner_by_osm_ids,
                 lagre_pris, hent_eller_opprett_partner, hent_toppliste, hent_toppliste_admin,
                 sett_kjede_for_stasjon, finn_naer_stasjon, opprett_stasjon,
-                hent_blogg_stats, finn_stasjoner_by_navn, endre_navn_stasjon)
+                hent_blogg_stats, finn_stasjoner_by_navn, endre_navn_stasjon,
+                hent_endringsforslag, slett_endringsforslag, antall_ubehandlede_endringsforslag)
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -80,6 +81,7 @@ def admin():
     brukere_antall = antall_brukere()
     stasjoner_antall = antall_stasjoner_med_pris()
     rapporter_antall = antall_ubehandlede_rapporter()
+    endringsforslag_antall = antall_ubehandlede_endringsforslag()
     deaktiverte_antall = len(hent_deaktiverte_stasjoner())
     reg_stoppet = hent_innstilling('registrering_stoppet') == '1'
     reg_status = 'STOPPET' if reg_stoppet else 'Åpen'
@@ -153,6 +155,11 @@ def admin():
     <div class="tile-ikon">&#9888;&#65039;</div>
     <div class="tile-tittel">Rapporter</div>
     <div class="tile-info">{rapporter_antall} ubehandlede</div>
+  </a>
+  <a href="/admin/endringsforslag" class="tile" {('style="border-color:#f59e0b"' if endringsforslag_antall else '')}>
+    <div class="tile-ikon">&#9999;&#65039;</div>
+    <div class="tile-tittel">Endringsforslag</div>
+    <div class="tile-info">{endringsforslag_antall} ubehandlede</div>
   </a>
   <a href="/admin/deaktiverte" class="tile">
     <div class="tile-ikon">&#128683;</div>
@@ -556,6 +563,95 @@ def admin_rapporter():
   <table><tr><th>Stasjon</th><th style="text-align:center">Antall</th><th>Sist meldt av</th><th>Dato</th><th></th></tr>{rader_html}</table>
 </div>
 </div></body></html>'''
+
+
+@admin_bp.route('/admin/endringsforslag')
+@krever_innlogging
+@krever_admin
+def admin_endringsforslag():
+    forslag = hent_endringsforslag()
+    rader = []
+    for f in forslag:
+        naavarende = f['navn'] + (f' ({f["kjede"]})' if f['kjede'] else '')
+        kart_url = f'https://www.google.com/maps?q={f["lat"]},{f["lon"]}'
+        dato = f['tidspunkt'][:10] if f['tidspunkt'] else '–'
+        foreslatt_kjede = f['foreslatt_kjede'] or '–'
+        foreslatt_navn = f['foreslatt_navn'] or '–'
+        rader.append(
+            f'<tr>'
+            f'<td><a href="{kart_url}" target="_blank" style="color:#93c5fd;text-decoration:none">{naavarende}</a></td>'
+            f'<td style="color:#e5e7eb">{foreslatt_navn}</td>'
+            f'<td style="color:#e5e7eb">{foreslatt_kjede}</td>'
+            f'<td style="color:#94a3b8;font-size:0.78rem">{f["brukernavn"] or "–"}</td>'
+            f'<td style="color:#94a3b8;font-size:0.78rem">{dato}</td>'
+            f'<td style="display:flex;gap:6px;padding:6px 10px">'
+            f'<form method="post" action="/admin/godkjenn-endringsforslag" style="margin:0">'
+            f'<input type="hidden" name="forslag_id" value="{f["id"]}">'
+            f'<input type="hidden" name="stasjon_id" value="{f["stasjon_id"]}">'
+            f'<input type="hidden" name="foreslatt_navn" value="{f["foreslatt_navn"] or ""}">'
+            f'<input type="hidden" name="foreslatt_kjede" value="{f["foreslatt_kjede"] or ""}">'
+            f'<button style="background:transparent;border:1px solid #22c55e;color:#22c55e;'
+            f'font-size:0.75rem;padding:3px 8px;border-radius:4px;cursor:pointer">'
+            f'Godkjenn</button></form>'
+            f'<form method="post" action="/admin/avvis-endringsforslag" style="margin:0">'
+            f'<input type="hidden" name="forslag_id" value="{f["id"]}">'
+            f'<button style="background:transparent;border:1px solid #6b7280;color:#9ca3af;'
+            f'font-size:0.75rem;padding:3px 8px;border-radius:4px;cursor:pointer">'
+            f'Avvis</button></form>'
+            f'</td></tr>'
+        )
+    rader_html = ''.join(rader) or '<tr><td colspan="6" style="color:#94a3b8">Ingen endringsforslag</td></tr>'
+    return f'''<!DOCTYPE html><html lang="no"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Endringsforslag – Admin</title>
+<style>
+  *{{box-sizing:border-box;margin:0;padding:0}}
+  body{{font-family:system-ui,sans-serif;background:#0f172a;color:#e5e7eb;padding:2rem 1rem}}
+  .container{{max-width:900px;margin:0 auto}}
+  h1{{font-size:1.3rem;margin-bottom:0.5rem;color:#f1f5f9}}
+  p.info{{font-size:0.85rem;color:#94a3b8;margin-bottom:1.5rem}}
+  .kort{{background:#111827;border:1px solid #1f2937;border-radius:10px;padding:1.5rem;margin-bottom:1.5rem;overflow-x:auto}}
+  table{{width:100%;border-collapse:collapse;font-size:0.88rem}}
+  td,th{{padding:8px 10px;border-bottom:1px solid #1f2937;text-align:left}}
+  th{{color:#94a3b8;font-weight:500}}
+  nav{{margin-bottom:1.5rem;font-size:0.85rem}}
+  nav a{{color:#94a3b8}}
+</style></head><body><div class="container">
+<nav><a href="/admin">← Admin</a></nav>
+<h1>Endringsforslag fra brukere</h1>
+<p class="info">Brukere har foreslått endringer i kjede eller navn. Godkjenn for å anvende, eller avvis for å slette.</p>
+<div class="kort">
+  <table><tr><th>Nåværende stasjon</th><th>Foreslått navn</th><th>Foreslått kjede</th><th>Bruker</th><th>Dato</th><th></th></tr>{rader_html}</table>
+</div>
+</div></body></html>'''
+
+
+@admin_bp.route('/admin/godkjenn-endringsforslag', methods=['POST'])
+@krever_innlogging
+@krever_admin
+def admin_godkjenn_endringsforslag():
+    forslag_id = request.form.get('forslag_id', type=int)
+    stasjon_id = request.form.get('stasjon_id', type=int)
+    foreslatt_navn = request.form.get('foreslatt_navn', '').strip()
+    foreslatt_kjede = request.form.get('foreslatt_kjede', '').strip()
+    if stasjon_id:
+        if foreslatt_navn:
+            endre_navn_stasjon(stasjon_id, foreslatt_navn)
+        if foreslatt_kjede:
+            sett_kjede_for_stasjon(stasjon_id, foreslatt_kjede)
+    if forslag_id:
+        slett_endringsforslag(forslag_id)
+    return redirect('/admin/endringsforslag')
+
+
+@admin_bp.route('/admin/avvis-endringsforslag', methods=['POST'])
+@krever_innlogging
+@krever_admin
+def admin_avvis_endringsforslag():
+    forslag_id = request.form.get('forslag_id', type=int)
+    if forslag_id:
+        slett_endringsforslag(forslag_id)
+    return redirect('/admin/endringsforslag')
 
 
 @admin_bp.route('/admin/deaktiverte')

@@ -1,6 +1,7 @@
 import sqlite3
 import math
 import os
+import threading
 from datetime import datetime
 
 _default_db = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'drivstoff.db')
@@ -16,17 +17,16 @@ def get_conn():
 def init_db():
     try:
         conn_test = sqlite3.connect(DB_PATH, timeout=5)
-        conn_test.execute("PRAGMA journal_mode=WAL")
+        integrity = conn_test.execute("PRAGMA integrity_check").fetchone()[0]
         conn_test.close()
-    except sqlite3.DatabaseError:
-        if os.path.exists(DB_PATH):
-            os.remove(DB_PATH)
-        wal = DB_PATH + '-wal'
-        shm = DB_PATH + '-shm'
-        if os.path.exists(wal):
-            os.remove(wal)
-        if os.path.exists(shm):
-            os.remove(shm)
+        if integrity != 'ok':
+            raise sqlite3.DatabaseError(f'integrity_check feilet: {integrity}')
+    except sqlite3.DatabaseError as e:
+        import logging
+        logging.getLogger('drivstoff').warning(f'DB korrupt ved oppstart, nullstiller: {e}')
+        for path in [DB_PATH, DB_PATH + '-wal', DB_PATH + '-shm']:
+            if os.path.exists(path):
+                os.remove(path)
     with get_conn() as conn:
         conn.executescript('''
             CREATE TABLE IF NOT EXISTS stasjoner (
@@ -146,6 +146,17 @@ def _migrer_db():
                 FOREIGN KEY (stasjon_id) REFERENCES stasjoner(id),
                 FOREIGN KEY (bruker_id) REFERENCES brukere(id)
             )''')
+        if 'endringsforslag' not in tabeller:
+            conn.execute('''CREATE TABLE endringsforslag (
+                id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                stasjon_id       INTEGER NOT NULL,
+                bruker_id        INTEGER,
+                foreslatt_navn   TEXT,
+                foreslatt_kjede  TEXT,
+                tidspunkt        TEXT DEFAULT (datetime('now')),
+                FOREIGN KEY (stasjon_id) REFERENCES stasjoner(id),
+                FOREIGN KEY (bruker_id) REFERENCES brukere(id)
+            )''')
 
 
 def hent_innstilling(noekkel, standard=None):
@@ -179,7 +190,7 @@ def lagre_stasjon(navn, kjede, lat, lon, osm_id, land=None):
             '''INSERT INTO stasjoner (navn, kjede, lat, lon, osm_id, land)
                VALUES (?, ?, ?, ?, ?, ?)
                ON CONFLICT(osm_id) DO UPDATE SET
-                 navn=excluded.navn, kjede=excluded.kjede,
+                 navn=excluded.navn, kjede=COALESCE(excluded.kjede, stasjoner.kjede),
                  lat=excluded.lat, lon=excluded.lon,
                  land=COALESCE(excluded.land, stasjoner.land),
                  sist_oppdatert=datetime('now')''',
@@ -187,12 +198,27 @@ def lagre_stasjon(navn, kjede, lat, lon, osm_id, land=None):
         )
 
 
-def lagre_pris(stasjon_id, bensin, diesel, bensin98=None, bruker_id=None, diesel_avgiftsfri=None):
-    with get_conn() as conn:
-        conn.execute(
-            'INSERT INTO priser (stasjon_id, bensin, diesel, bensin98, bruker_id, diesel_avgiftsfri) VALUES (?, ?, ?, ?, ?, ?)',
-            (stasjon_id, bensin, diesel, bensin98, bruker_id, diesel_avgiftsfri)
-        )
+_pris_lock = threading.Lock()
+
+
+def lagre_pris(stasjon_id, bensin, diesel, bensin98=None, bruker_id=None, diesel_avgiftsfri=None, min_intervall=300):
+    """Lagrer pris. Returnerer False hvis rate limit er nådd, ellers True."""
+    with _pris_lock:
+        with get_conn() as conn:
+            if bruker_id is not None:
+                sist = conn.execute(
+                    "SELECT tidspunkt FROM priser WHERE bruker_id=? AND stasjon_id=? ORDER BY tidspunkt DESC LIMIT 1",
+                    (bruker_id, stasjon_id)
+                ).fetchone()
+                if sist:
+                    sekunder_siden = (datetime.now() - datetime.strptime(sist[0], '%Y-%m-%d %H:%M:%S')).total_seconds()
+                    if sekunder_siden < min_intervall:
+                        return False
+            conn.execute(
+                'INSERT INTO priser (stasjon_id, bensin, diesel, bensin98, bruker_id, diesel_avgiftsfri) VALUES (?, ?, ?, ?, ?, ?)',
+                (stasjon_id, bensin, diesel, bensin98, bruker_id, diesel_avgiftsfri)
+            )
+    return True
 
 
 def hent_siste_prisoppdateringer(limit=100) -> list:
@@ -605,6 +631,39 @@ def antall_ubehandlede_rapporter() -> int:
         ).fetchone()[0]
 
 
+def legg_til_endringsforslag(stasjon_id: int, bruker_id: int, foreslatt_navn: str | None, foreslatt_kjede: str | None):
+    with get_conn() as conn:
+        conn.execute(
+            'INSERT INTO endringsforslag (stasjon_id, bruker_id, foreslatt_navn, foreslatt_kjede) VALUES (?, ?, ?, ?)',
+            (stasjon_id, bruker_id, foreslatt_navn or None, foreslatt_kjede or None)
+        )
+
+
+def hent_endringsforslag() -> list:
+    with get_conn() as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            '''SELECT e.id, e.stasjon_id, e.foreslatt_navn, e.foreslatt_kjede, e.tidspunkt,
+                      s.navn, s.kjede, s.lat, s.lon,
+                      b.brukernavn
+               FROM endringsforslag e
+               JOIN stasjoner s ON s.id = e.stasjon_id
+               LEFT JOIN brukere b ON b.id = e.bruker_id
+               ORDER BY e.tidspunkt DESC'''
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def slett_endringsforslag(forslag_id: int):
+    with get_conn() as conn:
+        conn.execute("DELETE FROM endringsforslag WHERE id = ?", (forslag_id,))
+
+
+def antall_ubehandlede_endringsforslag() -> int:
+    with get_conn() as conn:
+        return conn.execute("SELECT COUNT(*) FROM endringsforslag").fetchone()[0]
+
+
 def hent_toppliste(limit=50) -> list:
     """Antall prisregistreringer per bruker, ekskluderer partnere."""
     with get_conn() as conn:
@@ -620,6 +679,35 @@ def hent_toppliste(limit=50) -> list:
             (limit,)
         ).fetchall()
         return [dict(r) for r in rows]
+
+
+def hent_min_plassering(bruker_id) -> dict | None:
+    """Hent plassering og antall for en bestemt bruker (ekskluderer partnere)."""
+    with get_conn() as conn:
+        conn.row_factory = sqlite3.Row
+        rad = conn.execute(
+            '''SELECT COUNT(p.id) as antall
+               FROM priser p
+               JOIN brukere b ON b.id = p.bruker_id
+               WHERE p.bruker_id = ? AND b.brukernavn NOT LIKE 'partner:%' ''',
+            (bruker_id,)
+        ).fetchone()
+        if not rad or rad['antall'] == 0:
+            return None
+        antall = rad['antall']
+        plass_rad = conn.execute(
+            '''SELECT COUNT(*) + 1 as plass
+               FROM (
+                   SELECT p2.bruker_id
+                   FROM priser p2
+                   JOIN brukere b2 ON b2.id = p2.bruker_id
+                   WHERE b2.brukernavn NOT LIKE 'partner:%'
+                   GROUP BY p2.bruker_id
+                   HAVING COUNT(p2.id) > ?
+               )''',
+            (antall,)
+        ).fetchone()
+        return {'plass': plass_rad['plass'], 'antall': antall}
 
 
 def hent_toppliste_admin(limit=50) -> list:
@@ -650,6 +738,16 @@ def finn_stasjoner_by_navn(navn: str) -> list:
             (f'%{navn.lower()}%',)
         ).fetchall()
         return [dict(r) for r in rows]
+
+
+def endre_navn_stasjon(stasjon_id: int, nytt_navn: str) -> bool:
+    """Endre navn på en stasjon. Returnerer True hvis stasjonen ble funnet og oppdatert."""
+    with get_conn() as conn:
+        cursor = conn.execute(
+            "UPDATE stasjoner SET navn = ? WHERE id = ?",
+            (nytt_navn, stasjon_id)
+        )
+        return cursor.rowcount > 0
 
 
 def hent_eller_opprett_partner(navn: str) -> int:

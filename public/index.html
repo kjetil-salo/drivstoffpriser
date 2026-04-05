@@ -328,6 +328,7 @@ Vil du hjelpe til? Opprett en gratis bruker og oppdater priser på stasjoner næ
           <button id="sheet-endre-btn" class="btn-lagre">Endre pris</button>
         </div>
         <button id="sheet-nedlagt-btn" class="btn-nedlagt" style="display:none">Meld som nedlagt</button>
+        <button id="sheet-forslag-btn" class="btn-nedlagt" style="display:none;margin-top:0.5rem">Foreslå endring</button>
 
         <!-- Admin: tilknytt kjede -->
         <div id="sheet-admin-kjede" hidden>
@@ -394,6 +395,42 @@ Vil du hjelpe til? Opprett en gratis bruker og oppdater priser på stasjoner næ
 
   <!-- Toast-melding -->
   <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+
+  <!-- Endringsforslag-modal -->
+  <div id="forslag-backdrop" class="forslag-backdrop"></div>
+  <div id="forslag-modal" class="forslag-modal" role="dialog" aria-modal="true" aria-labelledby="forslag-tittel">
+    <h3 id="forslag-tittel" class="forslag-tittel">Foreslå endring</h3>
+    <p class="forslag-info">Forslaget sendes til admin for gjennomgang.</p>
+    <div class="pris-input-gruppe">
+      <label for="forslag-kjede-select">Kjede</label>
+      <select id="forslag-kjede-select">
+        <option value="">— Ingen kjede —</option>
+        <option value="Circle K">Circle K</option>
+        <option value="Uno-X">Uno-X</option>
+        <option value="YX">YX</option>
+        <option value="Esso">Esso</option>
+        <option value="Shell">Shell</option>
+        <option value="Preem">Preem</option>
+        <option value="St1">St1</option>
+        <option value="Best">Best</option>
+        <option value="Oljeleverandøren">Oljeleverandøren</option>
+        <option value="Tanken">Tanken</option>
+        <option value="Driv">Driv</option>
+        <option value="Haltbakk Express">Haltbakk Express</option>
+        <option value="Bunker Oil">Bunker Oil</option>
+        <option value="Knapphus">Knapphus</option>
+      </select>
+    </div>
+    <div class="pris-input-gruppe" style="margin-top:0.75rem">
+      <label for="forslag-navn-input">Nytt navn (valgfritt)</label>
+      <input id="forslag-navn-input" type="text" autocomplete="off" style="width:100%">
+    </div>
+    <div id="forslag-status" style="display:none;margin-top:0.75rem;font-size:0.85rem"></div>
+    <div class="forslag-btns">
+      <button id="forslag-avbryt-btn" class="btn-avbryt">Avbryt</button>
+      <button id="forslag-lagre-btn" class="btn-lagre">Send forslag</button>
+    </div>
+  </div>
 
   <!-- Del-modal (desktop) -->
   <div id="del-modal-backdrop" hidden></div>

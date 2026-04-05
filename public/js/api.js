@@ -40,6 +40,17 @@ export async function meldNedlagt(stasjonId) {
     return resp.json();
 }
 
+export async function foreslåEndring(stasjonId, foreslattNavn, foreslattKjede) {
+    const resp = await fetch('/api/foreslå-endring', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stasjon_id: stasjonId, foreslatt_navn: foreslattNavn, foreslatt_kjede: foreslattKjede }),
+    });
+    if (resp.status === 401) return { status: 401 };
+    if (!resp.ok) throw new Error('Feil ved innsending');
+    return resp.json();
+}
+
 export async function settKjede(stasjonId, kjede) {
     const resp = await fetch('/admin/sett-kjede', {
         method: 'POST',
@@ -48,6 +59,17 @@ export async function settKjede(stasjonId, kjede) {
     });
     if (resp.status === 403) return { status: 403 };
     if (!resp.ok) throw new Error('Feil ved oppdatering av kjede');
+    return resp.json();
+}
+
+export async function endreNavn(stasjonId, navn) {
+    const resp = await fetch('/admin/endre-navn', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stasjon_id: stasjonId, navn }),
+    });
+    if (resp.status === 403) return { status: 403 };
+    if (!resp.ok) throw new Error('Feil ved oppdatering av navn');
     return resp.json();
 }
 

@@ -1,4 +1,4 @@
-import { oppdaterPris, meldNedlagt, settKjede, endreNavn } from './api.js';
+import { oppdaterPris, meldNedlagt, settKjede, endreNavn, foreslåEndring } from './api.js';
 import { getInnstillinger } from './settings.js';
 import { getKjedeFarge, getKjedeInitials, getKjedeLogo } from './kjede.js';
 
@@ -23,6 +23,16 @@ const bekreftBtnEl = document.getElementById('sheet-bekreft-btn');
 const navigerBtnEl = document.getElementById('sheet-naviger-btn');
 const kartBtnEl = document.getElementById('sheet-kart-btn');
 const nedlagtBtnEl = document.getElementById('sheet-nedlagt-btn');
+const forslagBtnEl = document.getElementById('sheet-forslag-btn');
+
+// Endringsforslag-modal
+const forslagModalEl = document.getElementById('forslag-modal');
+const forslagBackdropEl = document.getElementById('forslag-backdrop');
+const forslagKjedeEl = document.getElementById('forslag-kjede-select');
+const forslagNavnEl = document.getElementById('forslag-navn-input');
+const forslagStatusEl = document.getElementById('forslag-status');
+const forslagLagreEl = document.getElementById('forslag-lagre-btn');
+const forslagAvbrytEl = document.getElementById('forslag-avbryt-btn');
 
 // Admin-elementer
 const adminKjedeEl = document.getElementById('sheet-admin-kjede');
@@ -54,6 +64,13 @@ export function initSheet(onOppdatert) {
     editAvbrytBtn.addEventListener('click', visVisModus);
     editLagreBtn.addEventListener('click', lagrePris);
     nedlagtBtnEl.addEventListener('click', rapporterNedlagt);
+    forslagBtnEl.addEventListener('click', åpneForslagModal);
+    forslagAvbrytEl.addEventListener('click', lukkForslagModal);
+    forslagBackdropEl.addEventListener('click', lukkForslagModal);
+    forslagLagreEl.addEventListener('click', sendEndringsforslag);
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && forslagModalEl.classList.contains('open')) lukkForslagModal();
+    });
     kjedelagreBtnEl.addEventListener('click', lagreKjede);
     navnlagreBtnEl.addEventListener('click', lagreNavn);
 
@@ -81,6 +98,7 @@ export function visStasjonSheet(stasjon) {
     nedlagtBtnEl.style.display = innlogget ? '' : 'none';
     nedlagtBtnEl.disabled = false;
     nedlagtBtnEl.textContent = 'Meld som nedlagt';
+    forslagBtnEl.style.display = innlogget ? '' : 'none';
 
     if (window.__erAdmin) {
         adminKjedeEl.removeAttribute('hidden');
@@ -242,6 +260,61 @@ async function rapporterNedlagt() {
     }
 }
 
+function åpneForslagModal() {
+    forslagKjedeEl.value = aktivStasjon.kjede || '';
+    forslagNavnEl.value = '';
+    forslagNavnEl.placeholder = aktivStasjon.navn || '';
+    forslagStatusEl.style.display = 'none';
+    forslagLagreEl.disabled = false;
+    forslagLagreEl.textContent = 'Send forslag';
+    forslagModalEl.classList.add('open');
+    forslagBackdropEl.classList.add('open');
+    setTimeout(() => forslagNavnEl.focus(), 50);
+}
+
+function lukkForslagModal() {
+    forslagModalEl.classList.remove('open');
+    forslagBackdropEl.classList.remove('open');
+}
+
+async function sendEndringsforslag() {
+    const navn = forslagNavnEl.value.trim();
+    const kjede = forslagKjedeEl.value;
+    const naaværendeKjede = aktivStasjon.kjede || '';
+    const kjedeEndret = kjede !== naaværendeKjede;
+    if (!navn && !kjedeEndret) {
+        forslagStatusEl.textContent = 'Fyll ut minst ett felt.';
+        forslagStatusEl.style.display = 'block';
+        forslagStatusEl.style.color = '#ef4444';
+        return;
+    }
+    forslagLagreEl.disabled = true;
+    forslagLagreEl.textContent = 'Sender …';
+    forslagStatusEl.style.display = 'none';
+    try {
+        const res = await foreslåEndring(aktivStasjon.id, navn || null, kjedeEndret ? kjede : null);
+        if (res?.status === 401) {
+            forslagStatusEl.textContent = 'Du må logge inn for å sende forslag.';
+            forslagStatusEl.style.display = 'block';
+            forslagStatusEl.style.color = '#ef4444';
+            forslagLagreEl.disabled = false;
+            forslagLagreEl.textContent = 'Send forslag';
+            return;
+        }
+        forslagStatusEl.textContent = 'Takk! Forslaget er sendt til admin.';
+        forslagStatusEl.style.display = 'block';
+        forslagStatusEl.style.color = '#22c55e';
+        forslagLagreEl.textContent = 'Sendt!';
+        setTimeout(lukkForslagModal, 1800);
+    } catch {
+        forslagStatusEl.textContent = 'Feil ved innsending. Prøv igjen.';
+        forslagStatusEl.style.display = 'block';
+        forslagStatusEl.style.color = '#ef4444';
+        forslagLagreEl.disabled = false;
+        forslagLagreEl.textContent = 'Send forslag';
+    }
+}
+
 async function lagreKjede() {
     const kjede = kjedeSelectEl.value;
     kjedelagreBtnEl.disabled = true;
@@ -354,7 +427,7 @@ function formatPris(v) {
 
 function prisAlderKlasse(tidspunkt) {
     if (!tidspunkt) return 'alder-ingen';
-    const timer = (Date.now() - new Date(tidspunkt.replace(' ', 'T')).getTime()) / 3600000;
+    const timer = (Date.now() - new Date(tidspunkt.replace(' ', 'T') + 'Z').getTime()) / 3600000;
     if (timer < 8) return 'alder-fersk';
     if (timer < 24) return 'alder-gammel';
     if (timer < 48) return 'alder-utdatert';
@@ -426,7 +499,7 @@ function avstandTekst(m) {
 
 function formaterTid(tidStr) {
     try {
-        const d = new Date(tidStr.replace(' ', 'T'));
+        const d = new Date(tidStr.replace(' ', 'T') + 'Z');
         const diffMs = Date.now() - d.getTime();
         const min = Math.floor(diffMs / 60000);
         const timer = Math.floor(diffMs / 3600000);

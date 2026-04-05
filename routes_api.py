@@ -18,14 +18,13 @@ from db import (get_stasjoner_med_priser, lagre_pris, logg_visning,
                 opprett_stasjon, hent_billigste_priser_24t,
                 antall_prisoppdateringer_24t, meld_stasjon_nedlagt,
                 get_conn, hent_innstilling, hent_toppliste,
-                hent_min_plassering, logg_blogg_visning)
+                hent_min_plassering, logg_blogg_visning,
+                legg_til_endringsforslag)
 
 logger = logging.getLogger('drivstoff')
 
 api_bp = Blueprint('api', __name__)
 
-# Rate limiting for prisoppdateringer: (bruker_id, stasjon_id) -> siste tidspunkt
-_pris_rate_limit: dict = {}
 _PRIS_MIN_INTERVALL = 300  # sekunder (5 min)
 
 NORGE_BBOX = {'lat_min': 57.0, 'lat_max': 71.5, 'lon_min': 4.0, 'lon_max': 31.5}
@@ -70,12 +69,15 @@ def sync_db():
             return jsonify({'error': f'Korrupt DB mottatt: {integrity}'}), 400
 
         # Kopier inn i eksisterende DB-fil via sqlite3.backup().
-        # Dette håndterer WAL-modus korrekt og unngår at gamle WAL/SHM-filer
-        # fra Fly.io forurenser den nye databasen.
         src = sqlite3.connect(tmp_path)
         dst = sqlite3.connect(DB_PATH)
         src.backup(dst)
         src.close()
+        # Checkpoint og slå av WAL-modus så DB-filen er self-contained.
+        # Fly.io kan drepe prosessen når som helst — uten dette kan
+        # uncommittede WAL-filer gjøre DB korrupt ved neste oppstart.
+        dst.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        dst.execute("PRAGMA journal_mode=DELETE")
         dst.close()
 
         logger.info(f'Database synkronisert ({len(data)} bytes)')
@@ -260,16 +262,11 @@ def oppdater_pris():
 
     bruker_id = session.get('bruker_id')
 
-    nå = time.time()
-    nøkkel = (bruker_id, stasjon_id)
-    sist = _pris_rate_limit.get(nøkkel, 0)
-    if nå - sist < _PRIS_MIN_INTERVALL:
-        logger.info(f'Pris ignorert (rate limit): stasjon={stasjon_id} bruker={bruker_id} sekunder_siden={int(nå - sist)}')
-        return jsonify({'ok': True})
-    _pris_rate_limit[nøkkel] = nå
-
-    lagre_pris(stasjon_id, bensin, diesel, bensin98, bruker_id=bruker_id, diesel_avgiftsfri=diesel_avgiftsfri)
-    logger.info(f'Pris lagret: stasjon={stasjon_id} bensin={bensin} diesel={diesel} bensin98={bensin98} diesel_avgiftsfri={diesel_avgiftsfri} bruker={bruker_id}')
+    lagret = lagre_pris(stasjon_id, bensin, diesel, bensin98, bruker_id=bruker_id, diesel_avgiftsfri=diesel_avgiftsfri, min_intervall=_PRIS_MIN_INTERVALL)
+    if lagret:
+        logger.info(f'Pris lagret: stasjon={stasjon_id} bensin={bensin} diesel={diesel} bensin98={bensin98} diesel_avgiftsfri={diesel_avgiftsfri} bruker={bruker_id}')
+    else:
+        logger.info(f'Pris ignorert (rate limit): stasjon={stasjon_id} bruker={bruker_id}')
     return jsonify({'ok': True})
 
 
@@ -325,6 +322,27 @@ def rapporter_nedlagt():
     except Exception as e:
         logger.warning(f'Rapportering feilet: {e}')
         return jsonify({'error': 'Feil ved rapportering'}), 500
+
+
+@api_bp.route('/api/foreslå-endring', methods=['POST'])
+@krever_innlogging
+def foreslaa_endring():
+    data = request.get_json(silent=True) or {}
+    stasjon_id = data.get('stasjon_id')
+    if not stasjon_id:
+        return jsonify({'error': 'stasjon_id er påkrevd'}), 400
+    foreslatt_navn = (data.get('foreslatt_navn') or '').strip() or None
+    foreslatt_kjede = (data.get('foreslatt_kjede') or '').strip() or None
+    if not foreslatt_navn and not foreslatt_kjede:
+        return jsonify({'error': 'Minst ett felt må fylles ut'}), 400
+    bruker_id = session.get('bruker_id')
+    try:
+        legg_til_endringsforslag(stasjon_id, bruker_id, foreslatt_navn, foreslatt_kjede)
+        logger.info(f'Endringsforslag for stasjon {stasjon_id} fra bruker {bruker_id}: navn={foreslatt_navn}, kjede={foreslatt_kjede}')
+        return jsonify({'ok': True})
+    except Exception as e:
+        logger.warning(f'Endringsforslag feilet: {e}')
+        return jsonify({'error': 'Feil ved innsending'}), 500
 
 
 @api_bp.route('/api/nyhet')

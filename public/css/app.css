@@ -1264,6 +1264,60 @@ html, body {
   border-color: #ef4444;
 }
 
+/* ── Endringsforslag-modal ────────────────────────── */
+.forslag-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 2000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s;
+}
+.forslag-backdrop.open {
+  opacity: 1;
+  pointer-events: all;
+}
+.forslag-modal {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%) scale(0.95);
+  width: min(420px, calc(100vw - 2rem));
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 1.5rem;
+  z-index: 2001;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s, transform 0.2s;
+}
+.forslag-modal.open {
+  opacity: 1;
+  pointer-events: all;
+  transform: translate(-50%, -50%) scale(1);
+}
+.forslag-tittel {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 0.4rem;
+  color: var(--text-primary);
+}
+.forslag-info {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin-bottom: 1rem;
+}
+.forslag-btns {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+.forslag-btns button {
+  flex: 1;
+}
+
 .sheet-edit-tittel {
   font-size: var(--font-base);
   font-weight: 600;
