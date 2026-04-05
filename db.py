@@ -539,7 +539,8 @@ def finn_naer_stasjon(lat, lon, maks_avstand_m=50):
         delta = 0.005
         rows = conn.execute(
             '''SELECT id, navn, lat, lon FROM stasjoner
-               WHERE godkjent != 0 AND lat BETWEEN ? AND ? AND lon BETWEEN ? AND ?''',
+               WHERE (godkjent = 1 OR (godkjent = 0 AND lagt_til_av IS NOT NULL))
+               AND lat BETWEEN ? AND ? AND lon BETWEEN ? AND ?''',
             (lat - delta, lat + delta, lon - delta, lon + delta)
         ).fetchall()
     for row in rows:
@@ -555,7 +556,7 @@ def opprett_stasjon(navn, kjede, lat, lon, bruker_id):
     with get_conn() as conn:
         cursor = conn.execute(
             '''INSERT INTO stasjoner (navn, kjede, lat, lon, lagt_til_av, godkjent)
-               VALUES (?, ?, ?, ?, ?, 1)''',
+               VALUES (?, ?, ?, ?, ?, 0)''',
             (navn, kjede or None, lat, lon, bruker_id)
         )
         stasjon_id = cursor.lastrowid
@@ -598,10 +599,45 @@ def hent_deaktiverte_stasjoner() -> list:
         rows = conn.execute(
             '''SELECT s.id, s.navn, s.kjede, s.lat, s.lon, s.sist_oppdatert
                FROM stasjoner s
-               WHERE s.godkjent = 0
+               WHERE s.godkjent = 0 AND s.lagt_til_av IS NULL
                ORDER BY s.sist_oppdatert DESC'''
         ).fetchall()
         return [dict(r) for r in rows]
+
+
+def hent_ventende_stasjoner(filter='alle') -> list:
+    """Henter bruker-opprettede stasjoner. filter: 'ventende', 'idag', 'alle'"""
+    with get_conn() as conn:
+        conn.row_factory = sqlite3.Row
+        if filter == 'ventende':
+            where = "s.lagt_til_av IS NOT NULL AND s.godkjent = 0"
+        elif filter == 'idag':
+            where = "s.lagt_til_av IS NOT NULL AND date(s.sist_oppdatert) = date('now')"
+        else:
+            where = "s.lagt_til_av IS NOT NULL"
+        rows = conn.execute(
+            f'''SELECT s.id, s.navn, s.kjede, s.lat, s.lon, s.sist_oppdatert, s.godkjent,
+                       b.brukernavn, b.kallenavn
+                FROM stasjoner s
+                LEFT JOIN brukere b ON b.id = s.lagt_til_av
+                WHERE {where}
+                ORDER BY s.sist_oppdatert DESC
+                LIMIT 200'''
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def antall_ventende_stasjoner() -> int:
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) FROM stasjoner WHERE lagt_til_av IS NOT NULL AND godkjent = 0"
+        ).fetchone()
+        return row[0]
+
+
+def godkjenn_stasjon(stasjon_id: int):
+    with get_conn() as conn:
+        conn.execute("UPDATE stasjoner SET godkjent = 1 WHERE id = ? AND lagt_til_av IS NOT NULL", (stasjon_id,))
 
 
 def meld_stasjon_nedlagt(stasjon_id: int, bruker_id: int):

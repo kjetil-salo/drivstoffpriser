@@ -26,8 +26,8 @@ class TestToppliste:
     def test_en_bruker_med_registreringer(self):
         bruker = lag_bruker()
         stasjon = lag_stasjon()
-        db_mod.lagre_pris(stasjon['id'], 21.0, 20.0, bruker_id=bruker['id'])
-        db_mod.lagre_pris(stasjon['id'], 22.0, 21.0, bruker_id=bruker['id'])
+        db_mod.lagre_pris(stasjon['id'], 21.0, 20.0, bruker_id=bruker['id'], min_intervall=0)
+        db_mod.lagre_pris(stasjon['id'], 22.0, 21.0, bruker_id=bruker['id'], min_intervall=0)
 
         resultat = db_mod.hent_toppliste()
         assert len(resultat) == 1
@@ -37,9 +37,9 @@ class TestToppliste:
         b1 = lag_bruker('a@test.no')
         b2 = lag_bruker('b@test.no')
         s = lag_stasjon()
-        db_mod.lagre_pris(s['id'], 21.0, 20.0, bruker_id=b1['id'])
-        db_mod.lagre_pris(s['id'], 21.0, 20.0, bruker_id=b2['id'])
-        db_mod.lagre_pris(s['id'], 22.0, 21.0, bruker_id=b2['id'])
+        db_mod.lagre_pris(s['id'], 21.0, 20.0, bruker_id=b1['id'], min_intervall=0)
+        db_mod.lagre_pris(s['id'], 21.0, 20.0, bruker_id=b2['id'], min_intervall=0)
+        db_mod.lagre_pris(s['id'], 22.0, 21.0, bruker_id=b2['id'], min_intervall=0)
 
         resultat = db_mod.hent_toppliste()
         assert resultat[0]['antall'] == 2  # b2 øverst
@@ -48,7 +48,7 @@ class TestToppliste:
     def test_partner_ekskludert(self):
         partner_id = db_mod.hent_eller_opprett_partner('TestPartner')
         stasjon = lag_stasjon()
-        db_mod.lagre_pris(stasjon['id'], 21.0, 20.0, bruker_id=partner_id)
+        db_mod.lagre_pris(stasjon['id'], 21.0, 20.0, bruker_id=partner_id, min_intervall=0)
 
         resultat = db_mod.hent_toppliste()
         assert resultat == []
@@ -57,7 +57,7 @@ class TestToppliste:
         for i in range(5):
             b = lag_bruker(f'u{i}@test.no')
             s = lag_stasjon(f'Stasjon{i}', osm_id=f'node/{i}')
-            db_mod.lagre_pris(s['id'], 21.0, 20.0, bruker_id=b['id'])
+            db_mod.lagre_pris(s['id'], 21.0, 20.0, bruker_id=b['id'], min_intervall=0)
 
         resultat = db_mod.hent_toppliste(limit=3)
         assert len(resultat) == 3
@@ -66,7 +66,7 @@ class TestToppliste:
         bruker = lag_bruker()
         db_mod.sett_kallenavn(bruker['id'], 'Kjetil')
         stasjon = lag_stasjon()
-        db_mod.lagre_pris(stasjon['id'], 21.0, 20.0, bruker_id=bruker['id'])
+        db_mod.lagre_pris(stasjon['id'], 21.0, 20.0, bruker_id=bruker['id'], min_intervall=0)
 
         resultat = db_mod.hent_toppliste()
         assert resultat[0]['kallenavn'] == 'Kjetil'
@@ -80,7 +80,7 @@ class TestMinPlassering:
     def test_eneste_bruker_er_plassering_1(self):
         bruker = lag_bruker()
         stasjon = lag_stasjon()
-        db_mod.lagre_pris(stasjon['id'], 21.0, 20.0, bruker_id=bruker['id'])
+        db_mod.lagre_pris(stasjon['id'], 21.0, 20.0, bruker_id=bruker['id'], min_intervall=0)
 
         plass = db_mod.hent_min_plassering(bruker['id'])
         assert plass['plass'] == 1
@@ -92,8 +92,8 @@ class TestMinPlassering:
         s = lag_stasjon()
         # b2 registrerer 3, b1 registrerer 1
         for _ in range(3):
-            db_mod.lagre_pris(s['id'], 21.0, 20.0, bruker_id=b2['id'])
-        db_mod.lagre_pris(s['id'], 21.0, 20.0, bruker_id=b1['id'])
+            db_mod.lagre_pris(s['id'], 21.0, 20.0, bruker_id=b2['id'], min_intervall=0)
+        db_mod.lagre_pris(s['id'], 21.0, 20.0, bruker_id=b1['id'], min_intervall=0)
 
         plass = db_mod.hent_min_plassering(b1['id'])
         assert plass['plass'] == 2
@@ -103,8 +103,8 @@ class TestMinPlassering:
         partner_id = db_mod.hent_eller_opprett_partner('XPartner')
         s = lag_stasjon()
         for _ in range(5):
-            db_mod.lagre_pris(s['id'], 21.0, 20.0, bruker_id=partner_id)
-        db_mod.lagre_pris(s['id'], 21.0, 20.0, bruker_id=bruker['id'])
+            db_mod.lagre_pris(s['id'], 21.0, 20.0, bruker_id=partner_id, min_intervall=0)
+        db_mod.lagre_pris(s['id'], 21.0, 20.0, bruker_id=bruker['id'], min_intervall=0)
 
         plass = db_mod.hent_min_plassering(bruker['id'])
         assert plass['plass'] == 1
@@ -114,7 +114,7 @@ class TestTopplisteAdmin:
     def test_inkluderer_brukernavn(self):
         bruker = lag_bruker('kjent@test.no')
         stasjon = lag_stasjon()
-        db_mod.lagre_pris(stasjon['id'], 21.0, 20.0, bruker_id=bruker['id'])
+        db_mod.lagre_pris(stasjon['id'], 21.0, 20.0, bruker_id=bruker['id'], min_intervall=0)
 
         resultat = db_mod.hent_toppliste_admin()
         assert len(resultat) == 1
@@ -123,7 +123,7 @@ class TestTopplisteAdmin:
     def test_partner_ekskludert(self):
         partner_id = db_mod.hent_eller_opprett_partner('X')
         stasjon = lag_stasjon()
-        db_mod.lagre_pris(stasjon['id'], 21.0, 20.0, bruker_id=partner_id)
+        db_mod.lagre_pris(stasjon['id'], 21.0, 20.0, bruker_id=partner_id, min_intervall=0)
 
         resultat = db_mod.hent_toppliste_admin()
         assert resultat == []
@@ -225,11 +225,19 @@ class TestOpprettStasjon:
         assert duplikat is not None
         assert duplikat['navn'] == 'Eksisterende'
 
-    def test_opprettet_stasjon_er_søkbar(self):
+    def test_opprettet_stasjon_venter_godkjenning(self):
         bruker = lag_bruker()
-        db_mod.opprett_stasjon('Søkbar', 'Circle K', 60.39, 5.33, bruker['id'])
+        stasjon_id, _ = db_mod.opprett_stasjon('Ny stasjon', 'Circle K', 60.39, 5.33, bruker['id'])
+        assert stasjon_id is not None
+        ventende = db_mod.hent_ventende_stasjoner('ventende')
+        assert any(s['id'] == stasjon_id for s in ventende)
+        # Ikke synlig på kart før godkjent
         stasjoner = db_mod.get_stasjoner_med_priser(60.39, 5.33)
-        assert any(s['navn'] == 'Søkbar' for s in stasjoner)
+        assert not any(s['navn'] == 'Ny stasjon' for s in stasjoner)
+        # Godkjenn og sjekk at den dukker opp
+        db_mod.godkjenn_stasjon(stasjon_id)
+        stasjoner = db_mod.get_stasjoner_med_priser(60.39, 5.33)
+        assert any(s['navn'] == 'Ny stasjon' for s in stasjoner)
 
 
 class TestDeaktivering:
@@ -328,7 +336,7 @@ class TestBilligstePriser24t:
     def test_returnerer_pris(self):
         bruker = lag_bruker()
         stasjon = lag_stasjon()
-        db_mod.lagre_pris(stasjon['id'], 21.0, 20.0, bruker_id=bruker['id'])
+        db_mod.lagre_pris(stasjon['id'], 21.0, 20.0, bruker_id=bruker['id'], min_intervall=0)
         resultat = db_mod.hent_billigste_priser_24t()
         assert len(resultat) == 1
         assert resultat[0]['bensin'] == 21.0
@@ -336,7 +344,7 @@ class TestBilligstePriser24t:
     def test_deaktivert_stasjon_ekskludert(self):
         bruker = lag_bruker()
         stasjon = lag_stasjon()
-        db_mod.lagre_pris(stasjon['id'], 21.0, 20.0, bruker_id=bruker['id'])
+        db_mod.lagre_pris(stasjon['id'], 21.0, 20.0, bruker_id=bruker['id'], min_intervall=0)
         db_mod.deaktiver_stasjon(stasjon['id'])
         assert db_mod.hent_billigste_priser_24t() == []
 
@@ -348,8 +356,8 @@ class TestAntallPrisoppdateringer24t:
     def test_teller_korrekt(self):
         bruker = lag_bruker()
         stasjon = lag_stasjon()
-        db_mod.lagre_pris(stasjon['id'], 21.0, 20.0, bruker_id=bruker['id'])
-        db_mod.lagre_pris(stasjon['id'], 22.0, 21.0, bruker_id=bruker['id'])
+        db_mod.lagre_pris(stasjon['id'], 21.0, 20.0, bruker_id=bruker['id'], min_intervall=0)
+        db_mod.lagre_pris(stasjon['id'], 22.0, 21.0, bruker_id=bruker['id'], min_intervall=0)
         assert db_mod.antall_prisoppdateringer_24t() == 2
 
 
@@ -369,7 +377,7 @@ class TestTrenddata:
     def test_prisoppdatering_telles_i_trend(self):
         bruker = lag_bruker()
         stasjon = lag_stasjon()
-        db_mod.lagre_pris(stasjon['id'], 21.0, 20.0, bruker_id=bruker['id'])
+        db_mod.lagre_pris(stasjon['id'], 21.0, 20.0, bruker_id=bruker['id'], min_intervall=0)
         resultat = db_mod.prisoppdateringer_per_time_48t()
         total = sum(n for _, n in resultat)
         assert total == 1

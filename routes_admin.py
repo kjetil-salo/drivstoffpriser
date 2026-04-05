@@ -11,7 +11,7 @@ from flask import Blueprint, request, session, redirect, jsonify
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
-from db import (finn_bruker_id, hent_alle_brukere, slett_bruker,
+from db import (finn_bruker_id, hent_alle_brukere, slett_bruker, har_rolle, sett_roller_bruker,
                 opprett_invitasjon, hent_siste_prisoppdateringer,
                 stasjoner_med_pris_koordinater, get_statistikk,
                 antall_stasjoner_med_pris, antall_brukere,
@@ -25,7 +25,8 @@ from db import (finn_bruker_id, hent_alle_brukere, slett_bruker,
                 lagre_pris, hent_eller_opprett_partner, hent_toppliste, hent_toppliste_admin,
                 sett_kjede_for_stasjon, finn_naer_stasjon, opprett_stasjon,
                 hent_blogg_stats, finn_stasjoner_by_navn, endre_navn_stasjon,
-                hent_endringsforslag, slett_endringsforslag, antall_ubehandlede_endringsforslag)
+                hent_endringsforslag, slett_endringsforslag, antall_ubehandlede_endringsforslag,
+                hent_ventende_stasjoner, antall_ventende_stasjoner, godkjenn_stasjon)
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -68,7 +69,17 @@ def krever_admin(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
         bruker = finn_bruker_id(session.get('bruker_id', 0))
-        if not bruker or not bruker['er_admin']:
+        if not bruker or not har_rolle(bruker, 'admin'):
+            return 'Ikke tilgang', 403
+        return f(*args, **kwargs)
+    return wrapper
+
+
+def krever_moderator(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        bruker = finn_bruker_id(session.get('bruker_id', 0))
+        if not bruker or not (har_rolle(bruker, 'admin') or har_rolle(bruker, 'moderator')):
             return 'Ikke tilgang', 403
         return f(*args, **kwargs)
     return wrapper
@@ -83,6 +94,7 @@ def admin():
     rapporter_antall = antall_ubehandlede_rapporter()
     endringsforslag_antall = antall_ubehandlede_endringsforslag()
     deaktiverte_antall = len(hent_deaktiverte_stasjoner())
+    ventende_antall = antall_ventende_stasjoner()
     reg_stoppet = hent_innstilling('registrering_stoppet') == '1'
     reg_status = 'STOPPET' if reg_stoppet else 'Åpen'
     reg_farge = '#ef4444' if reg_stoppet else '#22c55e'
@@ -141,10 +153,10 @@ def admin():
     <div class="tile-tittel">Import</div>
     <div class="tile-info">Partnerdata</div>
   </a>
-  <a href="/admin/steder" class="tile">
+  <a href="/admin/steder" class="tile" {('style="border-color:#f59e0b"' if ventende_antall else '')}>
     <div class="tile-ikon">&#128205;</div>
     <div class="tile-tittel">Steder</div>
-    <div class="tile-info">Bruker-opprettede stasjoner</div>
+    <div class="tile-info">{ventende_antall} venter godkjenning</div>
   </a>
   <a href="/admin/brukere" class="tile">
     <div class="tile-ikon">&#128101;</div>
@@ -266,29 +278,60 @@ document.querySelector('form[action="/admin/invitasjon"]').addEventListener('sub
 
 @admin_bp.route('/admin/steder')
 @krever_innlogging
-@krever_admin
+@krever_moderator
 def admin_steder():
-    brukerstasjoner = hent_brukerstasjoner()
-    stasjon_rader = []
-    for s in brukerstasjoner:
-        dato = s['sist_oppdatert'][:10] if s['sist_oppdatert'] else '–'
-        bruker = s['brukernavn'] or '–'
-        navn = s['navn'] + (f' ({s["kjede"]})' if s['kjede'] else '')
+    filter_valg = request.args.get('filter', 'ventende')
+    stasjoner = hent_ventende_stasjoner(filter_valg)
+    ventende_totalt = antall_ventende_stasjoner()
+
+    filter_tabs = ''
+    for slug, label in [('ventende', 'Venter godkjenning'), ('idag', 'I dag'), ('alle', 'Alle')]:
+        aktiv = 'color:#f1f5f9;border-color:#3b82f6' if filter_valg == slug else 'color:#94a3b8;border-color:transparent'
+        filter_tabs += (
+            f'<a href="/admin/steder?filter={slug}" '
+            f'style="padding:6px 14px;border-bottom:2px solid;text-decoration:none;font-size:0.85rem;{aktiv}">'
+            f'{label}</a>'
+        )
+
+    rader = []
+    for s in stasjoner:
+        bruker = s['kallenavn'] or s['brukernavn'] or '–'
+        kjede = s['kjede'] or '–'
+        tidspunkt = s['sist_oppdatert'][:16] if s['sist_oppdatert'] else '–'
         kart_url = f'https://www.google.com/maps?q={s["lat"]},{s["lon"]}'
-        stasjon_rader.append(
-            f'<tr>'
-            f'<td><a href="{kart_url}" target="_blank" style="color:#93c5fd;text-decoration:none">{navn}</a></td>'
-            f'<td style="color:#93c5fd;font-size:0.78rem">{bruker}</td>'
-            f'<td style="color:#94a3b8;font-size:0.78rem">{dato}</td>'
-            f'<td><form method="post" action="/admin/slett-stasjon" style="margin:0"'
-            f' onsubmit="return confirm(\'Slette {s["navn"]}? Tilhørende priser slettes også.\')">'
+        godkjent = s['godkjent']
+        status_badge = (
+            '<span style="color:#22c55e;font-size:0.75rem">✓ godkjent</span>' if godkjent
+            else '<span style="color:#f59e0b;font-size:0.75rem">⏳ venter</span>'
+        )
+        navn_escaped = s['navn'].replace("'", "\\'") if s['navn'] else ''
+
+        godkjenn_knapp = '' if godkjent else (
+            f'<form method="post" action="/admin/godkjenn-stasjon" style="margin:0;display:inline">'
             f'<input type="hidden" name="stasjon_id" value="{s["id"]}">'
-            f'<button style="background:transparent;border:1px solid #ef4444;color:#ef4444;'
-            f'font-size:0.75rem;padding:3px 8px;border-radius:4px;cursor:pointer;width:auto">'
-            f'Slett</button></form></td>'
+            f'<input type="hidden" name="filter" value="{filter_valg}">'
+            f'<button class="btn-ok">Godkjenn</button></form> '
+        )
+
+        rader.append(
+            f'<tr>'
+            f'<td>'
+            f'  <a href="{kart_url}" target="_blank" style="color:#93c5fd;text-decoration:none;font-weight:500">{s["navn"] or "?"}</a>'
+            f'  <div style="font-size:0.75rem;color:#94a3b8;margin-top:2px">{kjede} · {bruker} · {tidspunkt}</div>'
+            f'</td>'
+            f'<td style="white-space:nowrap">{status_badge}</td>'
+            f'<td style="white-space:nowrap">'
+            f'  {godkjenn_knapp}'
+            f'  <form method="post" action="/admin/slett-stasjon" style="margin:0;display:inline"'
+            f'    onsubmit="return confirm(\'Slette {navn_escaped}? Tilhørende priser slettes også.\')">'
+            f'  <input type="hidden" name="stasjon_id" value="{s["id"]}">'
+            f'  <input type="hidden" name="redirect" value="/admin/steder?filter={filter_valg}">'
+            f'  <button class="btn-fare">Slett</button></form>'
+            f'</td>'
             f'</tr>'
         )
-    stasjon_rader_html = ''.join(stasjon_rader) or '<tr><td colspan="4" style="color:#94a3b8">Ingen bruker-opprettede stasjoner</td></tr>'
+
+    rader_html = ''.join(rader) or f'<tr><td colspan="3" style="color:#94a3b8;padding:1rem">Ingen stasjoner</td></tr>'
 
     return f'''<!DOCTYPE html><html lang="no"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -296,26 +339,38 @@ def admin_steder():
 <style>
   *{{box-sizing:border-box;margin:0;padding:0}}
   body{{font-family:system-ui,sans-serif;background:#0f172a;color:#e5e7eb;padding:2rem 1rem}}
-  .container{{max-width:640px;margin:0 auto}}
-  h1{{font-size:1.3rem;margin-bottom:2rem;color:#f1f5f9}}
-  .kort{{background:#111827;border:1px solid #1f2937;border-radius:10px;padding:1.5rem;margin-bottom:1.5rem}}
+  .container{{max-width:800px;margin:0 auto}}
+  h1{{font-size:1.3rem;margin-bottom:0.5rem;color:#f1f5f9}}
+  .subtitle{{font-size:0.85rem;color:#94a3b8;margin-bottom:1.5rem}}
+  .tabs{{display:flex;gap:0;border-bottom:1px solid #1f2937;margin-bottom:1.5rem}}
+  .kort{{background:#111827;border:1px solid #1f2937;border-radius:10px;overflow:hidden}}
   table{{width:100%;border-collapse:collapse;font-size:0.88rem}}
-  td,th{{padding:8px 10px;border-bottom:1px solid #1f2937;text-align:left}}
-  th{{color:#94a3b8;font-weight:500}}
+  td,th{{padding:10px 12px;border-bottom:1px solid #1f2937;text-align:left;vertical-align:middle}}
+  th{{color:#94a3b8;font-weight:500;font-size:0.8rem;background:#0f172a}}
+  tr:last-child td{{border-bottom:none}}
   nav{{margin-bottom:1.5rem;font-size:0.85rem}}
-  nav a{{color:#94a3b8}}
+  nav a{{color:#94a3b8;text-decoration:none}}
+  .btn-ok{{background:transparent;border:1px solid #22c55e;color:#22c55e;font-size:0.75rem;padding:4px 10px;border-radius:4px;cursor:pointer}}
+  .btn-ok:hover{{background:rgba(34,197,94,0.1)}}
+  .btn-fare{{background:transparent;border:1px solid #ef4444;color:#ef4444;font-size:0.75rem;padding:4px 10px;border-radius:4px;cursor:pointer}}
+  .btn-fare:hover{{background:rgba(239,68,68,0.1)}}
 </style></head><body><div class="container">
 <nav><a href="/admin">← Admin</a></nav>
 <h1>Bruker-opprettede stasjoner</h1>
+<p class="subtitle">{ventende_totalt} venter godkjenning</p>
+<div class="tabs">{filter_tabs}</div>
 <div class="kort">
-  <table><tr><th>Stasjon</th><th>Lagt til av</th><th>Dato</th><th></th></tr>{stasjon_rader_html}</table>
+  <table>
+    <tr><th>Stasjon</th><th>Status</th><th>Handlinger</th></tr>
+    {rader_html}
+  </table>
 </div>
 </div></body></html>'''
 
 
 @admin_bp.route('/admin/prislogg')
 @krever_innlogging
-@krever_admin
+@krever_moderator
 def prislogg():
     oppdateringer = hent_siste_prisoppdateringer(limit=200)
     _oslo = ZoneInfo('Europe/Oslo')
@@ -406,9 +461,21 @@ def admin_slett_bruker():
 @krever_admin
 def admin_slett_stasjon():
     stasjon_id = request.form.get('stasjon_id', type=int)
+    tilbake = request.form.get('redirect', '/admin/steder')
     if stasjon_id:
         slett_stasjon(stasjon_id)
-    return redirect('/admin/steder')
+    return redirect(tilbake)
+
+
+@admin_bp.route('/admin/godkjenn-stasjon', methods=['POST'])
+@krever_innlogging
+@krever_admin
+def admin_godkjenn_stasjon():
+    stasjon_id = request.form.get('stasjon_id', type=int)
+    filter_valg = request.form.get('filter', 'ventende')
+    if stasjon_id:
+        godkjenn_stasjon(stasjon_id)
+    return redirect(f'/admin/steder?filter={filter_valg}')
 
 
 @admin_bp.route('/admin/endre-stasjon', methods=['GET', 'POST'])
@@ -511,7 +578,7 @@ def admin_endre_stasjon():
 
 @admin_bp.route('/admin/rapporter')
 @krever_innlogging
-@krever_admin
+@krever_moderator
 def admin_rapporter():
     rapporter = hent_rapporter()
     rader = []
@@ -567,7 +634,7 @@ def admin_rapporter():
 
 @admin_bp.route('/admin/endringsforslag')
 @krever_innlogging
-@krever_admin
+@krever_moderator
 def admin_endringsforslag():
     forslag = hent_endringsforslag()
     rader = []
@@ -628,7 +695,7 @@ def admin_endringsforslag():
 
 @admin_bp.route('/admin/godkjenn-endringsforslag', methods=['POST'])
 @krever_innlogging
-@krever_admin
+@krever_moderator
 def admin_godkjenn_endringsforslag():
     forslag_id = request.form.get('forslag_id', type=int)
     stasjon_id = request.form.get('stasjon_id', type=int)
@@ -646,7 +713,7 @@ def admin_godkjenn_endringsforslag():
 
 @admin_bp.route('/admin/avvis-endringsforslag', methods=['POST'])
 @krever_innlogging
-@krever_admin
+@krever_moderator
 def admin_avvis_endringsforslag():
     forslag_id = request.form.get('forslag_id', type=int)
     if forslag_id:
@@ -656,7 +723,7 @@ def admin_avvis_endringsforslag():
 
 @admin_bp.route('/admin/deaktiverte')
 @krever_innlogging
-@krever_admin
+@krever_moderator
 def admin_deaktiverte():
     stasjoner = hent_deaktiverte_stasjoner()
     rader = []
@@ -704,7 +771,7 @@ def admin_deaktiverte():
 
 @admin_bp.route('/admin/deaktiver-stasjon', methods=['POST'])
 @krever_innlogging
-@krever_admin
+@krever_moderator
 def admin_deaktiver_stasjon():
     stasjon_id = request.form.get('stasjon_id', type=int)
     if stasjon_id:
@@ -717,7 +784,7 @@ def admin_deaktiver_stasjon():
 
 @admin_bp.route('/admin/reaktiver-stasjon', methods=['POST'])
 @krever_innlogging
-@krever_admin
+@krever_moderator
 def admin_reaktiver_stasjon():
     stasjon_id = request.form.get('stasjon_id', type=int)
     if stasjon_id:
@@ -727,7 +794,7 @@ def admin_reaktiver_stasjon():
 
 @admin_bp.route('/admin/sett-kjede', methods=['POST'])
 @krever_innlogging
-@krever_admin
+@krever_moderator
 def admin_sett_kjede():
     data = request.get_json()
     stasjon_id = data.get('stasjon_id') if data else None
@@ -740,7 +807,7 @@ def admin_sett_kjede():
 
 @admin_bp.route('/admin/endre-navn', methods=['POST'])
 @krever_innlogging
-@krever_admin
+@krever_moderator
 def admin_endre_navn():
     data = request.get_json()
     stasjon_id = data.get('stasjon_id') if data else None
@@ -755,7 +822,7 @@ def admin_endre_navn():
 
 @admin_bp.route('/admin/avvis-rapport', methods=['POST'])
 @krever_innlogging
-@krever_admin
+@krever_moderator
 def admin_avvis_rapport():
     stasjon_id = request.form.get('stasjon_id', type=int)
     if stasjon_id:
