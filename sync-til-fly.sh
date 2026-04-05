@@ -36,6 +36,12 @@ if ok != 'ok':
 print(f'Backup OK, integritetssjekk: {ok}')
 EOF
 
+# Vekk Fly.io-instansen og vent til den er klar
+echo "Vekker Fly.io..."
+curl -s -o /dev/null --max-time 30 "https://drivstoffpriser.fly.dev/health" || true
+echo "Venter 30 sekunder..."
+sleep 30
+
 # Send til Fly.io (maks 90 sek, 3 forsøk ved feil)
 HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' \
     --max-time 90 \
