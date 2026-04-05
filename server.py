@@ -15,6 +15,7 @@ from datetime import timedelta
 
 import resend
 from flask import Flask, request, redirect
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from db import init_db, _migrer_db
 from osm import start_bakgrunnsoppdatering
@@ -46,6 +47,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PUBLIC_DIR = os.path.join(BASE_DIR, 'public')
 
 app = Flask(__name__, static_folder=PUBLIC_DIR, static_url_path='')
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1)
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-nøkkel-bytt-i-prod')
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=90)
 resend.api_key = os.environ.get('RESEND_API_KEY', '')
@@ -163,4 +165,5 @@ if __name__ == '__main__':
     _migrer_db()
     start_bakgrunnsoppdatering()
     port = int(os.environ.get('PORT', 7342))
-    app.run(host='0.0.0.0', port=port, debug=True)
+    debug = os.environ.get('FLASK_DEBUG', '0') == '1'
+    app.run(host='0.0.0.0', port=port, debug=debug)

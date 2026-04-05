@@ -103,6 +103,13 @@ def init_db():
                 FOREIGN KEY (stasjon_id) REFERENCES stasjoner(id),
                 FOREIGN KEY (bruker_id) REFERENCES brukere(id)
             );
+            CREATE TABLE IF NOT EXISTS rate_limit (
+                id        INTEGER PRIMARY KEY AUTOINCREMENT,
+                type      TEXT NOT NULL,
+                nokkel    TEXT NOT NULL,
+                tidspunkt TEXT DEFAULT (datetime('now'))
+            );
+            CREATE INDEX IF NOT EXISTS idx_rate_limit ON rate_limit(type, nokkel, tidspunkt);
         ''')
 
 
@@ -164,6 +171,44 @@ def _migrer_db():
                 FOREIGN KEY (stasjon_id) REFERENCES stasjoner(id),
                 FOREIGN KEY (bruker_id) REFERENCES brukere(id)
             )''')
+        if 'rate_limit' not in tabeller:
+            conn.execute('''CREATE TABLE rate_limit (
+                id        INTEGER PRIMARY KEY AUTOINCREMENT,
+                type      TEXT NOT NULL,
+                nokkel    TEXT NOT NULL,
+                tidspunkt TEXT DEFAULT (datetime('now'))
+            )''')
+            conn.execute('CREATE INDEX idx_rate_limit ON rate_limit(type, nokkel, tidspunkt)')
+
+
+def sjekk_rate_limit(type: str, nokkel: str, maks: int, vindu_sekunder: int) -> bool:
+    """Returner True hvis nokkel har nådd maks antall hendelser i vindu_sekunder."""
+    with get_conn() as conn:
+        antall = conn.execute(
+            "SELECT COUNT(*) FROM rate_limit WHERE type=? AND nokkel=? "
+            "AND tidspunkt > datetime('now', ? || ' seconds')",
+            (type, nokkel, f'-{vindu_sekunder}')
+        ).fetchone()[0]
+    return antall >= maks
+
+
+def logg_rate_limit(type: str, nokkel: str):
+    """Registrer én hendelse for nokkel."""
+    with get_conn() as conn:
+        conn.execute(
+            'INSERT INTO rate_limit (type, nokkel) VALUES (?, ?)',
+            (type, nokkel)
+        )
+        # Rydd bort rader eldre enn 2 timer løpende
+        conn.execute(
+            "DELETE FROM rate_limit WHERE tidspunkt < datetime('now', '-2 hours')"
+        )
+
+
+def slett_rate_limit(type: str, nokkel: str):
+    """Fjern alle hendelser for nokkel (brukes ved vellykket innlogging)."""
+    with get_conn() as conn:
+        conn.execute('DELETE FROM rate_limit WHERE type=? AND nokkel=?', (type, nokkel))
 
 
 def hent_innstilling(noekkel, standard=None):

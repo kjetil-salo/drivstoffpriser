@@ -1,5 +1,6 @@
 """Auth-ruter: innlogging, registrering, passord-tilbakestilling, invitasjoner."""
 
+import logging
 import os
 import re
 import secrets
@@ -11,7 +12,10 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from db import (antall_brukere, opprett_bruker, finn_bruker, finn_bruker_id,
                 opprett_invitasjon, hent_invitasjon, merk_invitasjon_brukt,
                 opprett_tilbakestilling, hent_tilbakestilling, merk_tilbakestilling_brukt, oppdater_passord,
-                slett_bruker, hent_innstilling, sett_kallenavn)
+                slett_bruker, hent_innstilling, sett_kallenavn,
+                sjekk_rate_limit, logg_rate_limit, slett_rate_limit)
+
+logger = logging.getLogger('drivstoff')
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -55,6 +59,7 @@ def logg_inn():
     if request.method == 'POST':
         brukernavn = request.form.get('brukernavn', '').strip()
         passord = request.form.get('passord', '').strip()
+        ip = request.remote_addr
 
         if ingen_brukere:
             if not brukernavn or not passord:
@@ -65,9 +70,18 @@ def logg_inn():
             session['bruker_id'] = bruker['id']
             return redirect('/')
 
+        if sjekk_rate_limit('innlogging', ip, maks=10, vindu_sekunder=900):
+            logger.warning(f'Innlogging blokkert (rate limit): ip={ip} brukernavn={brukernavn}')
+            return _auth_side('Logg inn', _login_form(), 'For mange feil forsøk. Prøv igjen om 15 minutter.')
+
         bruker = finn_bruker(brukernavn)
         if not bruker or not check_password_hash(bruker['passord_hash'], passord):
+            logg_rate_limit('innlogging', ip)
+            logger.warning(f'Mislykket innlogging: brukernavn={brukernavn} ip={ip}')
             return _auth_side('Logg inn', _login_form(), 'Feil brukernavn eller passord.')
+
+        slett_rate_limit('innlogging', ip)
+        logger.info(f'Innlogging OK: brukernavn={brukernavn} ip={ip}')
         session.permanent = True
         session['bruker_id'] = bruker['id']
         return redirect('/')
@@ -112,6 +126,11 @@ def registrer():
     if request.method == 'POST':
         epost = request.form.get('epost', '').strip().lower()
         passord = request.form.get('passord', '').strip()
+        ip = request.remote_addr
+
+        if sjekk_rate_limit('registrering', ip, maks=5, vindu_sekunder=3600):
+            logger.warning(f'Registrering blokkert (rate limit): ip={ip}')
+            return _auth_side('Registrer deg', _registrer_form(), 'For mange registreringer fra din tilkobling. Prøv igjen senere.')
 
         if not _EPOST_RE.match(epost):
             return _auth_side('Registrer deg', _registrer_form(), 'Ugyldig e-postadresse.')
@@ -121,6 +140,8 @@ def registrer():
             return _auth_side('Registrer deg', _registrer_form(), 'E-postadressen er allerede i bruk.')
 
         opprett_bruker(epost, generate_password_hash(passord))
+        logg_rate_limit('registrering', ip)
+        logger.info(f'Ny bruker registrert: epost={epost} ip={ip}')
         bruker = finn_bruker(epost)
         session.permanent = True
         session['bruker_id'] = bruker['id']
@@ -144,11 +165,21 @@ def tilbakestill():
     import resend
     if request.method == 'POST':
         epost = request.form.get('epost', '').strip().lower()
+        ip = request.remote_addr
+
+        if sjekk_rate_limit('tilbakestilling', ip, maks=3, vindu_sekunder=3600):
+            logger.warning(f'Tilbakestilling blokkert (rate limit): ip={ip} epost={epost}')
+            # Samme melding som ved suksess — ikke avslør at IP er blokkert
+            return _auth_side('Tilbakestill passord',
+                '<p style="color:#94a3b8">Hvis e-postadressen finnes i systemet har du nå fått en lenke. Sjekk innboksen.</p>'
+                '<a href="/auth/logg-inn">← Tilbake</a>')
+
         bruker = finn_bruker(epost)
         if bruker:
             token = secrets.token_urlsafe(32)
             utloper = (datetime.utcnow() + timedelta(hours=1)).strftime('%Y-%m-%d %H:%M:%S')
             opprett_tilbakestilling(token, epost, utloper)
+            logg_rate_limit('tilbakestilling', ip)
             base_url = os.environ.get('BASE_URL', request.host_url.rstrip('/'))
             lenke = f'{base_url}/auth/nytt-passord?token={token}'
             try:
