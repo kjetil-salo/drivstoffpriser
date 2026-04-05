@@ -333,12 +333,16 @@ def foreslaa_endring():
         return jsonify({'error': 'stasjon_id er påkrevd'}), 400
     foreslatt_navn = (data.get('foreslatt_navn') or '').strip() or None
     foreslatt_kjede = (data.get('foreslatt_kjede') or '').strip() or None
-    if not foreslatt_navn and not foreslatt_kjede:
+    er_nedlagt = bool(data.get('er_nedlagt'))
+    if not foreslatt_navn and not foreslatt_kjede and not er_nedlagt:
         return jsonify({'error': 'Minst ett felt må fylles ut'}), 400
     bruker_id = session.get('bruker_id')
     try:
-        legg_til_endringsforslag(stasjon_id, bruker_id, foreslatt_navn, foreslatt_kjede)
-        logger.info(f'Endringsforslag for stasjon {stasjon_id} fra bruker {bruker_id}: navn={foreslatt_navn}, kjede={foreslatt_kjede}')
+        if er_nedlagt:
+            meld_stasjon_nedlagt(stasjon_id, bruker_id)
+        if foreslatt_navn or foreslatt_kjede:
+            legg_til_endringsforslag(stasjon_id, bruker_id, foreslatt_navn, foreslatt_kjede)
+        logger.info(f'Endringsforslag for stasjon {stasjon_id} fra bruker {bruker_id}: navn={foreslatt_navn}, kjede={foreslatt_kjede}, nedlagt={er_nedlagt}')
         return jsonify({'ok': True})
     except Exception as e:
         logger.warning(f'Endringsforslag feilet: {e}')

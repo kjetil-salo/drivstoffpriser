@@ -40,11 +40,11 @@ export async function meldNedlagt(stasjonId) {
     return resp.json();
 }
 
-export async function foreslåEndring(stasjonId, foreslattNavn, foreslattKjede) {
+export async function foreslåEndring(stasjonId, foreslattNavn, foreslattKjede, erNedlagt = false) {
     const resp = await fetch('/api/foreslaa-endring', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ stasjon_id: stasjonId, foreslatt_navn: foreslattNavn, foreslatt_kjede: foreslattKjede }),
+        body: JSON.stringify({ stasjon_id: stasjonId, foreslatt_navn: foreslattNavn, foreslatt_kjede: foreslattKjede, er_nedlagt: erNedlagt }),
     });
     if (resp.status === 401) return { status: 401 };
     if (!resp.ok) throw new Error('Feil ved innsending');

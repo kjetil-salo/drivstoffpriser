@@ -327,8 +327,7 @@ Vil du hjelpe til? Opprett en gratis bruker og oppdater priser på stasjoner næ
           <button id="sheet-bekreft-btn" class="btn-avbryt">Bekreft priser</button>
           <button id="sheet-endre-btn" class="btn-lagre">Endre pris</button>
         </div>
-        <button id="sheet-nedlagt-btn" class="btn-nedlagt" style="display:none">Meld som nedlagt</button>
-        <button id="sheet-forslag-btn" class="btn-nedlagt" style="display:none;margin-top:0.5rem">Foreslå endring</button>
+        <button id="sheet-forslag-btn" class="btn-nedlagt" style="display:none">Foreslå endring</button>
 
         <!-- Admin: tilknytt kjede -->
         <div id="sheet-admin-kjede" hidden>
@@ -425,6 +424,10 @@ Vil du hjelpe til? Opprett en gratis bruker og oppdater priser på stasjoner næ
       <label for="forslag-navn-input">Nytt navn (valgfritt)</label>
       <input id="forslag-navn-input" type="text" autocomplete="off" style="width:100%">
     </div>
+    <label class="forslag-nedlagt-rad">
+      <input id="forslag-nedlagt-check" type="checkbox">
+      Stasjonen er nedlagt
+    </label>
     <div id="forslag-status" style="display:none;margin-top:0.75rem;font-size:0.85rem"></div>
     <div class="forslag-btns">
       <button id="forslag-avbryt-btn" class="btn-avbryt">Avbryt</button>

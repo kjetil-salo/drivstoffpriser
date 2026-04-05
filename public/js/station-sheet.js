@@ -1,4 +1,4 @@
-import { oppdaterPris, meldNedlagt, settKjede, endreNavn, foreslåEndring } from './api.js';
+import { oppdaterPris, settKjede, endreNavn, foreslåEndring } from './api.js';
 import { getInnstillinger } from './settings.js';
 import { getKjedeFarge, getKjedeInitials, getKjedeLogo } from './kjede.js';
 
@@ -22,7 +22,6 @@ const endreBtnEl = document.getElementById('sheet-endre-btn');
 const bekreftBtnEl = document.getElementById('sheet-bekreft-btn');
 const navigerBtnEl = document.getElementById('sheet-naviger-btn');
 const kartBtnEl = document.getElementById('sheet-kart-btn');
-const nedlagtBtnEl = document.getElementById('sheet-nedlagt-btn');
 const forslagBtnEl = document.getElementById('sheet-forslag-btn');
 
 // Endringsforslag-modal
@@ -30,6 +29,7 @@ const forslagModalEl = document.getElementById('forslag-modal');
 const forslagBackdropEl = document.getElementById('forslag-backdrop');
 const forslagKjedeEl = document.getElementById('forslag-kjede-select');
 const forslagNavnEl = document.getElementById('forslag-navn-input');
+const forslagNedlagtEl = document.getElementById('forslag-nedlagt-check');
 const forslagStatusEl = document.getElementById('forslag-status');
 const forslagLagreEl = document.getElementById('forslag-lagre-btn');
 const forslagAvbrytEl = document.getElementById('forslag-avbryt-btn');
@@ -63,7 +63,6 @@ export function initSheet(onOppdatert) {
     bekreftBtnEl.addEventListener('click', bekreftPris);
     editAvbrytBtn.addEventListener('click', visVisModus);
     editLagreBtn.addEventListener('click', lagrePris);
-    nedlagtBtnEl.addEventListener('click', rapporterNedlagt);
     forslagBtnEl.addEventListener('click', åpneForslagModal);
     forslagAvbrytEl.addEventListener('click', lukkForslagModal);
     forslagBackdropEl.addEventListener('click', lukkForslagModal);
@@ -95,9 +94,6 @@ export function visStasjonSheet(stasjon) {
     const harPriser = stasjon.bensin != null || stasjon.bensin98 != null || stasjon.diesel != null || stasjon.diesel_avgiftsfri != null;
     endreBtnEl.style.display = innlogget ? '' : 'none';
     bekreftBtnEl.style.display = innlogget && harPriser ? '' : 'none';
-    nedlagtBtnEl.style.display = innlogget ? '' : 'none';
-    nedlagtBtnEl.disabled = false;
-    nedlagtBtnEl.textContent = 'Meld som nedlagt';
     forslagBtnEl.style.display = innlogget ? '' : 'none';
 
     if (window.__erAdmin) {
@@ -242,28 +238,12 @@ async function bekreftPris() {
     bekreftBtnEl.textContent = 'Bekreft priser';
 }
 
-async function rapporterNedlagt() {
-    if (!confirm('Er du sikker på at denne stasjonen er nedlagt? Den meldes til admin for vurdering.')) return;
-    nedlagtBtnEl.disabled = true;
-    nedlagtBtnEl.textContent = 'Sender …';
-    try {
-        const resultat = await meldNedlagt(aktivStasjon.id);
-        if (resultat?.status === 401) {
-            nedlagtBtnEl.disabled = false;
-            nedlagtBtnEl.textContent = 'Meld som nedlagt';
-            return;
-        }
-        nedlagtBtnEl.textContent = 'Takk for meldingen!';
-    } catch {
-        nedlagtBtnEl.textContent = 'Feil – prøv igjen';
-        nedlagtBtnEl.disabled = false;
-    }
-}
 
 function åpneForslagModal() {
     forslagKjedeEl.value = aktivStasjon.kjede || '';
     forslagNavnEl.value = '';
     forslagNavnEl.placeholder = aktivStasjon.navn || '';
+    forslagNedlagtEl.checked = false;
     forslagStatusEl.style.display = 'none';
     forslagLagreEl.disabled = false;
     forslagLagreEl.textContent = 'Send forslag';
@@ -280,9 +260,10 @@ function lukkForslagModal() {
 async function sendEndringsforslag() {
     const navn = forslagNavnEl.value.trim();
     const kjede = forslagKjedeEl.value;
+    const nedlagt = forslagNedlagtEl.checked;
     const naaværendeKjede = aktivStasjon.kjede || '';
     const kjedeEndret = kjede !== naaværendeKjede;
-    if (!navn && !kjedeEndret) {
+    if (!navn && !kjedeEndret && !nedlagt) {
         forslagStatusEl.textContent = 'Fyll ut minst ett felt.';
         forslagStatusEl.style.display = 'block';
         forslagStatusEl.style.color = '#ef4444';
@@ -292,7 +273,7 @@ async function sendEndringsforslag() {
     forslagLagreEl.textContent = 'Sender …';
     forslagStatusEl.style.display = 'none';
     try {
-        const res = await foreslåEndring(aktivStasjon.id, navn || null, kjedeEndret ? kjede : null);
+        const res = await foreslåEndring(aktivStasjon.id, navn || null, kjedeEndret ? kjede : null, nedlagt);
         if (res?.status === 401) {
             forslagStatusEl.textContent = 'Du må logge inn for å sende forslag.';
             forslagStatusEl.style.display = 'block';
