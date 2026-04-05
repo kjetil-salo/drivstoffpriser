@@ -41,7 +41,7 @@ export async function meldNedlagt(stasjonId) {
 }
 
 export async function foreslåEndring(stasjonId, foreslattNavn, foreslattKjede) {
-    const resp = await fetch('/api/foreslå-endring', {
+    const resp = await fetch('/api/foreslaa-endring', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ stasjon_id: stasjonId, foreslatt_navn: foreslattNavn, foreslatt_kjede: foreslattKjede }),

@@ -324,7 +324,7 @@ def rapporter_nedlagt():
         return jsonify({'error': 'Feil ved rapportering'}), 500
 
 
-@api_bp.route('/api/foreslå-endring', methods=['POST'])
+@api_bp.route('/api/foreslaa-endring', methods=['POST'])
 @krever_innlogging
 def foreslaa_endring():
     data = request.get_json(silent=True) or {}
