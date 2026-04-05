@@ -1,4 +1,4 @@
-export const KJEDE_NAVN = ['Circle K', 'Uno-X', 'YX', 'Esso', 'Shell', 'Preem', 'St1', 'Best', 'Oljeleverandøren', 'Tanken', 'Driv', 'Haltbakk Express', 'Bunker Oil'];
+export const KJEDE_NAVN = ['Circle K', 'Uno-X', 'YX', 'Esso', 'Shell', 'Preem', 'St1', 'Best', 'Oljeleverandøren', 'Tanken', 'Driv', 'Haltbakk Express', 'Bunker Oil', 'Knapphus', 'Trønder Oil'];
 
 const KJEDE_DOMENER = [
     { match: ['circle k', 'circlek'],          logo: 'circlek',              farge: '#f97316' },
@@ -14,6 +14,8 @@ const KJEDE_DOMENER = [
     { match: ['driv'],                          logo: 'driv.svg',             farge: '#cf1130' },
     { match: ['haltbakk'],                      logo: 'haltbakk.webp',        farge: '#b91c1c' },
     { match: ['bunker oil', 'bunkeroil'],       logo: 'bunker-oil.svg',       farge: '#1e40af' },
+    { match: ['knapphus'],                      logo: 'knapphus',             farge: '#f59e0b' },
+    { match: ['trønder oil', 'tronder oil'],    logo: 'tronder-oil',          farge: '#1d4ed8' },
 ];
 
 function _finn(kjede) {
