@@ -119,6 +119,9 @@ def _migrer_db():
         bruker_kolonner = [r[1] for r in conn.execute("PRAGMA table_info(brukere)").fetchall()]
         if 'kallenavn' not in bruker_kolonner:
             conn.execute("ALTER TABLE brukere ADD COLUMN kallenavn TEXT")
+        if 'roller' not in bruker_kolonner:
+            conn.execute("ALTER TABLE brukere ADD COLUMN roller TEXT NOT NULL DEFAULT ''")
+            conn.execute("UPDATE brukere SET roller='admin' WHERE er_admin=1")
 
         stasjon_kolonner = [r[1] for r in conn.execute("PRAGMA table_info(stasjoner)").fetchall()]
         if 'lagt_til_av' not in stasjon_kolonner:
@@ -127,6 +130,10 @@ def _migrer_db():
             conn.execute("ALTER TABLE stasjoner ADD COLUMN godkjent INTEGER DEFAULT 1")
         if 'land' not in stasjon_kolonner:
             conn.execute("ALTER TABLE stasjoner ADD COLUMN land TEXT")
+        if 'navn_låst' not in stasjon_kolonner:
+            conn.execute("ALTER TABLE stasjoner ADD COLUMN navn_låst INTEGER NOT NULL DEFAULT 0")
+        if 'kjede_låst' not in stasjon_kolonner:
+            conn.execute("ALTER TABLE stasjoner ADD COLUMN kjede_låst INTEGER NOT NULL DEFAULT 0")
 
         # Rapporter-tabell og blogg_visninger (migrering)
         tabeller = [r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
@@ -190,7 +197,8 @@ def lagre_stasjon(navn, kjede, lat, lon, osm_id, land=None):
             '''INSERT INTO stasjoner (navn, kjede, lat, lon, osm_id, land)
                VALUES (?, ?, ?, ?, ?, ?)
                ON CONFLICT(osm_id) DO UPDATE SET
-                 navn=excluded.navn, kjede=COALESCE(excluded.kjede, stasjoner.kjede),
+                 navn=CASE WHEN stasjoner.navn_låst=1 THEN stasjoner.navn ELSE excluded.navn END,
+                 kjede=CASE WHEN stasjoner.kjede_låst=1 THEN stasjoner.kjede ELSE COALESCE(excluded.kjede, stasjoner.kjede) END,
                  lat=excluded.lat, lon=excluded.lon,
                  land=COALESCE(excluded.land, stasjoner.land),
                  sist_oppdatert=datetime('now')''',
@@ -202,18 +210,22 @@ _pris_lock = threading.Lock()
 
 
 def lagre_pris(stasjon_id, bensin, diesel, bensin98=None, bruker_id=None, diesel_avgiftsfri=None, min_intervall=300):
-    """Lagrer pris. Returnerer False hvis rate limit er nådd, ellers True."""
+    """Lagrer pris. Oppdaterer siste rad hvis bruker korrigerer innen intervallet, ellers insert."""
     with _pris_lock:
         with get_conn() as conn:
             if bruker_id is not None:
                 sist = conn.execute(
-                    "SELECT tidspunkt FROM priser WHERE bruker_id=? AND stasjon_id=? ORDER BY tidspunkt DESC LIMIT 1",
+                    "SELECT id, tidspunkt FROM priser WHERE bruker_id=? AND stasjon_id=? ORDER BY tidspunkt DESC LIMIT 1",
                     (bruker_id, stasjon_id)
                 ).fetchone()
                 if sist:
-                    sekunder_siden = (datetime.now() - datetime.strptime(sist[0], '%Y-%m-%d %H:%M:%S')).total_seconds()
+                    sekunder_siden = (datetime.now() - datetime.strptime(sist[1], '%Y-%m-%d %H:%M:%S')).total_seconds()
                     if sekunder_siden < min_intervall:
-                        return False
+                        conn.execute(
+                            'UPDATE priser SET bensin=?, diesel=?, bensin98=?, diesel_avgiftsfri=?, tidspunkt=datetime("now") WHERE id=?',
+                            (bensin, diesel, bensin98, diesel_avgiftsfri, sist[0])
+                        )
+                        return True
             conn.execute(
                 'INSERT INTO priser (stasjon_id, bensin, diesel, bensin98, bruker_id, diesel_avgiftsfri) VALUES (?, ?, ?, ?, ?, ?)',
                 (stasjon_id, bensin, diesel, bensin98, bruker_id, diesel_avgiftsfri)
@@ -379,11 +391,28 @@ def antall_brukere() -> int:
         return conn.execute("SELECT COUNT(*) FROM brukere").fetchone()[0]
 
 
-def opprett_bruker(brukernavn: str, passord_hash: str, er_admin: bool = False):
+def har_rolle(bruker: dict, rolle: str) -> bool:
+    if not bruker:
+        return False
+    return rolle in (bruker.get('roller') or '').split()
+
+
+def sett_roller_bruker(bruker_id: int, roller: list[str]):
+    roller_str = ' '.join(sorted(set(roller)))
+    er_admin = 1 if 'admin' in roller else 0
     with get_conn() as conn:
         conn.execute(
-            "INSERT INTO brukere (brukernavn, passord_hash, er_admin) VALUES (?, ?, ?)",
-            (brukernavn, passord_hash, 1 if er_admin else 0)
+            "UPDATE brukere SET roller=?, er_admin=? WHERE id=?",
+            (roller_str, er_admin, bruker_id)
+        )
+
+
+def opprett_bruker(brukernavn: str, passord_hash: str, er_admin: bool = False):
+    roller = 'admin' if er_admin else ''
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT INTO brukere (brukernavn, passord_hash, er_admin, roller) VALUES (?, ?, ?, ?)",
+            (brukernavn, passord_hash, 1 if er_admin else 0, roller)
         )
 
 
@@ -409,7 +438,7 @@ def hent_alle_brukere() -> list:
     with get_conn() as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
-            "SELECT id, brukernavn, er_admin, opprettet FROM brukere ORDER BY opprettet"
+            "SELECT id, brukernavn, er_admin, roller, opprettet FROM brukere ORDER BY opprettet"
         ).fetchall()
         return [dict(r) for r in rows]
 
@@ -473,7 +502,7 @@ def sett_kallenavn(bruker_id: int, kallenavn: str):
 
 def sett_kjede_for_stasjon(stasjon_id: int, kjede: str):
     with get_conn() as conn:
-        conn.execute("UPDATE stasjoner SET kjede = ? WHERE id = ?",
+        conn.execute("UPDATE stasjoner SET kjede = ?, kjede_låst = 1 WHERE id = ?",
                      (kjede or None, stasjon_id))
 
 
@@ -744,7 +773,7 @@ def endre_navn_stasjon(stasjon_id: int, nytt_navn: str) -> bool:
     """Endre navn på en stasjon. Returnerer True hvis stasjonen ble funnet og oppdatert."""
     with get_conn() as conn:
         cursor = conn.execute(
-            "UPDATE stasjoner SET navn = ? WHERE id = ?",
+            "UPDATE stasjoner SET navn = ?, navn_låst = 1 WHERE id = ?",
             (nytt_navn, stasjon_id)
         )
         return cursor.rowcount > 0
