@@ -225,19 +225,11 @@ class TestOpprettStasjon:
         assert duplikat is not None
         assert duplikat['navn'] == 'Eksisterende'
 
-    def test_opprettet_stasjon_venter_godkjenning(self):
+    def test_opprettet_stasjon_er_søkbar(self):
         bruker = lag_bruker()
-        stasjon_id, _ = db_mod.opprett_stasjon('Ny stasjon', 'Circle K', 60.39, 5.33, bruker['id'])
-        assert stasjon_id is not None
-        ventende = db_mod.hent_ventende_stasjoner('ventende')
-        assert any(s['id'] == stasjon_id for s in ventende)
-        # Ikke synlig på kart før godkjent
+        db_mod.opprett_stasjon('Søkbar', 'Circle K', 60.39, 5.33, bruker['id'])
         stasjoner = db_mod.get_stasjoner_med_priser(60.39, 5.33)
-        assert not any(s['navn'] == 'Ny stasjon' for s in stasjoner)
-        # Godkjenn og sjekk at den dukker opp
-        db_mod.godkjenn_stasjon(stasjon_id)
-        stasjoner = db_mod.get_stasjoner_med_priser(60.39, 5.33)
-        assert any(s['navn'] == 'Ny stasjon' for s in stasjoner)
+        assert any(s['navn'] == 'Søkbar' for s in stasjoner)
 
 
 class TestDeaktivering:

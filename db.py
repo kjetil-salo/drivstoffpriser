@@ -556,7 +556,7 @@ def opprett_stasjon(navn, kjede, lat, lon, bruker_id):
     with get_conn() as conn:
         cursor = conn.execute(
             '''INSERT INTO stasjoner (navn, kjede, lat, lon, lagt_til_av, godkjent)
-               VALUES (?, ?, ?, ?, ?, 0)''',
+               VALUES (?, ?, ?, ?, ?, 1)''',
             (navn, kjede or None, lat, lon, bruker_id)
         )
         stasjon_id = cursor.lastrowid

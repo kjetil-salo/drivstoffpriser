@@ -280,12 +280,12 @@ document.querySelector('form[action="/admin/invitasjon"]').addEventListener('sub
 @krever_innlogging
 @krever_moderator
 def admin_steder():
-    filter_valg = request.args.get('filter', 'ventende')
+    filter_valg = request.args.get('filter', 'idag')
     stasjoner = hent_ventende_stasjoner(filter_valg)
     ventende_totalt = antall_ventende_stasjoner()
 
     filter_tabs = ''
-    for slug, label in [('ventende', 'Venter godkjenning'), ('idag', 'I dag'), ('alle', 'Alle')]:
+    for slug, label in [('idag', 'I dag'), ('alle', 'Alle')]:
         aktiv = 'color:#f1f5f9;border-color:#3b82f6' if filter_valg == slug else 'color:#94a3b8;border-color:transparent'
         filter_tabs += (
             f'<a href="/admin/steder?filter={slug}" '
@@ -306,22 +306,13 @@ def admin_steder():
         )
         navn_escaped = s['navn'].replace("'", "\\'") if s['navn'] else ''
 
-        godkjenn_knapp = '' if godkjent else (
-            f'<form method="post" action="/admin/godkjenn-stasjon" style="margin:0;display:inline">'
-            f'<input type="hidden" name="stasjon_id" value="{s["id"]}">'
-            f'<input type="hidden" name="filter" value="{filter_valg}">'
-            f'<button class="btn-ok">Godkjenn</button></form> '
-        )
-
         rader.append(
             f'<tr>'
             f'<td>'
             f'  <a href="{kart_url}" target="_blank" style="color:#93c5fd;text-decoration:none;font-weight:500">{s["navn"] or "?"}</a>'
             f'  <div style="font-size:0.75rem;color:#94a3b8;margin-top:2px">{kjede} · {bruker} · {tidspunkt}</div>'
             f'</td>'
-            f'<td style="white-space:nowrap">{status_badge}</td>'
             f'<td style="white-space:nowrap">'
-            f'  {godkjenn_knapp}'
             f'  <form method="post" action="/admin/slett-stasjon" style="margin:0;display:inline"'
             f'    onsubmit="return confirm(\'Slette {navn_escaped}? Tilhørende priser slettes også.\')">'
             f'  <input type="hidden" name="stasjon_id" value="{s["id"]}">'
@@ -361,7 +352,7 @@ def admin_steder():
 <div class="tabs">{filter_tabs}</div>
 <div class="kort">
   <table>
-    <tr><th>Stasjon</th><th>Status</th><th>Handlinger</th></tr>
+    <tr><th>Stasjon</th><th></th></tr>
     {rader_html}
   </table>
 </div>
