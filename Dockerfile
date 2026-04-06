@@ -10,4 +10,4 @@ COPY public/ ./public/
 
 EXPOSE 3002
 
-CMD ["python3", "server.py"]
+CMD ["sh", "-c", "gunicorn -w 1 --threads 4 -b 0.0.0.0:${PORT:-7342} server:app"]
