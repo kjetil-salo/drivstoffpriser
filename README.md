@@ -65,7 +65,7 @@ Alle kan se priser. For å rapportere priser trenger du en konto:
                                │
                    ┌───────────┼───────────┐
                    ▼           ▼           ▼
-               Overpass    Nominatim    Fly.io
+               Overpass    Photon       Fly.io
                API (OSM)  (geocoding)  (failover)
                                           ▲
                                           │ DB-synk
@@ -82,7 +82,7 @@ Alle kan se priser. For å rapportere priser trenger du en konto:
 | Backend | Python 3.12, Flask 3 |
 | Database | SQLite med WAL-modus |
 | Kartdata | OpenStreetMap via Overpass API (daglig bakgrunnsoppdatering) |
-| Geocoding | Nominatim |
+| Geocoding | Photon (komoot.io) |
 | E-post | Resend (passordreset) |
 | Hosting | Raspberry Pi + Docker + Cloudflare Tunnel |
 | Failover | Fly.io — DB synkes automatisk fra Pi hver 4. time (kl 00, 04, 08, 12, 16, 20) |
@@ -113,7 +113,7 @@ drivstoffpriser/
 │       ├── list.js        # Listevisning med sortering
 │       ├── station-sheet.js  # Bunnark med detaljer og prisredigering
 │       ├── location.js    # To-stegs GPS (nettverk → høy presisjon)
-│       ├── search.js      # Stedssøk med Nominatim
+│       ├── search.js      # Stedssøk med Photon
 │       ├── settings.js    # Drivstofftype-filter
 │       ├── add-station.js # Legg til stasjon med kartpinne
 │       ├── stats.js       # Statistikkfanen
@@ -277,12 +277,12 @@ Databasen sikkerhetskopieres daglig til lokal disk og eksternt til Cloudflare R2
 | Oppbevaring | 30 dager rullerende |
 | Verktøy | rclone v1.73.1+ |
 
-Backup bruker `python3 sqlite3.backup()` for WAL-sikker kopi uten låsningsproblemer.
+Backup bruker `sqlite3 .backup`-kommandoen for WAL-sikker kopi uten låsningsproblemer.
 
 Manuell kjøring:
 ```bash
 bash /home/kjetil/drivstoffpriser/backup.sh
-rclone --config ~/.config/rclone/rclone.conf ls r2:drivstoffpriser-backup/daglig/
+rclone ls r2:drivstoffpriser-backup/daglig/
 ```
 
 ### Miljøvariabler
