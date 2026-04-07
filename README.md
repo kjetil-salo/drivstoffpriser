@@ -139,7 +139,7 @@ drivstoffpriser/
 | Metode | Endepunkt | Beskrivelse |
 |--------|-----------|-------------|
 | `GET` | `/api/stasjoner?lat=&lon=` | Stasjoner innen 30 km (maks 30, kun Norge) |
-| `GET` | `/api/stedssok?q=` | Geocoding via Nominatim |
+| `GET` | `/api/stedssok?q=` | Geocoding via Photon (komoot.io) |
 | `GET` | `/api/statistikk` | Billigste/dyreste priser og antall oppdateringer siste 24t |
 | `GET` | `/api/totalt-med-pris` | Antall stasjoner med registrert pris |
 | `GET` | `/api/meg` | Innlogget bruker-info |
