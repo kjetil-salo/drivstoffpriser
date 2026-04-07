@@ -73,7 +73,7 @@ case "${1:-}" in
         kjor_tester
         deploy_pi "staging" "docker-compose.staging.yml" "~/drivstoffpriser-staging"
         echo ""
-        echo "[staging] Test på http://raspberrypi:3003 — deploy til prod med: ./deploy.sh prod"
+        echo "[staging] Test på http://raspberrypi:3004 — deploy til prod med: ./deploy.sh prod"
         ;;
     fly)
         kjor_tester
