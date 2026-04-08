@@ -31,6 +31,10 @@ export function sentrerKart(lat, lon, zoom = 13) {
     if (map) map.setView([lat, lon], zoom);
 }
 
+export function panTilPosisjon(lat, lon) {
+    if (map) map.panTo([lat, lon]);
+}
+
 export function getKartSenter() {
     if (!map) return null;
     const c = map.getCenter();
@@ -63,13 +67,22 @@ function kmMellom(lat1, lon1, lat2, lon2) {
 
 export function visUserPosisjon(pos) {
     if (!map) return;
+    oppdaterUserMarker(pos);
+    map.setView([pos.lat, pos.lon], 13);
+}
+
+export function oppdaterUserMarker(pos) {
+    if (!map) return;
     if (userMarker) userMarker.remove();
     userMarker = L.circleMarker([pos.lat, pos.lon], {
         color: '#3b82f6', fillColor: '#3b82f6',
         fillOpacity: 0.85, radius: 8, weight: 3,
         pane: 'userPane',
     }).addTo(map);
-    map.setView([pos.lat, pos.lon], 13);
+}
+
+export function registrerBrukerDrag(onDrag) {
+    if (map) map.on('dragstart', onDrag);
 }
 
 export function visStasjoner(stasjoner, onKlikk) {
@@ -184,7 +197,7 @@ function prisIkon(s) {
 
 function prisAlderTimer(tidspunkt) {
     if (!tidspunkt) return null;
-    const ts = new Date(tidspunkt.replace(' ', 'T'));
+    const ts = new Date(tidspunkt.replace(' ', 'T') + 'Z');
     return (Date.now() - ts.getTime()) / 3600000;
 }
 
@@ -243,8 +256,7 @@ function getKompaktPris(s) {
 
 function kompaktIkon(s, erBilligst) {
     const farge = prisFarge(s);
-    const borderFarge = erBilligst ? '#4ade80'
-        : farge === 'green'  ? '#22c55e'
+    const borderFarge = farge === 'green'  ? '#22c55e'
         : farge === 'orange' ? '#f97316'
         : farge === 'violet' ? '#a78bfa'
         : '#9ca3af';
@@ -284,9 +296,9 @@ function kompaktIkon(s, erBilligst) {
             `<div class="km-circle" style="border-color:${borderFarge};${circleStyle}">${innerHtml}</div>` +
             (prisStr ? `<div class="km-pris">${prisStr}${alderHtml}</div>` : '') +
             `</div>`,
-        iconSize: [44, 60],
-        iconAnchor: [22, 38],
-        popupAnchor: [0, -38],
+        iconSize: erBilligst ? [54, 72] : [44, 60],
+        iconAnchor: erBilligst ? [27, 46] : [22, 38],
+        popupAnchor: erBilligst ? [0, -46] : [0, -38],
     });
 }
 

@@ -75,3 +75,19 @@ export function hentPosisjon(onSuccess, onError, onStatus) {
         { enableHighAccuracy: false, maximumAge: 0, timeout: 5000 }
     );
 }
+
+export function startFollowWatch(onPosisjon, onError) {
+    if (!navigator.geolocation) {
+        onError('Nettleseren støtter ikke geolokasjon.');
+        return () => {};
+    }
+    const id = navigator.geolocation.watchPosition(
+        (pos) => {
+            const { latitude: lat, longitude: lon, accuracy } = pos.coords;
+            onPosisjon({ lat, lon, accuracy });
+        },
+        (err) => onError({ nektet: err.code === 1 }),
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 }
+    );
+    return () => navigator.geolocation.clearWatch(id);
+}

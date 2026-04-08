@@ -1,6 +1,6 @@
 import { hentStasjoner } from './api.js';
-import { hentPosisjon } from './location.js';
-import { initMap, sentrerKart, visUserPosisjon, visStasjoner, oppdaterStasjonPriser, initKartBevegelse, refreshKartInnstillinger, getKartSenter } from './map.js';
+import { hentPosisjon, startFollowWatch } from './location.js';
+import { initMap, sentrerKart, panTilPosisjon, visUserPosisjon, oppdaterUserMarker, registrerBrukerDrag, visStasjoner, oppdaterStasjonPriser, initKartBevegelse, refreshKartInnstillinger, getKartSenter } from './map.js';
 import { visListe, oppdaterKort } from './list.js';
 import { initSheet, visStasjonSheet, oppdaterSheetStasjon, lukkSheet, refreshSheetInnstillinger } from './station-sheet.js';
 import { initSearch } from './search.js';
@@ -27,6 +27,7 @@ function lagrePosisjon(pos) {
 // ── State ─────────────────────────────────────────
 let stasjoner = [];
 let userPos = null;
+let followStopFn = null;
 
 // ── DOM ───────────────────────────────────────────
 const locBtn = document.getElementById('loc-btn');
@@ -346,7 +347,51 @@ document.addEventListener('naviger-til-stasjon', async (e) => {
 });
 
 // ── Geolokasjon ───────────────────────────────────
-locBtn.addEventListener('click', startLokasjon);
+registrerBrukerDrag(stoppFollow);
+
+locBtn.addEventListener('click', () => {
+    if (!userPos) {
+        startLokasjon();
+    } else if (followStopFn) {
+        stoppFollow();
+    } else {
+        startFollow();
+    }
+});
+
+function startFollow() {
+    locBtn.classList.add('follow-aktiv');
+    locBtn.setAttribute('aria-label', 'Deaktiver GPS-følging');
+    let sisteStasjonHentPos = userPos;
+    followStopFn = startFollowWatch(
+        async (pos) => {
+            userPos = pos;
+            lagrePosisjon(pos);
+            oppdaterUserMarker(pos);
+            panTilPosisjon(pos.lat, pos.lon);
+
+            const dlat = (pos.lat - sisteStasjonHentPos.lat) * 111;
+            const dlon = (pos.lon - sisteStasjonHentPos.lon) * 111 * Math.cos(pos.lat * Math.PI / 180);
+            const km = Math.sqrt(dlat * dlat + dlon * dlon);
+            if (km >= 3) {
+                sisteStasjonHentPos = pos;
+                try {
+                    stasjoner = await hentStasjoner(pos.lat, pos.lon);
+                    visStasjoner(stasjoner, visStasjonSheet);
+                } catch {}
+            }
+        },
+        () => stoppFollow()
+    );
+}
+
+function stoppFollow() {
+    if (!followStopFn) return;
+    followStopFn();
+    followStopFn = null;
+    locBtn.classList.remove('follow-aktiv');
+    locBtn.setAttribute('aria-label', 'Hent posisjon');
+}
 
 function startLokasjon() {
     locBtn.disabled = true;

@@ -87,6 +87,8 @@ html, body {
 }
 #loc-btn:hover { background: rgba(30, 41, 59, 0.95); }
 #loc-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+#loc-btn.follow-aktiv { background: rgba(37, 99, 235, 0.92); }
+#loc-btn.follow-aktiv:hover { background: rgba(29, 78, 216, 0.95); }
 
 #auth-lenke {
   font-size: var(--font-xs);
@@ -327,12 +329,14 @@ html, body {
   box-shadow: 0 0 0 1.5px rgba(255,255,255,0.85), 0 2px 6px rgba(0,0,0,0.4);
 }
 .km-billigst .km-circle {
-  border-width: 6px;
+  width: 44px;
+  height: 44px;
+  border-width: 7px;
   animation: km-billigst-puls 2.5s ease-in-out infinite;
 }
 @keyframes km-billigst-puls {
-  0%, 100% { box-shadow: 0 0 0 2px rgba(255,255,255,0.9), 0 0 6px 2px rgba(74,222,128,0.5); }
-  50%       { box-shadow: 0 0 0 2px rgba(255,255,255,1),   0 0 18px 8px rgba(74,222,128,0.85); }
+  0%, 100% { box-shadow: 0 0 0 2px rgba(255,255,255,0.9), 0 0 10px 4px rgba(74,222,128,0.6); }
+  50%       { box-shadow: 0 0 0 2px rgba(255,255,255,1),   0 0 28px 12px rgba(74,222,128,0.9); }
 }
 @media (prefers-reduced-motion: reduce) {
   .km-billigst .km-circle { animation: none; }
@@ -370,9 +374,15 @@ html, body {
   white-space: nowrap;
   line-height: 1.4;
 }
+.km-billigst {
+  width: 54px;
+}
 .km-billigst .km-pris {
   background: #15803d;
-  color: #dcfce7;
+  color: #4ade80;
+  font-size: 0.74rem;
+  font-weight: 800;
+  padding: 2px 6px;
 }
 .km-alder {
   display: block;
