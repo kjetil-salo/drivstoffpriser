@@ -174,21 +174,20 @@ function lagKort(s) {
             : ' · <em>Ingen priser</em>'}</div>
         </div>
       </div>
-      <div class="b-priser">${lagChips(s)}</div>
-      ${harPris(s) ? `<button class="b-bekreft-btn" aria-label="Bekreft alle priser">✓ Bekreft alle</button>` : ''}
+      <div class="b-priser">${lagRader(s)}</div>
     `;
 
-    li.querySelectorAll('.b-chip').forEach(chip => {
-        chip.addEventListener('click', () => åpneEdit(li, s, chip.dataset.type));
+    li.querySelectorAll('.b-rad-rediger').forEach(btn => {
+        btn.addEventListener('click', () => åpneEdit(li, s, btn.dataset.type));
     });
-
-    const bekreftBtn = li.querySelector('.b-bekreft-btn');
-    if (bekreftBtn) bekreftBtn.addEventListener('click', () => bekreftAlle(li, s));
+    li.querySelectorAll('.b-rad-bekreft').forEach(btn => {
+        btn.addEventListener('click', () => bekreftType(li, s, btn.dataset.type));
+    });
 
     return li;
 }
 
-function lagChips(s) {
+function lagRader(s) {
     return [
         { type: 'bensin',            label: '95 oktan', v: s.bensin,            ts: s.bensin_tidspunkt },
         { type: 'bensin98',          label: '98 oktan', v: s.bensin98,          ts: s.bensin98_tidspunkt },
@@ -198,11 +197,16 @@ function lagChips(s) {
         const alder = ts ? (Date.now() - new Date(ts + 'Z')) / 3600000 : Infinity;
         const dot = alder < 6 ? 'b-dot-fersk' : alder < 24 ? 'b-dot-ok' : 'b-dot-gammel';
         const pris = v != null ? v.toFixed(2) : '–';
-        return `<button class="b-chip" data-type="${type}">
+        const harPrisRad = v != null;
+        return `<div class="b-rad" data-type="${type}">
           <span class="b-dot ${dot}"></span>
-          <span class="b-chip-label">${label}</span>
-          <span class="b-chip-pris">${pris}</span>
-        </button>`;
+          <span class="b-rad-label">${label}</span>
+          <span class="b-rad-pris">${pris}</span>
+          <button class="b-rad-rediger" data-type="${type}" aria-label="Endre ${label}">✎</button>
+          ${harPrisRad
+            ? `<button class="b-rad-bekreft" data-type="${type}" aria-label="Bekreft ${label}">✓</button>`
+            : `<span class="b-rad-bekreft-placeholder"></span>`}
+        </div>`;
     }).join('');
 }
 
@@ -210,7 +214,7 @@ function lagChips(s) {
 function åpneEdit(kortEl, stasjon, type) {
     if (redigerer) lukkEdit(false);
 
-    const chip = kortEl.querySelector(`.b-chip[data-type="${type}"]`);
+    const rad = kortEl.querySelector(`.b-rad[data-type="${type}"]`);
     const gjeldende = stasjon[type];
 
     const editEl = document.createElement('div');
@@ -228,8 +232,8 @@ function åpneEdit(kortEl, stasjon, type) {
     const lagreBtn = editEl.querySelector('.b-edit-lagre');
     const avbrytBtn = editEl.querySelector('.b-edit-avbryt');
 
-    chip.after(editEl);
-    chip.classList.add('b-chip-aktiv');
+    rad.after(editEl);
+    rad.classList.add('b-rad-aktiv');
     redigerer = { kortEl, stasjon, type, editEl };
 
     setTimeout(() => { input.focus(); input.select(); }, 50);
@@ -246,10 +250,10 @@ function lukkEdit(suksess = false) {
     if (!redigerer) return;
     const { kortEl, type, editEl } = redigerer;
     editEl.remove();
-    const chip = kortEl.querySelector(`.b-chip[data-type="${type}"]`);
-    if (chip) {
-        chip.classList.remove('b-chip-aktiv');
-        if (suksess) chip.classList.add('b-chip-suksess');
+    const rad = kortEl.querySelector(`.b-rad[data-type="${type}"]`);
+    if (rad) {
+        rad.classList.remove('b-rad-aktiv');
+        if (suksess) rad.classList.add('b-rad-suksess');
     }
     redigerer = null;
 }
@@ -292,11 +296,11 @@ async function lagrePris() {
         stasjon[type] = pris;
         stasjon[`${type}_tidspunkt`] = naa;
 
-        // Oppdater chip-tekst og avslutt edit med suksess-animasjon
-        const chip = kortEl.querySelector(`.b-chip[data-type="${type}"]`);
-        if (chip) {
-            chip.querySelector('.b-chip-pris').textContent = pris.toFixed(2);
-            chip.querySelector('.b-dot').className = 'b-dot b-dot-fersk';
+        // Oppdater rad-tekst og avslutt edit med suksess-animasjon
+        const rad = kortEl.querySelector(`.b-rad[data-type="${type}"]`);
+        if (rad) {
+            rad.querySelector('.b-rad-pris').textContent = pris.toFixed(2);
+            rad.querySelector('.b-dot').className = 'b-dot b-dot-fersk';
         }
         lukkEdit(true);
 
@@ -316,9 +320,10 @@ async function lagrePris() {
     }
 }
 
-// ── Bekreft alle ──────────────────────────────────
-async function bekreftAlle(kortEl, stasjon) {
-    const btn = kortEl.querySelector('.b-bekreft-btn');
+// ── Bekreft ───────────────────────────────────────
+async function bekreftType(kortEl, stasjon, type) {
+    const btn = kortEl.querySelector(`.b-rad-bekreft[data-type="${type}"]`);
+    if (!btn) return;
     btn.disabled = true;
     btn.textContent = '…';
 
@@ -338,27 +343,21 @@ async function bekreftAlle(kortEl, stasjon) {
         if (!resp.ok) throw new Error();
 
         const naa = new Date().toISOString().replace('T', ' ').slice(0, 19);
-        ['bensin', 'bensin98', 'diesel', 'diesel_avgiftsfri'].forEach(type => {
-            if (stasjon[type] != null) {
-                stasjon[`${type}_tidspunkt`] = naa;
-                const chip = kortEl.querySelector(`.b-chip[data-type="${type}"]`);
-                if (chip) {
-                    chip.querySelector('.b-dot').className = 'b-dot b-dot-fersk';
-                    chip.classList.add('b-chip-suksess');
-                }
-            }
-        });
+        stasjon[`${type}_tidspunkt`] = naa;
+
+        const rad = kortEl.querySelector(`.b-rad[data-type="${type}"]`);
+        if (rad) rad.querySelector('.b-dot').className = 'b-dot b-dot-fersk';
+        rad?.classList.add('b-rad-suksess');
 
         dagTeller++;
         sessionStorage.setItem('bidrag_dag', dagTeller);
         oppdaterRang();
 
-        btn.textContent = '✓ Bekreftet';
+        btn.textContent = '✓';
         setTimeout(visListe, 1500);
-
     } catch {
         btn.disabled = false;
-        btn.textContent = '✓ Bekreft alle';
+        btn.textContent = '✓';
     }
 }
 

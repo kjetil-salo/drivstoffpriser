@@ -136,33 +136,25 @@
     /* ── Priser ── */
     .b-priser {
       display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
+      flex-direction: column;
+      gap: 2px;
+      margin-top: 4px;
     }
-    .b-chip {
+    .b-rad {
       display: flex;
       align-items: center;
-      gap: 5px;
-      background: #1e293b;
-      border: 1px solid var(--border-color-medium);
-      border-radius: var(--radius-full);
-      padding: 7px 12px;
-      font-size: var(--font-sm);
-      color: var(--color-text);
-      cursor: pointer;
-      min-height: 36px;
-      touch-action: manipulation;
-      -webkit-tap-highlight-color: transparent;
-      transition: background var(--transition-base), border-color var(--transition-base);
+      gap: 8px;
+      padding: 8px 4px;
+      border-radius: var(--radius-sm);
+      transition: background var(--transition-base);
     }
-    .b-chip:hover, .b-chip:focus-visible { background: #263346; border-color: var(--color-accent); outline: none; }
-    .b-chip-aktiv { background: #1e3a5f; border-color: var(--color-accent); }
-    @keyframes b-flash { 0%,100% { background: #1e293b; } 50% { background: var(--color-success-soft); border-color: var(--color-success); } }
-    .b-chip-suksess { animation: b-flash 0.8s ease; }
+    @keyframes b-flash { 0%,100% { background: transparent; } 40% { background: var(--color-success-soft); } }
+    .b-rad-suksess { animation: b-flash 0.9s ease; }
+    .b-rad-aktiv   { background: #1e3a5f; }
 
     .b-dot {
-      width: 7px;
-      height: 7px;
+      width: 8px;
+      height: 8px;
       border-radius: 50%;
       flex-shrink: 0;
     }
@@ -170,8 +162,47 @@
     .b-dot-ok     { background: #f59e0b; }
     .b-dot-gammel { background: #ef4444; }
 
-    .b-chip-label { color: var(--color-muted); }
-    .b-chip-pris  { font-weight: 600; font-variant-numeric: tabular-nums; }
+    .b-rad-label {
+      color: var(--color-muted);
+      font-size: var(--font-sm);
+      width: 70px;
+      flex-shrink: 0;
+    }
+    .b-rad-pris {
+      flex: 1;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      font-size: var(--font-md);
+    }
+    .b-rad-rediger {
+      background: none;
+      border: 1px solid var(--border-color-medium);
+      border-radius: var(--radius-sm);
+      color: var(--color-muted);
+      font-size: 0.95rem;
+      cursor: pointer;
+      min-width: 44px;
+      min-height: 44px;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .b-rad-rediger:hover { border-color: var(--color-accent); color: var(--color-accent); }
+    .b-rad-bekreft {
+      background: var(--color-success-soft);
+      border: 1px solid var(--color-success);
+      border-radius: var(--radius-sm);
+      color: var(--color-success);
+      font-size: 1.1rem;
+      font-weight: 700;
+      cursor: pointer;
+      min-width: 44px;
+      min-height: 44px;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .b-rad-bekreft:hover:not(:disabled) { background: rgba(34,197,94,0.35); }
+    .b-rad-bekreft:disabled { opacity: 0.5; cursor: default; }
+    .b-rad-bekreft-placeholder { min-width: 44px; }
 
     /* ── Inline edit ── */
     .b-edit {
@@ -223,26 +254,6 @@
     .b-edit-lagre:hover  { background: var(--color-success-soft); }
     .b-edit-avbryt:hover { background: rgba(148,163,184,0.1); }
     .b-edit-lagre:disabled { opacity: 0.5; }
-
-    /* ── Bekreft alle ── */
-    .b-bekreft-btn {
-      margin-top: 10px;
-      width: 100%;
-      background: var(--color-success-soft);
-      border: 1px solid var(--color-success);
-      border-radius: var(--radius-md);
-      color: var(--color-success);
-      font-size: var(--font-sm);
-      font-weight: 600;
-      padding: 10px;
-      cursor: pointer;
-      min-height: 44px;
-      touch-action: manipulation;
-      -webkit-tap-highlight-color: transparent;
-      transition: background var(--transition-base);
-    }
-    .b-bekreft-btn:hover:not(:disabled) { background: rgba(34, 197, 94, 0.35); }
-    .b-bekreft-btn:disabled { opacity: 0.6; cursor: default; }
 
     /* ── Tom liste ── */
     #b-tom {
