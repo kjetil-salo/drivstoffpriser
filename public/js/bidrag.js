@@ -175,11 +175,15 @@ function lagKort(s) {
         </div>
       </div>
       <div class="b-priser">${lagChips(s)}</div>
+      ${harPris(s) ? `<button class="b-bekreft-btn" aria-label="Bekreft alle priser">✓ Bekreft alle</button>` : ''}
     `;
 
     li.querySelectorAll('.b-chip').forEach(chip => {
         chip.addEventListener('click', () => åpneEdit(li, s, chip.dataset.type));
     });
+
+    const bekreftBtn = li.querySelector('.b-bekreft-btn');
+    if (bekreftBtn) bekreftBtn.addEventListener('click', () => bekreftAlle(li, s));
 
     return li;
 }
@@ -312,7 +316,57 @@ async function lagrePris() {
     }
 }
 
+// ── Bekreft alle ──────────────────────────────────
+async function bekreftAlle(kortEl, stasjon) {
+    const btn = kortEl.querySelector('.b-bekreft-btn');
+    btn.disabled = true;
+    btn.textContent = '…';
+
+    try {
+        const resp = await fetch('/api/pris', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                stasjon_id:        stasjon.id,
+                bensin:            stasjon.bensin,
+                bensin98:          stasjon.bensin98,
+                diesel:            stasjon.diesel,
+                diesel_avgiftsfri: stasjon.diesel_avgiftsfri,
+            }),
+        });
+        if (resp.status === 401) { window.location.href = '/auth/logg-inn?neste=/bidrag'; return; }
+        if (!resp.ok) throw new Error();
+
+        const naa = new Date().toISOString().replace('T', ' ').slice(0, 19);
+        ['bensin', 'bensin98', 'diesel', 'diesel_avgiftsfri'].forEach(type => {
+            if (stasjon[type] != null) {
+                stasjon[`${type}_tidspunkt`] = naa;
+                const chip = kortEl.querySelector(`.b-chip[data-type="${type}"]`);
+                if (chip) {
+                    chip.querySelector('.b-dot').className = 'b-dot b-dot-fersk';
+                    chip.classList.add('b-chip-suksess');
+                }
+            }
+        });
+
+        dagTeller++;
+        sessionStorage.setItem('bidrag_dag', dagTeller);
+        oppdaterRang();
+
+        btn.textContent = '✓ Bekreftet';
+        setTimeout(visListe, 1500);
+
+    } catch {
+        btn.disabled = false;
+        btn.textContent = '✓ Bekreft alle';
+    }
+}
+
 // ── Hjelpere ──────────────────────────────────────
+function harPris(s) {
+    return s.bensin != null || s.bensin98 != null || s.diesel != null || s.diesel_avgiftsfri != null;
+}
+
 function nyesteTidspunkt(s) {
     return [s.bensin_tidspunkt, s.diesel_tidspunkt, s.bensin98_tidspunkt, s.diesel_avgiftsfri_tidspunkt]
         .filter(Boolean).reduce((a, b) => a > b ? a : b, null);
