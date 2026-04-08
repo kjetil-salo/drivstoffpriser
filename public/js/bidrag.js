@@ -201,7 +201,7 @@ function åpneEdit(kortEl, stasjon, type) {
     const editEl = document.createElement('div');
     editEl.className = 'b-edit';
     editEl.innerHTML = `
-      <span class="b-edit-label">${chip.querySelector('.b-chip-label').textContent}</span>
+      <span class="b-edit-label">${rad.querySelector('.b-rad-label').textContent}</span>
       <input class="b-edit-input" type="text" inputmode="decimal"
              value="${gjeldende != null ? gjeldende.toFixed(2).replace('.', ',') : ''}"
              placeholder="0,00" aria-label="Ny pris">
