@@ -104,11 +104,7 @@ function prioritet(s) {
 }
 
 function sorter(list) {
-    return [...list].sort((a, b) => {
-        const pa = prioritet(a), pb = prioritet(b);
-        if (pa !== pb) return pa - pb;
-        return a.avstand_m - b.avstand_m;
-    });
+    return [...list].sort((a, b) => a.avstand_m - b.avstand_m);
 }
 
 // ── Render ────────────────────────────────────────
@@ -117,22 +113,7 @@ function visListe() {
     const sortert = sorter(stasjoner);
     listeEl.innerHTML = '';
 
-    const grupper = [
-        { pri: [0],   tittel: 'Ingen pris registrert' },
-        { pri: [1],   tittel: 'Ikke oppdatert siste 24 timer' },
-        { pri: [2,3], tittel: 'Nylig oppdatert' },
-    ];
-
-    for (const g of grupper) {
-        const utvalg = sortert.filter(s => g.pri.includes(prioritet(s)));
-        if (!utvalg.length) continue;
-        const tittelEl = document.createElement('li');
-        tittelEl.className = 'b-seksjon';
-        tittelEl.textContent = g.tittel;
-        tittelEl.setAttribute('aria-hidden', 'true');
-        listeEl.appendChild(tittelEl);
-        for (const s of utvalg) listeEl.appendChild(lagKort(s));
-    }
+    for (const s of sortert) listeEl.appendChild(lagKort(s));
 
     if (!sortert.length) {
         const tom = document.createElement('li');
