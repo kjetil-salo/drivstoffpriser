@@ -199,6 +199,38 @@ class TestBidragSide:
         assert b'#bidrag-btn[hidden]' in resp.data
 
 
+class TestBidragJS:
+    """Statisk analyse av bidrag.js for å fange opp foreldede referanser."""
+
+    def _les_js(self, client):
+        return client.get('/js/bidrag.js').data.decode()
+
+    def test_ingen_chip_variabelreferanser(self, client):
+        """'chip.' må ikke forekomme — ble erstattet av 'rad.' under refaktorering."""
+        js = self._les_js(client)
+        assert 'chip.' not in js, "Foreldet 'chip.'-referanse funnet i bidrag.js"
+
+    def test_ingen_b_chip_selektorer(self, client):
+        """CSS-klassen b-chip finnes ikke lenger — alle selektorer skal bruke b-rad."""
+        js = self._les_js(client)
+        assert '.b-chip' not in js, "Foreldet '.b-chip'-selektor funnet i bidrag.js"
+
+    def test_querySelector_selektorer_finnes_i_html(self, client):
+        """Klasser brukt i querySelector skal finnes i bidrag.html."""
+        import re
+        js  = self._les_js(client)
+        html = client.get('/bidrag').data.decode()
+        brukte = set(re.findall(r'querySelector\(["\']\.([b]-[\w-]+)["\']', js))
+        for klasse in brukte:
+            assert klasse in html, f"JS-selektor '.{klasse}' mangler i bidrag.html"
+
+    def test_bekreft_og_rediger_knapper_i_html(self, client):
+        """b-rad-bekreft og b-rad-rediger må finnes i HTML-malen i bidrag.js."""
+        js = self._les_js(client)
+        assert 'b-rad-bekreft' in js, 'b-rad-bekreft mangler i bidrag.js'
+        assert 'b-rad-rediger' in js, 'b-rad-rediger mangler i bidrag.js'
+
+
 # ── /admin/oversikt ────────────────────────────────
 
 class TestOversikt:
