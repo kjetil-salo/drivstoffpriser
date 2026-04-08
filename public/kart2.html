@@ -56,9 +56,9 @@
       </div>
     </div>
     <span id="loc-status" aria-live="polite"></span>
-    <button id="add-station-btn" hidden aria-label="Legg til stasjon">+</button>
     <button id="innstillinger-btn" aria-label="Innstillinger" aria-expanded="false"><span aria-hidden="true">⚙️</span></button>
     <a id="info-btn" href="/om" aria-label="Om appen"><span aria-hidden="true">ℹ️</span></a>
+    <a id="moderator-btn" href="/admin" aria-label="Moderatorpanel" hidden><span aria-hidden="true">🛡️</span></a>
     <a id="auth-lenke" href="/auth/logg-inn" hidden></a>
   </header>
 
@@ -86,6 +86,7 @@
   <!-- Kartvisning -->
   <main id="view-kart" class="view" role="tabpanel" aria-labelledby="tab-kart">
     <div id="map"></div>
+    <button id="add-station-btn" hidden aria-label="Legg til stasjon">+</button>
   </main>
 
   <!-- Listevisning -->

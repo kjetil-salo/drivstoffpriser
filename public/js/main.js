@@ -132,8 +132,13 @@ fetch('/api/logview', { method: 'POST' }).catch(() => {});
 const meg = await fetch('/api/meg').then(r => r.json()).catch(() => ({}));
 window.__innlogget = meg.innlogget || false;
 window.__erAdmin = meg.er_admin || false;
+window.__roller = meg.roller || [];
 
 const authLenke = document.getElementById('auth-lenke');
+const moderatorBtn = document.getElementById('moderator-btn');
+if (moderatorBtn && (window.__erAdmin || window.__roller.includes('moderator'))) {
+    moderatorBtn.removeAttribute('hidden');
+}
 if (window.__innlogget) {
     authLenke.textContent = meg.kallenavn || meg.brukernavn;
     authLenke.href = '/auth/min-konto';

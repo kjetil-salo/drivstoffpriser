@@ -1489,7 +1489,7 @@ html, body {
   font-weight: 400;
 }
 
-#info-btn {
+#info-btn, #moderator-btn {
   font-size: 1.1rem;
   text-decoration: none;
   display: flex;
