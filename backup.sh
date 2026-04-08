@@ -26,4 +26,16 @@ fi
 ls -t "$DAGLIG_DIR"/drivstoff-*.db 2>/dev/null | tail -n +8 | xargs -r rm
 ls -t "$UKENTLIG_DIR"/drivstoff-*.db 2>/dev/null | tail -n +5 | xargs -r rm
 
+# Last opp til Cloudflare R2
+rclone copy "$DAGLIG_FIL" r2:drivstoffpriser-backup/daglig/ \
+    --s3-no-check-bucket \
+    --log-level ERROR \
+    2>> /tmp/drivstoff-backup.log
+
+# Rydd opp i R2: slett filer eldre enn 30 dager
+rclone delete r2:drivstoffpriser-backup/daglig/ \
+    --min-age 30d \
+    --s3-no-check-bucket \
+    2>> /tmp/drivstoff-backup.log
+
 echo "$(date): Backup OK ($DAGLIG_FIL)"
