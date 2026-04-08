@@ -57,6 +57,29 @@ function visToppliste(data) {
         rader.push(`<div class="stat-toppliste-rad stat-toppliste-meg stat-toppliste-utenfor"><span class="stat-toppliste-nr">${minPlass.plass}.</span><span class="stat-toppliste-navn">Deg</span><span class="stat-toppliste-antall">${minPlass.antall}</span></div>`);
     }
     el.innerHTML = rader.join('');
+    injiserBidragPromo();
+}
+
+function injiserBidragPromo() {
+    if (document.getElementById('bidrag-promo')) return;
+    const promo = document.createElement('div');
+    promo.id = 'bidrag-promo';
+    promo.innerHTML = `
+      <a href="/bidrag" class="bidrag-promo-lenke">Oppdater priser effektivt →</a>
+      <label class="bidrag-promo-snarvei">
+        <input type="checkbox" id="bidrag-snarvei-cb">
+        <span>Vis snarvei øverst</span>
+      </label>
+    `;
+    document.getElementById('stat-toppliste').after(promo);
+
+    const cb = promo.querySelector('#bidrag-snarvei-cb');
+    cb.checked = localStorage.getItem('bidrag_snarvei') === '1';
+    cb.addEventListener('change', () => {
+        localStorage.setItem('bidrag_snarvei', cb.checked ? '1' : '0');
+        const btn = document.getElementById('bidrag-btn');
+        if (btn) btn.hidden = !cb.checked;
+    });
 }
 
 export async function lastStatistikk() {

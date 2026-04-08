@@ -135,6 +135,12 @@ window.__erAdmin = meg.er_admin || false;
 window.__roller = meg.roller || [];
 
 const authLenke = document.getElementById('auth-lenke');
+
+const bidragBtn = document.getElementById('bidrag-btn');
+if (bidragBtn && window.__innlogget && localStorage.getItem('bidrag_snarvei') === '1') {
+    bidragBtn.removeAttribute('hidden');
+}
+
 const moderatorBtn = document.getElementById('moderator-btn');
 if (moderatorBtn && (window.__erAdmin || window.__roller.includes('moderator'))) {
     moderatorBtn.removeAttribute('hidden');

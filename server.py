@@ -150,6 +150,11 @@ def kart2():
     return app.send_static_file('kart2.html')
 
 
+@app.route('/bidrag')
+def bidrag():
+    return app.send_static_file('bidrag.html')
+
+
 @app.route('/blogg')
 def blogg_redirect():
     return redirect('/blogg/', code=301)

@@ -1489,7 +1489,7 @@ html, body {
   font-weight: 400;
 }
 
-#info-btn, #moderator-btn {
+#info-btn, #moderator-btn, #bidrag-btn {
   font-size: 1.1rem;
   text-decoration: none;
   display: flex;
@@ -1823,6 +1823,33 @@ html, body {
   border-bottom: none;
   margin-top: 4px;
 }
+
+/* ── Bidrag-promo (under toppliste) ─────────────── */
+#bidrag-promo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  flex-wrap: wrap;
+}
+.bidrag-promo-lenke {
+  font-size: var(--font-sm);
+  color: var(--color-accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+.bidrag-promo-lenke:hover { text-decoration: underline; }
+.bidrag-promo-snarvei {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-xs);
+  color: var(--color-muted);
+  cursor: pointer;
+  user-select: none;
+}
+.bidrag-promo-snarvei input { cursor: pointer; }
 
 /* ── Del-modal (desktop) ─────────────────────────── */
 #del-modal-backdrop {

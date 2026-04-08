@@ -1,0 +1,333 @@
+import { getKjedeFarge, getKjedeInitials, getKjedeLogo } from './kjede.js';
+
+// ── State ─────────────────────────────────────────
+let posisjon = null;
+let stasjoner = [];
+let redigerer = null;  // { kortEl, stasjon, type, editEl }
+let refreshTimer = null;
+let dagTeller = parseInt(sessionStorage.getItem('bidrag_dag') || '0');
+
+const radiusEl = document.getElementById('b-radius');
+const gpsEl   = document.getElementById('b-gps');
+const listeEl = document.getElementById('b-liste');
+const rangEl  = document.getElementById('b-rang');
+
+// ── Auth ──────────────────────────────────────────
+const meg = await fetch('/api/meg').then(r => r.json()).catch(() => ({}));
+if (!meg.innlogget) {
+    window.location.href = '/auth/logg-inn?neste=/bidrag';
+}
+
+// ── Radius ────────────────────────────────────────
+radiusEl.value = localStorage.getItem('bidrag_radius') || '5';
+radiusEl.addEventListener('change', () => {
+    localStorage.setItem('bidrag_radius', radiusEl.value);
+    if (posisjon) hentOgVis();
+});
+
+// ── Rang ──────────────────────────────────────────
+async function oppdaterRang() {
+    try {
+        const data = await fetch('/api/toppliste').then(r => r.json());
+        const liste = Array.isArray(data) ? data : (data.liste || []);
+        const minPlass = Array.isArray(data) ? null : data.min_plass;
+        const megIdx = liste.findIndex(r => r.er_meg);
+        let plass = null, antall = 0;
+        if (megIdx >= 0) { plass = megIdx + 1; antall = liste[megIdx].antall; }
+        else if (minPlass) { plass = minPlass.plass; antall = minPlass.antall; }
+
+        if (plass) {
+            rangEl.innerHTML = `🏆 <strong>#${plass}</strong> &nbsp;·&nbsp; ${antall} denne uken`;
+        } else {
+            rangEl.textContent = '🏆 Kom deg på lista!';
+        }
+    } catch { rangEl.textContent = ''; }
+}
+oppdaterRang();
+
+// ── GPS ───────────────────────────────────────────
+function startGPS() {
+    if (!navigator.geolocation) {
+        gpsEl.textContent = 'GPS ikke tilgjengelig i denne nettleseren';
+        return;
+    }
+    navigator.geolocation.watchPosition(
+        pos => {
+            const ny = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+            if (!posisjon || haversine(posisjon, ny) > 100) {
+                posisjon = ny;
+                hentOgVis();
+            }
+        },
+        () => { gpsEl.textContent = 'Kunne ikke hente posisjon — sjekk at GPS er på'; },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }
+    );
+}
+
+function haversine(a, b) {
+    const R = 6371000;
+    const dLat = (b.lat - a.lat) * Math.PI / 180;
+    const dLon = (b.lon - a.lon) * Math.PI / 180;
+    const x = Math.sin(dLat/2)**2 + Math.cos(a.lat*Math.PI/180) * Math.cos(b.lat*Math.PI/180) * Math.sin(dLon/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1-x));
+}
+
+startGPS();
+
+// ── Hent og vis ───────────────────────────────────
+async function hentOgVis() {
+    clearTimeout(refreshTimer);
+    const r = parseInt(radiusEl.value);
+    try {
+        const resp = await fetch(`/api/stasjoner?lat=${posisjon.lat}&lon=${posisjon.lon}&radius=${r}`);
+        if (!resp.ok) return;
+        const data = await resp.json();
+        stasjoner = data.stasjoner || [];
+        visListe();
+        gpsEl.hidden = true;
+    } catch {
+        gpsEl.textContent = 'Feil ved henting av stasjoner';
+        gpsEl.hidden = false;
+    }
+    refreshTimer = setTimeout(hentOgVis, 30000);
+}
+
+// ── Sortering ─────────────────────────────────────
+// 0 = uten pris (høyeste prioritet), 1 = gammel (>24h), 2 = ok (<24h), 3 = fersk (<6h)
+function prioritet(s) {
+    const ts = nyesteTidspunkt(s);
+    if (!ts) return 0;
+    const alder = (Date.now() - new Date(ts + 'Z')) / 3600000;
+    if (alder > 24) return 1;
+    if (alder > 6)  return 2;
+    return 3;
+}
+
+function sorter(list) {
+    return [...list].sort((a, b) => {
+        const pa = prioritet(a), pb = prioritet(b);
+        if (pa !== pb) return pa - pb;
+        return a.avstand_m - b.avstand_m;
+    });
+}
+
+// ── Render ────────────────────────────────────────
+function visListe() {
+    if (redigerer) lukkEdit(false);
+    const sortert = sorter(stasjoner);
+    listeEl.innerHTML = '';
+
+    const grupper = [
+        { pri: [0],   tittel: 'Ingen pris registrert' },
+        { pri: [1],   tittel: 'Ikke oppdatert siste 24 timer' },
+        { pri: [2,3], tittel: 'Nylig oppdatert' },
+    ];
+
+    for (const g of grupper) {
+        const utvalg = sortert.filter(s => g.pri.includes(prioritet(s)));
+        if (!utvalg.length) continue;
+        const tittelEl = document.createElement('li');
+        tittelEl.className = 'b-seksjon';
+        tittelEl.textContent = g.tittel;
+        tittelEl.setAttribute('aria-hidden', 'true');
+        listeEl.appendChild(tittelEl);
+        for (const s of utvalg) listeEl.appendChild(lagKort(s));
+    }
+
+    if (!sortert.length) {
+        const tom = document.createElement('li');
+        tom.id = 'b-tom';
+        tom.textContent = 'Ingen stasjoner funnet i valgt radius';
+        listeEl.appendChild(tom);
+    }
+}
+
+function lagKort(s) {
+    const li = document.createElement('li');
+    li.className = 'b-kort';
+    li.dataset.id = s.id;
+
+    const kjedeEllerNavn = s.kjede || s.navn;
+    const farge    = getKjedeFarge(kjedeEllerNavn);
+    const initials = getKjedeInitials(s.kjede || s.navn);
+    const logoUrl  = getKjedeLogo(kjedeEllerNavn);
+
+    const avstandTekst = s.avstand_m < 1000
+        ? `${Math.round(s.avstand_m)} m`
+        : `${(s.avstand_m / 1000).toFixed(1)} km`;
+
+    const ts = nyesteTidspunkt(s);
+    const alderTekst = ts ? formaterAlder(ts) : null;
+    const gammel = !ts || (Date.now() - new Date(ts + 'Z')) > 24 * 3600000;
+
+    li.innerHTML = `
+      <div class="b-kort-topp">
+        <div class="b-badge" style="background:${farge}">
+          ${logoUrl
+            ? `<img src="${logoUrl}" alt="">`
+            : `<span>${esc(initials)}</span>`}
+        </div>
+        <div class="b-info">
+          <div class="b-navn">${esc(s.navn)}</div>
+          <div class="b-meta">${avstandTekst}${alderTekst
+            ? ` · <span class="${gammel ? 'b-gammel' : ''}">${alderTekst}</span>`
+            : ' · <em>Ingen priser</em>'}</div>
+        </div>
+      </div>
+      <div class="b-priser">${lagChips(s)}</div>
+    `;
+
+    li.querySelectorAll('.b-chip').forEach(chip => {
+        chip.addEventListener('click', () => åpneEdit(li, s, chip.dataset.type));
+    });
+
+    return li;
+}
+
+function lagChips(s) {
+    return [
+        { type: 'bensin',            label: '95 oktan', v: s.bensin,            ts: s.bensin_tidspunkt },
+        { type: 'bensin98',          label: '98 oktan', v: s.bensin98,          ts: s.bensin98_tidspunkt },
+        { type: 'diesel',            label: 'Diesel',   v: s.diesel,            ts: s.diesel_tidspunkt },
+        { type: 'diesel_avgiftsfri', label: 'Avg.fri',  v: s.diesel_avgiftsfri, ts: s.diesel_avgiftsfri_tidspunkt },
+    ].map(({ type, label, v, ts }) => {
+        const alder = ts ? (Date.now() - new Date(ts + 'Z')) / 3600000 : Infinity;
+        const dot = alder < 6 ? 'b-dot-fersk' : alder < 24 ? 'b-dot-ok' : 'b-dot-gammel';
+        const pris = v != null ? v.toFixed(2) : '–';
+        return `<button class="b-chip" data-type="${type}">
+          <span class="b-dot ${dot}"></span>
+          <span class="b-chip-label">${label}</span>
+          <span class="b-chip-pris">${pris}</span>
+        </button>`;
+    }).join('');
+}
+
+// ── Inline edit ───────────────────────────────────
+function åpneEdit(kortEl, stasjon, type) {
+    if (redigerer) lukkEdit(false);
+
+    const chip = kortEl.querySelector(`.b-chip[data-type="${type}"]`);
+    const gjeldende = stasjon[type];
+
+    const editEl = document.createElement('div');
+    editEl.className = 'b-edit';
+    editEl.innerHTML = `
+      <span class="b-edit-label">${chip.querySelector('.b-chip-label').textContent}</span>
+      <input class="b-edit-input" type="text" inputmode="decimal"
+             value="${gjeldende != null ? gjeldende.toFixed(2).replace('.', ',') : ''}"
+             placeholder="0,00" aria-label="Ny pris">
+      <button class="b-edit-lagre" aria-label="Lagre">✓</button>
+      <button class="b-edit-avbryt" aria-label="Avbryt">✕</button>
+    `;
+
+    const input    = editEl.querySelector('.b-edit-input');
+    const lagreBtn = editEl.querySelector('.b-edit-lagre');
+    const avbrytBtn = editEl.querySelector('.b-edit-avbryt');
+
+    chip.after(editEl);
+    chip.classList.add('b-chip-aktiv');
+    redigerer = { kortEl, stasjon, type, editEl };
+
+    setTimeout(() => { input.focus(); input.select(); }, 50);
+
+    input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); lagrePris(); }
+        if (e.key === 'Escape') lukkEdit(false);
+    });
+    lagreBtn.addEventListener('click', lagrePris);
+    avbrytBtn.addEventListener('click', () => lukkEdit(false));
+}
+
+function lukkEdit(suksess = false) {
+    if (!redigerer) return;
+    const { kortEl, type, editEl } = redigerer;
+    editEl.remove();
+    const chip = kortEl.querySelector(`.b-chip[data-type="${type}"]`);
+    if (chip) {
+        chip.classList.remove('b-chip-aktiv');
+        if (suksess) chip.classList.add('b-chip-suksess');
+    }
+    redigerer = null;
+}
+
+async function lagrePris() {
+    if (!redigerer) return;
+    const { kortEl, stasjon, type, editEl } = redigerer;
+    const input    = editEl.querySelector('.b-edit-input');
+    const lagreBtn = editEl.querySelector('.b-edit-lagre');
+
+    const verdi = input.value.trim().replace(',', '.');
+    const pris  = parseFloat(verdi);
+    if (isNaN(pris) || pris < 5 || pris > 50) {
+        input.classList.add('b-input-feil');
+        setTimeout(() => input.classList.remove('b-input-feil'), 600);
+        input.focus();
+        return;
+    }
+
+    lagreBtn.disabled = true;
+    lagreBtn.textContent = '…';
+
+    try {
+        const resp = await fetch('/api/pris', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                stasjon_id:        stasjon.id,
+                bensin:            type === 'bensin'            ? pris : stasjon.bensin,
+                bensin98:          type === 'bensin98'          ? pris : stasjon.bensin98,
+                diesel:            type === 'diesel'            ? pris : stasjon.diesel,
+                diesel_avgiftsfri: type === 'diesel_avgiftsfri' ? pris : stasjon.diesel_avgiftsfri,
+            }),
+        });
+        if (resp.status === 401) { window.location.href = '/auth/logg-inn?neste=/bidrag'; return; }
+        if (!resp.ok) throw new Error();
+
+        // Oppdater lokal kopi
+        const naa = new Date().toISOString().replace('T', ' ').slice(0, 19);
+        stasjon[type] = pris;
+        stasjon[`${type}_tidspunkt`] = naa;
+
+        // Oppdater chip-tekst og avslutt edit med suksess-animasjon
+        const chip = kortEl.querySelector(`.b-chip[data-type="${type}"]`);
+        if (chip) {
+            chip.querySelector('.b-chip-pris').textContent = pris.toFixed(2);
+            chip.querySelector('.b-dot').className = 'b-dot b-dot-fersk';
+        }
+        lukkEdit(true);
+
+        dagTeller++;
+        sessionStorage.setItem('bidrag_dag', dagTeller);
+
+        // Re-sorter etter 1.5s (etter at suksess-animasjonen er ferdig)
+        setTimeout(visListe, 1500);
+        // Oppdater rang i bakgrunnen
+        oppdaterRang();
+
+    } catch {
+        lagreBtn.disabled = false;
+        lagreBtn.textContent = '✓';
+        input.classList.add('b-input-feil');
+        setTimeout(() => input.classList.remove('b-input-feil'), 600);
+    }
+}
+
+// ── Hjelpere ──────────────────────────────────────
+function nyesteTidspunkt(s) {
+    return [s.bensin_tidspunkt, s.diesel_tidspunkt, s.bensin98_tidspunkt, s.diesel_avgiftsfri_tidspunkt]
+        .filter(Boolean).reduce((a, b) => a > b ? a : b, null);
+}
+
+function formaterAlder(ts) {
+    const diff = Date.now() - new Date(ts + 'Z');
+    const dager = Math.floor(diff / 86400000);
+    const timer = Math.floor(diff / 3600000);
+    const min   = Math.floor(diff / 60000);
+    if (dager > 0) return `${dager} d siden`;
+    if (timer > 0) return `${timer} t siden`;
+    return `${min} min siden`;
+}
+
+function esc(str) {
+    return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
