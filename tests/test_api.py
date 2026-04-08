@@ -176,6 +176,29 @@ class TestStedssok:
         assert resp.get_json() == []
 
 
+# ── /bidrag ────────────────────────────────────────
+
+class TestBidragSide:
+    def test_siden_finnes(self, client):
+        resp = client.get('/bidrag')
+        assert resp.status_code == 200
+        assert b'bidrag' in resp.data.lower()
+
+    def test_bidrag_btn_er_skjult_i_html(self, client):
+        """bidrag-btn må ha hidden-attributt i HTML-kilden — JS viser den kun ved opt-in."""
+        resp = client.get('/')
+        html = resp.data.decode()
+        import re
+        match = re.search(r'id="bidrag-btn"[^>]*>', html)
+        assert match, 'bidrag-btn ikke funnet i index.html'
+        assert 'hidden' in match.group(), 'bidrag-btn mangler hidden-attributt i HTML'
+
+    def test_bidrag_btn_hidden_css_override(self, client):
+        """CSS må overstyre display:flex med display:none når hidden er satt."""
+        resp = client.get('/css/app.css')
+        assert b'#bidrag-btn[hidden]' in resp.data
+
+
 # ── /admin/oversikt ────────────────────────────────
 
 class TestOversikt:

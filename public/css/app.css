@@ -1524,6 +1524,8 @@ html, body {
 }
 #add-station-btn:hover { background: rgba(30, 41, 59, 0.95); }
 #add-station-btn[hidden] { display: none; }
+#bidrag-btn[hidden]      { display: none; }
+#moderator-btn[hidden]   { display: none; }
 
 #add-station-backdrop {
   position: fixed;
