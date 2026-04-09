@@ -83,6 +83,12 @@ export function initSheet(onOppdatert) {
     bensin98Input.addEventListener('input', autoKomma);
     dieselInput.addEventListener('input', autoKomma);
     dieselAvgiftsfriInput.addEventListener('input', autoKomma);
+
+    const selectAll = (e) => e.target.select();
+    bensinInput.addEventListener('focus', selectAll);
+    bensin98Input.addEventListener('focus', selectAll);
+    dieselInput.addEventListener('focus', selectAll);
+    dieselAvgiftsfriInput.addEventListener('focus', selectAll);
 }
 
 export function visStasjonSheet(stasjon) {
