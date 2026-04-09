@@ -25,7 +25,7 @@ class TestAdminDashboard:
         resp = admin_client.get('/admin')
         html = resp.data.decode()
         assert 'Brukere' in html
-        assert 'Steder' in html
+        assert 'Nye stasjoner' in html
         assert 'Statistikk' in html
         assert 'Prislogg' in html
         assert 'Kart' in html

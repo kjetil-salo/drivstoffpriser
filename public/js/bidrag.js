@@ -29,15 +29,11 @@ radiusEl.addEventListener('change', () => {
 async function oppdaterRang() {
     try {
         const data = await fetch('/api/toppliste').then(r => r.json());
-        const liste = Array.isArray(data) ? data : (data.liste || []);
-        const minPlass = Array.isArray(data) ? null : data.min_plass;
-        const megIdx = liste.findIndex(r => r.er_meg);
-        let plass = null, antall = 0;
-        if (megIdx >= 0) { plass = megIdx + 1; antall = liste[megIdx].antall; }
-        else if (minPlass) { plass = minPlass.plass; antall = minPlass.antall; }
-
-        if (plass) {
-            rangEl.innerHTML = `🏆 <strong>#${plass}</strong> &nbsp;·&nbsp; ${antall} denne uken`;
+        const listeUke = Array.isArray(data) ? [] : (data.liste_uke || []);
+        const megIdx = listeUke.findIndex(r => r.er_meg);
+        if (megIdx >= 0) {
+            const { antall } = listeUke[megIdx];
+            rangEl.innerHTML = `🏆 <strong>#${megIdx + 1}</strong> &nbsp;·&nbsp; ${antall} denne uken`;
         } else {
             rangEl.textContent = '🏆 Kom deg på lista!';
         }
@@ -83,7 +79,7 @@ async function hentOgVis() {
         if (!resp.ok) return;
         const data = await resp.json();
         stasjoner = data.stasjoner || [];
-        visListe();
+        if (!redigerer) visListe();
         gpsEl.hidden = true;
     } catch {
         gpsEl.textContent = 'Feil ved henting av stasjoner';
@@ -198,12 +194,13 @@ function åpneEdit(kortEl, stasjon, type) {
     const rad = kortEl.querySelector(`.b-rad[data-type="${type}"]`);
     const gjeldende = stasjon[type];
 
+    const initVerdi = gjeldende != null ? formaterØre(String(Math.round(gjeldende * 100))) : '';
     const editEl = document.createElement('div');
     editEl.className = 'b-edit';
     editEl.innerHTML = `
       <span class="b-edit-label">${rad.querySelector('.b-rad-label').textContent}</span>
-      <input class="b-edit-input" type="text" inputmode="decimal"
-             value="${gjeldende != null ? gjeldende.toFixed(2).replace('.', ',') : ''}"
+      <input class="b-edit-input" type="text" inputmode="numeric"
+             value="${initVerdi}"
              placeholder="0,00" aria-label="Ny pris">
       <button class="b-edit-lagre" aria-label="Lagre">✓</button>
       <button class="b-edit-avbryt" aria-label="Avbryt">✕</button>
@@ -217,7 +214,19 @@ function åpneEdit(kortEl, stasjon, type) {
     rad.classList.add('b-rad-aktiv');
     redigerer = { kortEl, stasjon, type, editEl };
 
-    setTimeout(() => { input.focus(); input.select(); }, 50);
+    // Disable alle bekreft-knapper mens edit er åpen
+    document.querySelectorAll('.b-rad-bekreft').forEach(b => { b.disabled = true; b.style.opacity = '0.3'; });
+
+    // focus() må kalles synkront i user-gesture-handlern for at iOS-tastaturet skal åpne seg
+    input.focus();
+    setTimeout(() => input.select(), 50);
+
+    // Auto-komma: kun siffer tillatt, formateres fortløpende som KR,ØR
+    input.addEventListener('input', () => {
+        const digits = input.value.replace(/\D/g, '').replace(/^0+/, '');
+        input.value = formaterØre(digits);
+        input.setSelectionRange(input.value.length, input.value.length);
+    });
 
     input.addEventListener('keydown', e => {
         if (e.key === 'Enter') { e.preventDefault(); lagrePris(); }
@@ -237,6 +246,9 @@ function lukkEdit(suksess = false) {
         if (suksess) rad.classList.add('b-rad-suksess');
     }
     redigerer = null;
+
+    // Re-enable alle bekreft-knapper
+    document.querySelectorAll('.b-rad-bekreft').forEach(b => { b.disabled = false; b.style.opacity = ''; });
 }
 
 async function lagrePris() {
@@ -288,8 +300,8 @@ async function lagrePris() {
         dagTeller++;
         sessionStorage.setItem('bidrag_dag', dagTeller);
 
-        // Re-sorter etter 1.5s (etter at suksess-animasjonen er ferdig)
-        setTimeout(visListe, 1500);
+        // Hent fersk data og re-render etter at suksess-animasjonen er ferdig
+        setTimeout(hentOgVis, 1500);
         // Oppdater rang i bakgrunnen
         oppdaterRang();
 
@@ -335,7 +347,7 @@ async function bekreftType(kortEl, stasjon, type) {
         oppdaterRang();
 
         btn.textContent = '✓';
-        setTimeout(visListe, 1500);
+        setTimeout(hentOgVis, 1500);
     } catch {
         btn.disabled = false;
         btn.textContent = '✓';
@@ -364,4 +376,12 @@ function formaterAlder(ts) {
 
 function esc(str) {
     return (str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+// Formater sifferstreng som pris: "2199" → "21,99", "219" → "2,19", "21" → "0,21"
+function formaterØre(digits) {
+    if (!digits) return '';
+    if (digits.length === 1) return `0,0${digits}`;
+    if (digits.length === 2) return `0,${digits}`;
+    return `${digits.slice(0, -2)},${digits.slice(-2)}`;
 }

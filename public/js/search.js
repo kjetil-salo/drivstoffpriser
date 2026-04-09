@@ -2,30 +2,16 @@ let debounceTimer = null;
 let onStedsvalg = null;
 let aktivResultatIdx = -1;
 
-const toggleBtn = document.getElementById('search-toggle');
-const searchBox = document.getElementById('search-box');
 const searchInput = document.getElementById('search-input');
 const searchResults = document.getElementById('search-results');
 
 export function initSearch(onValg) {
     onStedsvalg = onValg;
 
-    toggleBtn.addEventListener('click', () => {
-        const lukket = searchBox.hasAttribute('hidden');
-        if (lukket) {
-            searchBox.removeAttribute('hidden');
-            toggleBtn.classList.add('aktiv');
-            toggleBtn.setAttribute('aria-expanded', 'true');
-            searchInput.focus();
-        } else {
-            lukkSearch();
-        }
-    });
-
     searchInput.addEventListener('input', () => {
         clearTimeout(debounceTimer);
         const q = searchInput.value.trim();
-        if (q.length < 2) { searchResults.innerHTML = ''; return; }
+        if (q.length < 2) { lukkSearch(false); return; }
         debounceTimer = setTimeout(() => sokSted(q), 350);
     });
 
@@ -48,7 +34,7 @@ export function initSearch(onValg) {
     });
 
     document.addEventListener('click', e => {
-        if (!searchBox.contains(e.target) && !toggleBtn.contains(e.target)) {
+        if (!searchResults.contains(e.target) && e.target !== searchInput) {
             lukkSearch();
         }
     });
@@ -60,7 +46,7 @@ async function sokSted(q) {
         const resultater = await resp.json();
         visResultater(resultater);
     } catch {
-        searchResults.innerHTML = '';
+        lukkSearch(false);
     }
 }
 
@@ -68,11 +54,13 @@ function visResultater(resultater) {
     aktivResultatIdx = -1;
     if (!resultater.length) {
         searchResults.innerHTML = '<div class="search-tom">Ingen treff</div>';
+        searchResults.removeAttribute('hidden');
         return;
     }
     searchResults.innerHTML = resultater.map((r, i) =>
         `<div class="search-rad" role="option" id="search-opt-${i}" data-i="${i}">${r.navn}</div>`
     ).join('');
+    searchResults.removeAttribute('hidden');
 
     searchResults.querySelectorAll('.search-rad').forEach((el, i) => {
         el.addEventListener('click', () => {
@@ -94,10 +82,9 @@ function markerResultat(rader) {
     }
 }
 
-function lukkSearch() {
-    searchBox.setAttribute('hidden', '');
-    toggleBtn.classList.remove('aktiv');
-    toggleBtn.setAttribute('aria-expanded', 'false');
-    searchInput.value = '';
+function lukkSearch(tømInput = true) {
+    searchResults.setAttribute('hidden', '');
     searchResults.innerHTML = '';
+    aktivResultatIdx = -1;
+    if (tømInput) searchInput.value = '';
 }

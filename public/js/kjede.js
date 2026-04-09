@@ -1,7 +1,8 @@
-export const KJEDE_NAVN = ['Circle K', 'Uno-X', 'YX', 'Esso', 'Shell', 'Preem', 'St1', 'Best', 'Oljeleverandøren', 'Tanken', 'Driv', 'Haltbakk Express', 'Bunker Oil', 'Knapphus', 'Trønder Oil'];
+export const KJEDE_NAVN = ['Best', 'Bunker Oil', 'Circle K', 'Din-X', 'Driv', 'Esso', 'Haltbakk Express', 'Haslestad Energi', 'Knapphus', 'MH24', 'Oljeleverandøren', 'Preem', 'Shell', 'St1', 'Tanken', 'Trønder Oil', 'Uno-X', 'YX'];
 
 const KJEDE_DOMENER = [
     { match: ['circle k', 'circlek'],          logo: 'circlek',              farge: '#f97316' },
+    { match: ['din-x', 'dinx', 'din x'],       logo: 'din-x',                farge: '#d45d00' },
     { match: ['uno-x', 'unox', 'uno x'],       logo: 'uno-x',                farge: '#16a34a' },
     { match: ['yx'],                            logo: 'yx',                   farge: '#dc2626' },
     { match: ['esso'],                          logo: 'esso',                 farge: '#2563eb' },
@@ -16,6 +17,8 @@ const KJEDE_DOMENER = [
     { match: ['bunker oil', 'bunkeroil'],       logo: 'bunker-oil.svg',       farge: '#1e40af' },
     { match: ['knapphus'],                      logo: 'knapphus',             farge: '#f59e0b' },
     { match: ['trønder oil', 'tronder oil'],    logo: 'tronder-oil',          farge: '#1d4ed8' },
+    { match: ['haslestad energi', 'haslestad'], logo: 'haslestadenergi',       farge: '#e47b02' },
+    { match: ['mh24', 'mh service', 'mhservice'], logo: 'mh24',              farge: '#1a5276' },
 ];
 
 function _finn(kjede) {

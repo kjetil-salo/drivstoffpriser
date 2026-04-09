@@ -17,9 +17,11 @@ from db import (get_stasjoner_med_priser, lagre_pris, logg_visning,
                 antall_stasjoner_med_pris, finn_bruker_id, DB_PATH,
                 opprett_stasjon, hent_billigste_priser_24t,
                 antall_prisoppdateringer_24t, meld_stasjon_nedlagt,
-                get_conn, hent_innstilling, hent_toppliste,
+                get_conn, hent_innstilling, hent_toppliste, hent_toppliste_uke,
                 hent_min_plassering, logg_blogg_visning,
-                legg_til_endringsforslag)
+                legg_til_endringsforslag, unike_enheter_per_dag,
+                prisoppdateringer_per_time_24t,
+                prisoppdateringer_rullende_24t_uke)
 
 logger = logging.getLogger('drivstoff')
 
@@ -262,6 +264,23 @@ def statistikk():
     })
 
 
+@api_bp.route('/api/prisregistreringer-per-time')
+def prisregistreringer_per_time():
+    data = prisoppdateringer_per_time_24t()
+    return jsonify([{'time': ts, 'antall': cnt} for ts, cnt in data])
+
+
+@api_bp.route('/api/prisregistreringer-uke')
+def prisregistreringer_uke():
+    data = prisoppdateringer_rullende_24t_uke()
+    return jsonify([{'time': ts, 'antall': cnt} for ts, cnt in data])
+
+
+@api_bp.route('/api/enheter-per-dag')
+def enheter_per_dag():
+    return jsonify(unike_enheter_per_dag(30))
+
+
 @api_bp.route('/api/pris', methods=['POST'])
 @krever_innlogging
 def oppdater_pris():
@@ -399,6 +418,7 @@ def nyhet():
 @api_bp.route('/api/toppliste')
 def toppliste():
     bruker_id = session.get('bruker_id')
+
     liste = hent_toppliste(limit=20)
     bruker_i_liste = False
     resultat = []
@@ -414,7 +434,18 @@ def toppliste():
     min_plass = None
     if bruker_id and not bruker_i_liste:
         min_plass = hent_min_plassering(bruker_id)
-    return jsonify({'liste': resultat, 'min_plass': min_plass})
+
+    liste_uke = hent_toppliste_uke(limit=20)
+    resultat_uke = []
+    for rad in liste_uke:
+        er_meg = bruker_id is not None and rad['id'] == bruker_id
+        resultat_uke.append({
+            'kallenavn': rad['kallenavn'] or None,
+            'antall': rad['antall'],
+            'er_meg': er_meg
+        })
+
+    return jsonify({'liste': resultat, 'liste_uke': resultat_uke, 'min_plass': min_plass})
 
 
 @api_bp.route('/om')

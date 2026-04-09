@@ -6,11 +6,6 @@ import tempfile
 import pytest
 
 # Sett DB_PATH til temp-fil FØR import av app/db
-@pytest.fixture(autouse=True)
-def nullstill_rate_limit():
-    import routes_api
-    routes_api._pris_rate_limit.clear()
-    yield
 
 
 @pytest.fixture(autouse=True)

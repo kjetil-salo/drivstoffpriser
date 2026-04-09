@@ -18,6 +18,7 @@ from db import (finn_bruker_id, hent_alle_brukere, slett_bruker, har_rolle, sett
                 hent_brukerstasjoner, slett_stasjon,
                 hent_innstilling, sett_innstilling,
                 nye_brukere_per_time_48t, prisoppdateringer_per_time_48t,
+                prisoppdateringer_rullende_24t_uke,
                 hent_rapporter, antall_ubehandlede_rapporter,
                 deaktiver_stasjon, reaktiver_stasjon,
                 slett_rapporter_for_stasjon, hent_deaktiverte_stasjoner,
@@ -26,7 +27,8 @@ from db import (finn_bruker_id, hent_alle_brukere, slett_bruker, har_rolle, sett
                 sett_kjede_for_stasjon, finn_naer_stasjon, opprett_stasjon,
                 hent_blogg_stats, finn_stasjoner_by_navn, endre_navn_stasjon,
                 hent_endringsforslag, slett_endringsforslag, antall_ubehandlede_endringsforslag,
-                hent_ventende_stasjoner, antall_ventende_stasjoner, godkjenn_stasjon)
+                hent_ventende_stasjoner, antall_ventende_stasjoner, godkjenn_stasjon,
+                unike_enheter_per_dag)
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -87,19 +89,67 @@ def krever_moderator(f):
 
 @admin_bp.route('/admin')
 @krever_innlogging
-@krever_admin
+@krever_moderator
 def admin():
-    brukere_antall = antall_brukere()
-    stasjoner_antall = antall_stasjoner_med_pris()
+    bruker = finn_bruker_id(session.get('bruker_id', 0))
+    er_admin = har_rolle(bruker, 'admin')
     rapporter_antall = antall_ubehandlede_rapporter()
     endringsforslag_antall = antall_ubehandlede_endringsforslag()
     deaktiverte_antall = len(hent_deaktiverte_stasjoner())
     ventende_antall = antall_ventende_stasjoner()
-    reg_stoppet = hent_innstilling('registrering_stoppet') == '1'
-    reg_status = 'STOPPET' if reg_stoppet else 'Åpen'
-    reg_farge = '#ef4444' if reg_stoppet else '#22c55e'
-    reg_knapp = 'Stopp registrering' if not reg_stoppet else 'Åpne registrering'
-    reg_verdi = '0' if reg_stoppet else '1'
+    if er_admin:
+        brukere_antall = antall_brukere()
+        stasjoner_antall = antall_stasjoner_med_pris()
+        reg_stoppet = hent_innstilling('registrering_stoppet') == '1'
+        reg_status = 'STOPPET' if reg_stoppet else 'Åpen'
+        reg_farge = '#ef4444' if reg_stoppet else '#22c55e'
+        reg_knapp = 'Stopp registrering' if not reg_stoppet else 'Åpne registrering'
+        reg_verdi = '0' if reg_stoppet else '1'
+        admin_tiles = f'''
+  <a href="/admin/oversikt" class="tile">
+    <div class="tile-ikon">&#128202;</div>
+    <div class="tile-tittel">Statistikk</div>
+    <div class="tile-info">Visninger og trender</div>
+  </a>
+  <a href="/admin/kart" class="tile">
+    <div class="tile-ikon">&#128506;&#65039;</div>
+    <div class="tile-tittel">Kart</div>
+    <div class="tile-info">{stasjoner_antall} stasjoner med pris</div>
+  </a>
+  <a href="/admin/import" class="tile">
+    <div class="tile-ikon">&#128229;</div>
+    <div class="tile-tittel">Import</div>
+    <div class="tile-info">Partnerdata</div>
+  </a>
+  <a href="/admin/brukere" class="tile">
+    <div class="tile-ikon">&#128101;</div>
+    <div class="tile-tittel">Brukere</div>
+    <div class="tile-info">{brukere_antall} registrerte</div>
+  </a>
+  <a href="/admin/nyhet" class="tile">
+    <div class="tile-ikon">&#128227;</div>
+    <div class="tile-tittel">Nyhet</div>
+    <div class="tile-info">Splash-melding</div>
+  </a>
+  <a href="/admin/endre-stasjon" class="tile">
+    <div class="tile-ikon">&#9998;&#65039;</div>
+    <div class="tile-tittel">Endre stasjon</div>
+    <div class="tile-info">S&#248;k og endre navn</div>
+  </a>'''
+        reg_panel = f'''
+<div class="admin-panel" style="margin-top:1.5rem">
+  <h2>Registrering</h2>
+  <div class="admin-rad">
+    <span class="admin-status" style="color:{reg_farge}">&#9679; {reg_status}</span>
+    <form method="post" action="/admin/toggle-registrering" style="margin:0">
+      <input type="hidden" name="verdi" value="{reg_verdi}">
+      <button class="admin-btn {'ok' if reg_stoppet else 'fare'}">{reg_knapp}</button>
+    </form>
+  </div>
+</div>'''
+    else:
+        admin_tiles = ''
+        reg_panel = ''
     return f'''<!DOCTYPE html><html lang="no"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Admin – Drivstoffpriser</title>
@@ -133,35 +183,15 @@ def admin():
 <h1>Admin</h1>
 
 <div class="tiles">
-  <a href="/admin/oversikt" class="tile">
-    <div class="tile-ikon">&#128202;</div>
-    <div class="tile-tittel">Statistikk</div>
-    <div class="tile-info">Visninger og trender</div>
-  </a>
   <a href="/admin/prislogg" class="tile">
     <div class="tile-ikon">&#128176;</div>
     <div class="tile-tittel">Prislogg</div>
     <div class="tile-info">Siste prisoppdateringer</div>
   </a>
-  <a href="/admin/kart" class="tile">
-    <div class="tile-ikon">&#128506;&#65039;</div>
-    <div class="tile-tittel">Kart</div>
-    <div class="tile-info">{stasjoner_antall} stasjoner med pris</div>
-  </a>
-  <a href="/admin/import" class="tile">
-    <div class="tile-ikon">&#128229;</div>
-    <div class="tile-tittel">Import</div>
-    <div class="tile-info">Partnerdata</div>
-  </a>
   <a href="/admin/steder" class="tile" {('style="border-color:#f59e0b"' if ventende_antall else '')}>
     <div class="tile-ikon">&#128205;</div>
-    <div class="tile-tittel">Steder</div>
+    <div class="tile-tittel">Nye stasjoner</div>
     <div class="tile-info">{ventende_antall} venter godkjenning</div>
-  </a>
-  <a href="/admin/brukere" class="tile">
-    <div class="tile-ikon">&#128101;</div>
-    <div class="tile-tittel">Brukere</div>
-    <div class="tile-info">{brukere_antall} registrerte</div>
   </a>
   <a href="/admin/rapporter" class="tile" {('style="border-color:#f59e0b"' if rapporter_antall else '')}>
     <div class="tile-ikon">&#9888;&#65039;</div>
@@ -178,33 +208,14 @@ def admin():
     <div class="tile-tittel">Deaktiverte</div>
     <div class="tile-info">{deaktiverte_antall} stasjoner</div>
   </a>
-  <a href="/admin/nyhet" class="tile">
-    <div class="tile-ikon">&#128227;</div>
-    <div class="tile-tittel">Nyhet</div>
-    <div class="tile-info">Splash-melding</div>
-  </a>
   <a href="/admin/toppliste" class="tile">
     <div class="tile-ikon">&#127942;</div>
     <div class="tile-tittel">Toppliste</div>
-    <div class="tile-info">Prisregistreringer</div>
+    <div class="tile-info">Topp 50 bidragsytere</div>
   </a>
-  <a href="/admin/endre-stasjon" class="tile">
-    <div class="tile-ikon">&#9998;&#65039;</div>
-    <div class="tile-tittel">Endre stasjon</div>
-    <div class="tile-info">S&#248;k og endre navn</div>
-  </a>
+{admin_tiles}
 </div>
-
-<div class="admin-panel" style="margin-top:1.5rem">
-  <h2>Registrering</h2>
-  <div class="admin-rad">
-    <span class="admin-status" style="color:{reg_farge}">&#9679; {reg_status}</span>
-    <form method="post" action="/admin/toggle-registrering" style="margin:0">
-      <input type="hidden" name="verdi" value="{reg_verdi}">
-      <button class="admin-btn {'ok' if reg_stoppet else 'fare'}">{reg_knapp}</button>
-    </form>
-  </div>
-</div>
+{reg_panel}
 </div></body></html>'''
 
 
@@ -212,7 +223,13 @@ def admin():
 @krever_innlogging
 @krever_admin
 def admin_brukere():
-    brukere = hent_alle_brukere()
+    sok = request.args.get('sok', '').strip()
+    side = request.args.get('side', 1, type=int)
+    per_side = 50
+    brukere, totalt = hent_alle_brukere(sok=sok, side=side, per_side=per_side)
+    antall_sider = max(1, (totalt + per_side - 1) // per_side)
+    side = max(1, min(side, antall_sider))
+
     rader = []
     for b in brukere:
         navn = b['brukernavn'] + ('&nbsp;👑' if b['er_admin'] else '')
@@ -230,6 +247,33 @@ def admin_brukere():
         rader.append(f'<tr><td>{navn}</td><td style="color:#94a3b8;font-size:0.78rem">{dato}</td>{slett_td}</tr>')
     bruker_rader = ''.join(rader)
 
+    # Paginering
+    def side_url(s):
+        if sok:
+            return f'/admin/brukere?sok={sok}&side={s}'
+        return f'/admin/brukere?side={s}'
+
+    paginering = ''
+    if antall_sider > 1:
+        knapper = []
+        if side > 1:
+            knapper.append(f'<a href="{side_url(side-1)}" class="side-knapp">← Forrige</a>')
+        for s in range(1, antall_sider + 1):
+            if s == side:
+                knapper.append(f'<span class="side-knapp aktiv">{s}</span>')
+            elif abs(s - side) <= 2 or s == 1 or s == antall_sider:
+                knapper.append(f'<a href="{side_url(s)}" class="side-knapp">{s}</a>')
+            elif abs(s - side) == 3:
+                knapper.append('<span style="color:#4b5563;padding:4px 2px">…</span>')
+        if side < antall_sider:
+            knapper.append(f'<a href="{side_url(side+1)}" class="side-knapp">Neste →</a>')
+        paginering = f'<div class="paginering">{"".join(knapper)}</div>'
+
+    sok_verdi = sok.replace('"', '&quot;')
+    info = f'{totalt} bruker{"e" if totalt != 1 else ""}'
+    if sok:
+        info += f' for «{sok}»'
+
     return f'''<!DOCTYPE html><html lang="no"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Brukere – Admin</title>
@@ -237,7 +281,7 @@ def admin_brukere():
   *{{box-sizing:border-box;margin:0;padding:0}}
   body{{font-family:system-ui,sans-serif;background:#0f172a;color:#e5e7eb;padding:2rem 1rem}}
   .container{{max-width:640px;margin:0 auto}}
-  h1{{font-size:1.3rem;margin-bottom:2rem;color:#f1f5f9}}
+  h1{{font-size:1.3rem;margin-bottom:1.5rem;color:#f1f5f9}}
   .kort{{background:#111827;border:1px solid #1f2937;border-radius:10px;padding:1.5rem;margin-bottom:1.5rem}}
   h2{{font-size:1rem;color:#94a3b8;margin-bottom:0.75rem}}
   table{{width:100%;border-collapse:collapse;font-size:0.88rem}}
@@ -250,11 +294,29 @@ def admin_brukere():
                font-size:0.82rem;word-break:break-all;color:#93c5fd;margin-top:1rem}}
   nav{{margin-bottom:1.5rem;font-size:0.85rem}}
   nav a{{color:#94a3b8}}
+  .sokfelt{{display:flex;gap:8px;margin-bottom:1rem}}
+  .sokfelt input{{flex:1;background:#1f2937;border:1px solid #374151;border-radius:6px;
+                  color:#e5e7eb;font-size:0.9rem;padding:8px 12px;outline:none}}
+  .sokfelt input:focus{{border-color:#3b82f6}}
+  .sokfelt button{{background:#374151;border:none;border-radius:6px;color:#e5e7eb;
+                   font-size:0.9rem;padding:8px 14px;cursor:pointer}}
+  .info-linje{{font-size:0.82rem;color:#6b7280;margin-bottom:0.75rem}}
+  .paginering{{display:flex;gap:4px;flex-wrap:wrap;margin-top:1rem;align-items:center}}
+  .side-knapp{{background:#1f2937;border:1px solid #374151;border-radius:5px;color:#94a3b8;
+               font-size:0.82rem;padding:5px 10px;text-decoration:none;white-space:nowrap}}
+  .side-knapp.aktiv{{background:#3b82f6;border-color:#3b82f6;color:white}}
+  .side-knapp:hover:not(.aktiv){{background:#374151}}
 </style></head><body><div class="container">
 <nav><a href="/admin">← Admin</a></nav>
 <h1>Brukere</h1>
 <div class="kort">
+  <form method="get" action="/admin/brukere" class="sokfelt">
+    <input type="search" name="sok" value="{sok_verdi}" placeholder="Søk på brukernavn…" autofocus>
+    <button type="submit">Søk</button>
+  </form>
+  <div class="info-linje">{info}</div>
   <table><tr><th>Brukernavn</th><th>Opprettet</th><th></th></tr>{bruker_rader}</table>
+  {paginering}
 </div>
 <div class="kort">
   <h2>Inviter ny bruker</h2>
@@ -955,7 +1017,7 @@ def priser_historikk():
 
 @admin_bp.route('/admin/oversikt')
 @krever_innlogging
-@krever_admin
+@krever_moderator
 def oversikt():
     stats = get_statistikk()
     med_pris = antall_stasjoner_med_pris()
@@ -964,6 +1026,9 @@ def oversikt():
     blogg_totalt = sum(r['antall'] for r in blogg_stats)
     labels = [d for d, _ in stats['trend_30d']]
     values = [c for _, c in stats['trend_30d']]
+    enheter_dag = unike_enheter_per_dag(30)
+    enheter_labels = [r['dato'] for r in enheter_dag]
+    enheter_values = [r['antall'] for r in enheter_dag]
     _oslo = ZoneInfo('Europe/Oslo')
     time_labels = []
     time_values = []
@@ -979,6 +1044,20 @@ def oversikt():
         lokal = datetime.fromisoformat(ts).replace(tzinfo=timezone.utc).astimezone(_oslo)
         bruker_48_labels.append(lokal.strftime('%d.%m %H:00'))
         bruker_48_values.append(cnt)
+    # Prisoppdateringer per time siste 24t
+    # Rullende 24t-sum per time siste uke
+    pris_uke = prisoppdateringer_rullende_24t_uke()
+    pris_uke_labels = []
+    pris_uke_values = []
+    dag_navn = ['man', 'tir', 'ons', 'tor', 'fre', 'lør', 'søn']
+    for ts, cnt in pris_uke:
+        lokal = datetime.fromisoformat(ts).replace(tzinfo=timezone.utc).astimezone(_oslo)
+        if lokal.hour == 0:
+            label = dag_navn[lokal.weekday()] + ' ' + lokal.strftime('%d.%m')
+        else:
+            label = ''
+        pris_uke_labels.append(label)
+        pris_uke_values.append(cnt)
     # Prisoppdateringer per time siste 48t
     pris_48t = prisoppdateringer_per_time_48t()
     pris_48_labels = []
@@ -1031,12 +1110,20 @@ def oversikt():
     <canvas id="graf" style="width:100%;max-height:240px"></canvas>
   </div>
   <div class="seksjon">
+    <h2>Unike enheter per dag – siste 30 dager</h2>
+    <canvas id="enhetergraf" style="width:100%;max-height:240px"></canvas>
+  </div>
+  <div class="seksjon">
     <h2>Besøk siste 24 timer</h2>
     <canvas id="timegraf" style="width:100%;max-height:200px"></canvas>
   </div>
   <div class="seksjon">
     <h2>Nye brukere per time – siste 48 timer</h2>
     <canvas id="brukergraf48" style="width:100%;max-height:220px"></canvas>
+  </div>
+  <div class="seksjon">
+    <h2>Rullende 24t-sum – siste 10 dager</h2>
+    <canvas id="prisukegraf" style="width:100%;max-height:220px"></canvas>
   </div>
   <div class="seksjon">
     <h2>Prisoppdateringer per time – siste 48 timer</h2>
@@ -1074,6 +1161,23 @@ new Chart(document.getElementById('graf'), {{
     }}
   }}
 }});
+new Chart(document.getElementById('enhetergraf'), {{
+  type: 'bar',
+  data: {{
+    labels: {enheter_labels},
+    datasets: [{{ label: 'Unike enheter', data: {enheter_values},
+      backgroundColor: 'rgba(20,184,166,0.6)',
+      borderColor: 'rgba(20,184,166,1)', borderWidth: 1 }}]
+  }},
+  options: {{
+    responsive: true,
+    plugins: {{ legend: {{ display: false }} }},
+    scales: {{
+      x: {{ ticks: {{ maxRotation: 45, color: '#94a3b8', font: {{ size: 10 }} }}, grid: {{ color: '#1f2937' }} }},
+      y: {{ beginAtZero: true, ticks: {{ color: '#94a3b8' }}, grid: {{ color: '#1f2937' }} }}
+    }}
+  }}
+}});
 new Chart(document.getElementById('timegraf'), {{
   type: 'bar',
   data: {{
@@ -1105,6 +1209,24 @@ new Chart(document.getElementById('brukergraf48'), {{
     scales: {{
       x: {{ ticks: {{ maxRotation: 60, color: '#94a3b8', font: {{ size: 9 }}, autoSkip: true, maxTicksLimit: 16 }}, grid: {{ color: '#1f2937' }} }},
       y: {{ beginAtZero: true, ticks: {{ stepSize: 1, color: '#94a3b8' }}, grid: {{ color: '#1f2937' }} }}
+    }}
+  }}
+}});
+new Chart(document.getElementById('prisukegraf'), {{
+  type: 'line',
+  data: {{
+    labels: {pris_uke_labels},
+    datasets: [{{ label: 'Prisregistreringer (rullende 24t)', data: {pris_uke_values},
+      borderColor: 'rgba(251,146,60,1)',
+      backgroundColor: 'rgba(251,146,60,0.15)',
+      borderWidth: 2, pointRadius: 0, fill: true, tension: 0.3 }}]
+  }},
+  options: {{
+    responsive: true,
+    plugins: {{ legend: {{ display: false }} }},
+    scales: {{
+      x: {{ ticks: {{ maxRotation: 0, color: '#94a3b8', font: {{ size: 10 }}, autoSkip: false }}, grid: {{ color: '#1f2937' }} }},
+      y: {{ beginAtZero: true, ticks: {{ color: '#94a3b8' }}, grid: {{ color: '#1f2937' }} }}
     }}
   }}
 }});
@@ -1281,18 +1403,22 @@ stasjoner.forEach(s => {{
   const kat = prisKat(s.tidspunkt);
   const m = L.circleMarker([s.lat, s.lon], {{
     radius: 7, fillColor: farge, color: '#1e3a5f', weight: 1, fillOpacity: 0.8
-  }}).addTo(map).bindPopup(
+  }}).bindPopup(
     '<b>' + s.navn + '</b>' + (s.kjede ? ' (' + s.kjede + ')' : '') +
     '<br>' + priser + '<br><span style="color:#888;font-size:0.8em">' + dato + '</span>'
   );
+  if (kat === 'fersk') m.addTo(map);
   if (!markorer[kat]) markorer[kat] = [];
   markorer[kat].push(m);
 }});
-if (stasjoner.length) {{
-  const bounds = L.latLngBounds(stasjoner.map(s => [s.lat, s.lon]));
-  map.fitBounds(bounds, {{ padding: [30, 30] }});
+const ferskeBounds = (markorer['fersk'] || []).map(m => m.getLatLng());
+if (ferskeBounds.length) {{
+  map.fitBounds(L.latLngBounds(ferskeBounds), {{ padding: [30, 30] }});
+}} else if (stasjoner.length) {{
+  map.fitBounds(L.latLngBounds(stasjoner.map(s => [s.lat, s.lon])), {{ padding: [30, 30] }});
 }}
 document.querySelectorAll('.legend span[data-kat]').forEach(el => {{
+  if (el.dataset.kat !== 'fersk') el.classList.add('inaktiv');
   el.addEventListener('click', () => {{
     const kat = el.dataset.kat;
     const aktiv = !el.classList.contains('inaktiv');

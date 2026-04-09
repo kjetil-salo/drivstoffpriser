@@ -140,7 +140,7 @@ function avstandTekst(m) {
 
 function prisAlderTekst(tidspunkt) {
     if (!tidspunkt) return null;
-    const d = new Date(tidspunkt.replace(' ', 'T'));
+    const d = new Date(tidspunkt.replace(' ', 'T') + 'Z');
     const diffMs = Date.now() - d.getTime();
     const min = Math.floor(diffMs / 60000);
     const timer = Math.floor(diffMs / 3600000);
@@ -155,7 +155,7 @@ function prisAlderTekst(tidspunkt) {
 
 function prisAlderKlasse(tidspunkt) {
     if (!tidspunkt) return 'alder-ingen';
-    const timer = (Date.now() - new Date(tidspunkt.replace(' ', 'T')).getTime()) / 3600000;
+    const timer = (Date.now() - new Date(tidspunkt.replace(' ', 'T') + 'Z').getTime()) / 3600000;
     if (timer < 8) return 'alder-fersk';
     if (timer < 24) return 'alder-gammel';
     if (timer < 48) return 'alder-utdatert';
@@ -164,7 +164,7 @@ function prisAlderKlasse(tidspunkt) {
 
 function prisAlderBanner(tidspunkt) {
     if (!tidspunkt) return null;
-    const dager = Math.floor((Date.now() - new Date(tidspunkt.replace(' ', 'T')).getTime()) / 86400000);
+    const dager = Math.floor((Date.now() - new Date(tidspunkt.replace(' ', 'T') + 'Z').getTime()) / 86400000);
     if (dager < 2) return null;
     return `⚠ Prisen er ${dager} dager gammel`;
 }

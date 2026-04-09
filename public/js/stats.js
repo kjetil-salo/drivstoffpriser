@@ -34,29 +34,91 @@ function visPrisKort(elementId, data) {
     el.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); naviger(); } };
 }
 
+const medaljer = ['🥇', '🥈', '🥉'];
+
+function lagRadEl(rad, globalIdx) {
+    const div = document.createElement('div');
+    div.className = 'stat-toppliste-rad' + (rad.er_meg ? ' stat-toppliste-meg' : '');
+    const plassEl = document.createElement('span');
+    plassEl.className = globalIdx < 3 ? 'stat-toppliste-medalje' : 'stat-toppliste-nr';
+    plassEl.textContent = globalIdx < 3 ? medaljer[globalIdx] : `${globalIdx + 1}.`;
+    const navnEl = document.createElement('span');
+    navnEl.className = 'stat-toppliste-navn' + (!rad.kallenavn && !rad.er_meg ? ' stat-toppliste-anonym' : '');
+    navnEl.textContent = rad.kallenavn || (rad.er_meg ? 'Deg' : 'Anonym bidragsyter');
+    const antallEl = document.createElement('span');
+    antallEl.className = 'stat-toppliste-antall';
+    antallEl.textContent = rad.antall;
+    div.append(plassEl, navnEl, antallEl);
+    return div;
+}
+
+function byggRadliste(container, liste, synligeRader, minPlass) {
+    const synlig = liste.slice(0, synligeRader);
+    const skjult = liste.slice(synligeRader);
+
+    synlig.forEach((rad, i) => container.appendChild(lagRadEl(rad, i)));
+
+    if (skjult.length) {
+        const merDiv = document.createElement('div');
+        merDiv.className = 'stat-toppliste-mer';
+        const knapp = document.createElement('button');
+        knapp.className = 'stat-toppliste-utvid';
+        knapp.textContent = `··· vis topp ${liste.length}`;
+        knapp.addEventListener('click', () => {
+            merDiv.remove();
+            skjult.forEach((rad, i) => container.appendChild(lagRadEl(rad, synligeRader + i)));
+            if (minPlass) container.appendChild(lagMinPlassEl(minPlass));
+        });
+        merDiv.appendChild(knapp);
+        container.appendChild(merDiv);
+    } else if (minPlass) {
+        container.appendChild(lagMinPlassEl(minPlass));
+    }
+}
+
+function lagMinPlassEl(minPlass) {
+    const div = document.createElement('div');
+    div.className = 'stat-toppliste-rad stat-toppliste-meg stat-toppliste-utenfor';
+    div.innerHTML = `<span class="stat-toppliste-nr">${minPlass.plass}.</span><span class="stat-toppliste-navn">Deg</span><span class="stat-toppliste-antall">${minPlass.antall}</span>`;
+    return div;
+}
+
 function visToppliste(data) {
     const el = document.getElementById('stat-toppliste');
     const liste = Array.isArray(data) ? data : (data.liste || []);
+    const listeUke = Array.isArray(data) ? [] : (data.liste_uke || []);
     const minPlass = Array.isArray(data) ? null : data.min_plass;
-    if (!liste || liste.length === 0) {
+
+    if (!liste.length && !listeUke.length) {
         el.innerHTML = '<div class="stat-toppliste-tom">Ingen registreringer ennå</div>';
+        injiserBidragPromo();
         return;
     }
-    const medaljer = ['🥇', '🥈', '🥉'];
-    const rader = liste.map((rad, i) => {
-        const plass = i < 3 ? `<span class="stat-toppliste-medalje">${medaljer[i]}</span>` : `<span class="stat-toppliste-nr">${i + 1}.</span>`;
-        const navn = rad.kallenavn
-            ? `<span class="stat-toppliste-navn">${rad.kallenavn}</span>`
-            : rad.er_meg
-                ? `<span class="stat-toppliste-navn">Deg</span>`
-                : `<span class="stat-toppliste-navn stat-toppliste-anonym">Anonym bidragsyter</span>`;
-        const megKlasse = rad.er_meg ? ' stat-toppliste-meg' : '';
-        return `<div class="stat-toppliste-rad${megKlasse}">${plass}${navn}<span class="stat-toppliste-antall">${rad.antall}</span></div>`;
-    });
-    if (minPlass) {
-        rader.push(`<div class="stat-toppliste-rad stat-toppliste-meg stat-toppliste-utenfor"><span class="stat-toppliste-nr">${minPlass.plass}.</span><span class="stat-toppliste-navn">Deg</span><span class="stat-toppliste-antall">${minPlass.antall}</span></div>`);
+
+    el.innerHTML = '';
+
+    if (listeUke.length) {
+        const seksjon = document.createElement('div');
+        seksjon.className = 'stat-toppliste-seksjon';
+        const tittel = document.createElement('div');
+        tittel.className = 'stat-toppliste-seksjon-tittel';
+        tittel.textContent = 'Denne uken';
+        seksjon.appendChild(tittel);
+        byggRadliste(seksjon, listeUke, 5, null);
+        el.appendChild(seksjon);
     }
-    el.innerHTML = rader.join('');
+
+    if (liste.length) {
+        const seksjon = document.createElement('div');
+        seksjon.className = 'stat-toppliste-seksjon';
+        const tittel = document.createElement('div');
+        tittel.className = 'stat-toppliste-seksjon-tittel';
+        tittel.textContent = 'Totalt';
+        seksjon.appendChild(tittel);
+        byggRadliste(seksjon, liste, 10, minPlass);
+        el.appendChild(seksjon);
+    }
+
     injiserBidragPromo();
 }
 
@@ -87,7 +149,7 @@ export async function lastStatistikk() {
     try {
         const [respStat, respTopp] = await Promise.all([
             fetch('/api/statistikk'),
-            fetch('/api/toppliste')
+            fetch('/api/toppliste'),
         ]);
         if (!respStat.ok) return;
         const data = await respStat.json();

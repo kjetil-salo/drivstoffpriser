@@ -90,8 +90,27 @@ export function initInnstillinger(onChange) {
         } else {
             try {
                 await navigator.clipboard.writeText(data.url);
-                visToast('✓ Lenke kopiert!');
-            } catch { visToast('drivstoffprisene.no'); }
+            } catch { /* clipboard ikke tilgjengelig */ }
+            visDelModal();
         }
     });
+
+    const delModalBackdrop = document.getElementById('del-modal-backdrop');
+    const delModal = document.getElementById('del-modal');
+    document.getElementById('del-modal-lukk').addEventListener('click', lukkDelModal);
+    delModalBackdrop.addEventListener('click', lukkDelModal);
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !delModal.hasAttribute('hidden')) lukkDelModal();
+    });
+}
+
+function visDelModal() {
+    document.getElementById('del-modal-backdrop').removeAttribute('hidden');
+    document.getElementById('del-modal').removeAttribute('hidden');
+    document.getElementById('del-modal-lukk').focus();
+}
+
+function lukkDelModal() {
+    document.getElementById('del-modal-backdrop').setAttribute('hidden', '');
+    document.getElementById('del-modal').setAttribute('hidden', '');
 }

@@ -2,16 +2,25 @@ import sqlite3
 import math
 import os
 import threading
+from contextlib import contextmanager
 from datetime import datetime
 
 _default_db = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'drivstoff.db')
 DB_PATH = os.environ.get('DB_PATH', _default_db)
 
 
+@contextmanager
 def get_conn():
     conn = sqlite3.connect(DB_PATH, timeout=10)
     conn.execute("PRAGMA journal_mode=WAL")
-    return conn
+    try:
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 
 def init_db():
@@ -295,6 +304,23 @@ def hent_siste_prisoppdateringer(limit=100) -> list:
         return [dict(r) for r in rows]
 
 
+def unike_enheter_per_dag(dager: int = 30) -> list[dict]:
+    from datetime import date, timedelta
+    with get_conn() as conn:
+        conn.row_factory = sqlite3.Row
+        today = date.today()
+        dato_map = {(today - timedelta(days=i)).isoformat(): 0 for i in range(dager - 1, -1, -1)}
+        for row in conn.execute(
+            "SELECT DATE(ts) AS dato, COUNT(DISTINCT device_id) AS antall "
+            "FROM visninger WHERE device_id != '' AND ts >= DATE('now', ?) "
+            "GROUP BY dato",
+            (f'-{dager - 1} days',)
+        ).fetchall():
+            if row['dato'] in dato_map:
+                dato_map[row['dato']] = row['antall']
+        return [{'dato': d, 'antall': n} for d, n in dato_map.items()]
+
+
 def get_statistikk() -> dict:
     from datetime import date, timedelta
     with get_conn() as conn:
@@ -376,6 +402,53 @@ def nye_brukere_per_time_48t() -> list:
         for row in conn.execute(
             "SELECT strftime('%Y-%m-%d %H:00:00', opprettet) as time, COUNT(*) as cnt "
             "FROM brukere WHERE opprettet >= datetime('now', '-48 hours') "
+            "GROUP BY time ORDER BY time"
+        ).fetchall():
+            if row['time'] in timer_map:
+                timer_map[row['time']] = row['cnt']
+    return list(timer_map.items())
+
+
+def prisoppdateringer_rullende_24t_uke() -> list:
+    """Rullende 24-timers sum per time, siste 10 dager (240 punkter)."""
+    import bisect
+    from datetime import timedelta, timezone
+    now = datetime.now(timezone.utc)
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT tidspunkt FROM priser "
+            "WHERE tidspunkt >= datetime('now', '-11 days') ORDER BY tidspunkt"
+        ).fetchall()
+    timestamps = []
+    for (ts_str,) in rows:
+        t = datetime.fromisoformat(ts_str)
+        if t.tzinfo is None:
+            t = t.replace(tzinfo=timezone.utc)
+        timestamps.append(t.timestamp())
+    result = []
+    for i in range(10 * 24, -1, -1):
+        slot = now - timedelta(hours=i)
+        slot_end = slot.timestamp()
+        slot_start = (slot - timedelta(hours=24)).timestamp()
+        left = bisect.bisect_left(timestamps, slot_start)
+        right = bisect.bisect_right(timestamps, slot_end)
+        result.append((slot.strftime('%Y-%m-%d %H:00:00'), right - left))
+    return result
+
+
+def prisoppdateringer_per_time_24t() -> list:
+    """Antall prisoppdateringer per time siste 24 timer."""
+    from datetime import timedelta, timezone
+    now = datetime.now(timezone.utc)
+    timer_map = {}
+    for i in range(24, -1, -1):
+        t = (now - timedelta(hours=i)).strftime('%Y-%m-%d %H:00:00')
+        timer_map[t] = 0
+    with get_conn() as conn:
+        conn.row_factory = sqlite3.Row
+        for row in conn.execute(
+            "SELECT strftime('%Y-%m-%d %H:00:00', tidspunkt) as time, COUNT(*) as cnt "
+            "FROM priser WHERE tidspunkt >= datetime('now', '-24 hours') "
             "GROUP BY time ORDER BY time"
         ).fetchall():
             if row['time'] in timer_map:
@@ -479,13 +552,28 @@ def finn_bruker_id(bruker_id: int) -> dict | None:
         return dict(row) if row else None
 
 
-def hent_alle_brukere() -> list:
+def hent_alle_brukere(sok: str = '', side: int = 1, per_side: int = 50) -> tuple[list, int]:
+    offset = (side - 1) * per_side
     with get_conn() as conn:
         conn.row_factory = sqlite3.Row
-        rows = conn.execute(
-            "SELECT id, brukernavn, er_admin, roller, opprettet FROM brukere ORDER BY opprettet"
-        ).fetchall()
-        return [dict(r) for r in rows]
+        if sok:
+            mønster = f'%{sok}%'
+            totalt = conn.execute(
+                "SELECT COUNT(*) FROM brukere WHERE brukernavn LIKE ?", (mønster,)
+            ).fetchone()[0]
+            rows = conn.execute(
+                "SELECT id, brukernavn, er_admin, roller, opprettet FROM brukere "
+                "WHERE brukernavn LIKE ? ORDER BY opprettet DESC LIMIT ? OFFSET ?",
+                (mønster, per_side, offset)
+            ).fetchall()
+        else:
+            totalt = conn.execute("SELECT COUNT(*) FROM brukere").fetchone()[0]
+            rows = conn.execute(
+                "SELECT id, brukernavn, er_admin, roller, opprettet FROM brukere "
+                "ORDER BY opprettet DESC LIMIT ? OFFSET ?",
+                (per_side, offset)
+            ).fetchall()
+        return [dict(r) for r in rows], totalt
 
 
 def slett_bruker(bruker_id: int):
@@ -783,6 +871,24 @@ def hent_toppliste(limit=50) -> list:
                FROM priser p
                JOIN brukere b ON b.id = p.bruker_id
                WHERE b.brukernavn NOT LIKE 'partner:%'
+               GROUP BY p.bruker_id
+               ORDER BY antall DESC
+               LIMIT ?''',
+            (limit,)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def hent_toppliste_uke(limit=20) -> list:
+    """Antall prisregistreringer per bruker siste 7 dager, ekskluderer partnere."""
+    with get_conn() as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            '''SELECT b.id, b.kallenavn, COUNT(p.id) as antall
+               FROM priser p
+               JOIN brukere b ON b.id = p.bruker_id
+               WHERE b.brukernavn NOT LIKE 'partner:%'
+                 AND p.tidspunkt >= datetime('now', '-7 days')
                GROUP BY p.bruker_id
                ORDER BY antall DESC
                LIMIT ?''',

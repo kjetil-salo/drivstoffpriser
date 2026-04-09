@@ -1826,6 +1826,42 @@ html, body {
   margin-top: 4px;
 }
 
+/* ── Toppliste seksjoner ─────────────────────────── */
+.stat-toppliste-seksjon + .stat-toppliste-seksjon {
+  border-top: 1px solid var(--border-color);
+}
+
+.stat-toppliste-seksjon-tittel {
+  font-size: var(--font-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-muted);
+  padding: 8px var(--space-md) 4px;
+}
+
+.stat-toppliste-mer {
+  display: flex;
+  justify-content: center;
+  padding: 6px var(--space-md);
+  border-top: 1px dashed var(--border-color);
+}
+
+.stat-toppliste-utvid {
+  background: none;
+  border: none;
+  color: var(--color-muted);
+  font-size: var(--font-sm);
+  cursor: pointer;
+  padding: 4px 12px;
+  border-radius: var(--radius-sm);
+  letter-spacing: 0.05em;
+}
+
+.stat-toppliste-utvid:hover {
+  color: var(--color-text);
+  background: rgba(148,163,184,0.08);
+}
+
 /* ── Bidrag-promo (under toppliste) ─────────────── */
 #bidrag-promo {
   display: flex;

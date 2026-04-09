@@ -244,8 +244,8 @@ class TestToppliste:
         for i in range(20):
             b = lag_bruker(f'stor{i}@test.no')
             for _ in range(i + 2):
-                db_mod.lagre_pris(stasjon['id'], 21.0, 20.0, bruker_id=b['id'])
-        db_mod.lagre_pris(stasjon['id'], 21.0, 20.0, bruker_id=meg['id'])
+                db_mod.lagre_pris(stasjon['id'], 21.0, 20.0, bruker_id=b['id'], min_intervall=0)
+        db_mod.lagre_pris(stasjon['id'], 21.0, 20.0, bruker_id=meg['id'], min_intervall=0)
 
         resp = innlogget_client.get('/api/toppliste')
         data = resp.get_json()

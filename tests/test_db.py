@@ -169,7 +169,8 @@ class TestBrukere:
     def test_hent_alle_brukere(self):
         db_mod.opprett_bruker('a@b.no', generate_password_hash('x'))
         db_mod.opprett_bruker('b@b.no', generate_password_hash('x'), er_admin=True)
-        alle = db_mod.hent_alle_brukere()
+        alle, totalt = db_mod.hent_alle_brukere()
+        assert totalt == 2
         assert len(alle) == 2
 
     def test_oppdater_passord(self):

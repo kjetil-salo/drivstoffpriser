@@ -150,7 +150,7 @@ function prisIkon(s) {
 
 function prisAlderTimer(tidspunkt) {
     if (!tidspunkt) return null;
-    const ts = new Date(tidspunkt.replace(' ', 'T'));
+    const ts = new Date(tidspunkt.replace(' ', 'T') + 'Z');
     return (Date.now() - ts.getTime()) / 3600000;
 }
 
