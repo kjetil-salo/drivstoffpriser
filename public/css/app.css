@@ -96,8 +96,11 @@ html, body {
   white-space: nowrap;
   flex-shrink: 0;
   text-decoration: none;
+  display: inline-flex;
+  align-items: center;
 }
 #auth-lenke:hover { color: var(--color-text); }
+#auth-ikon { vertical-align: middle; }
 
 #innstillinger-btn {
   background: none;

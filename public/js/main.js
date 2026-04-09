@@ -147,11 +147,14 @@ if (moderatorBtn && (window.__erAdmin || window.__roller.includes('moderator')))
     moderatorBtn.removeAttribute('hidden');
 }
 if (window.__innlogget) {
-    authLenke.textContent = meg.kallenavn || meg.brukernavn;
+    document.getElementById('auth-ikon').removeAttribute('hidden');
+    document.getElementById('auth-tekst').textContent = '';
     authLenke.href = '/auth/min-konto';
+    authLenke.title = meg.kallenavn || meg.brukernavn;
+    authLenke.setAttribute('aria-label', 'Min konto (' + (meg.kallenavn || meg.brukernavn) + ')');
     authLenke.removeAttribute('hidden');
 } else {
-    authLenke.textContent = 'Logg inn';
+    document.getElementById('auth-tekst').textContent = 'Logg inn';
     authLenke.href = '/auth/logg-inn';
     authLenke.removeAttribute('hidden');
 }
