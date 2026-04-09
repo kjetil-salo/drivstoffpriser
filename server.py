@@ -115,7 +115,7 @@ def cache_headers(response):
         elif path == '/api/toppliste':
             response.headers['Cache-Control'] = 'no-store'
         elif path == '/api/nyhet':
-            response.headers['Cache-Control'] = 'public, max-age=3600'
+            response.headers['Cache-Control'] = 'private, no-store'
         elif path.startswith('/api/stedssok'):
             response.headers['Cache-Control'] = 'public, max-age=86400'
         else:

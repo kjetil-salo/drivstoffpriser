@@ -401,18 +401,68 @@ def foreslaa_endring():
 @api_bp.route('/api/nyhet')
 def nyhet():
     import hashlib
+
+    # Admin-nyhet trumfer alltid
     tekst = hent_innstilling('nyhet_tekst', '')
     utloper = hent_innstilling('nyhet_utloper', '')
-    if not tekst or not utloper:
+    if tekst and utloper:
+        try:
+            utloper_dt = datetime.fromisoformat(utloper)
+            if datetime.now() < utloper_dt:
+                nyhet_id = hashlib.md5(tekst.encode()).hexdigest()[:8]
+                return jsonify({'tekst': tekst, 'utloper': utloper, 'id': nyhet_id, 'tittel': 'Nyhet'})
+        except ValueError:
+            pass
+
+    # Personaliserte ukentlige meldinger
+    if hent_innstilling('personlig_splash', '') != '1':
         return jsonify({'tekst': None})
-    try:
-        utloper_dt = datetime.fromisoformat(utloper)
-    except ValueError:
-        return jsonify({'tekst': None})
-    if datetime.now() >= utloper_dt:
-        return jsonify({'tekst': None})
-    nyhet_id = hashlib.md5(tekst.encode()).hexdigest()[:8]
-    return jsonify({'tekst': tekst, 'utloper': utloper, 'id': nyhet_id})
+
+    from datetime import timedelta
+    from db import get_conn
+
+    uke = datetime.now().isocalendar()[1]
+    aar = datetime.now().year
+    bruker_id = session.get('bruker_id')
+
+    if bruker_id:
+        with get_conn() as conn:
+            row = conn.execute(
+                "SELECT COUNT(*) FROM priser WHERE bruker_id = ? AND tidspunkt >= datetime('now', '-7 days')",
+                (bruker_id,)
+            ).fetchone()
+        antall = row[0] if row else 0
+
+        if antall == 0:
+            tekst = ('Nå er vi over 4 000 registrerte brukere!\n\n'
+                      'Prisene holdes oppdatert av brukerne selv — hver eneste pris teller. '
+                      'Har du mulighet til å legge inn en pris eller to neste gang du fyller?')
+            tittel = 'Hei!'
+        elif antall < 20:
+            tekst = (f'Takk for de {antall} prisene du har lagt inn denne uken!\n\n'
+                      'Du er én av mange som holder prisene ferske for over 50\u00a0000 besøkende.')
+            tittel = 'Hei!'
+        else:
+            tekst = (f'Wow — {antall} priser denne uken!\n\n'
+                      'Du er en av våre mest aktive bidragsytere, og det merkes. Tusen takk!')
+            tittel = 'Hei!'
+        splash_id = f'pers_{aar}w{uke}_{bruker_id}'
+    else:
+        tekst = ('Over 50\u00a0000 har brukt drivstoffprisene.no så langt — og prisene holdes '
+                  'oppdatert av brukere som deg.\n\n'
+                  'Har du lyst til å bidra? Opprett en bruker, så kan du legge inn priser '
+                  'på stasjoner du passerer.')
+        tittel = 'Velkommen!'
+        splash_id = f'pers_{aar}w{uke}_anon'
+
+    # Utløper ved slutten av uken (søndag 23:59)
+    i_dag = datetime.now()
+    dager_til_sondag = 6 - i_dag.weekday()
+    if dager_til_sondag < 0:
+        dager_til_sondag += 7
+    utloper = (i_dag + timedelta(days=dager_til_sondag)).replace(hour=23, minute=59, second=59).isoformat()
+
+    return jsonify({'tekst': tekst, 'utloper': utloper, 'id': splash_id, 'tittel': tittel})
 
 
 @api_bp.route('/api/toppliste')

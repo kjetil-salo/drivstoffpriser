@@ -103,6 +103,7 @@ if (nyhetData.tekst) {
         const d = nyhetData;
         const backdrop = document.getElementById('nyhet-backdrop');
         const dialog = document.getElementById('nyhet-dialog');
+        document.getElementById('nyhet-tittel').textContent = d.tittel || 'Nyhet';
         document.getElementById('nyhet-tekst').textContent = d.tekst;
         const tidligereFokus = document.activeElement;
         backdrop.removeAttribute('hidden');

@@ -892,6 +892,9 @@ def admin_nyhet():
         if action == 'fjern':
             sett_innstilling('nyhet_tekst', '')
             sett_innstilling('nyhet_utloper', '')
+        elif action == 'toggle_personlig':
+            gjeldende = hent_innstilling('personlig_splash', '')
+            sett_innstilling('personlig_splash', '' if gjeldende == '1' else '1')
         else:
             tekst = request.form.get('tekst', '').strip()
             utloper = request.form.get('utloper', '').strip()
@@ -927,6 +930,27 @@ def admin_nyhet():
       <form method="post" style="margin:0">
         <input type="hidden" name="action" value="fjern">
         <button class="admin-btn fare">Fjern nyhet</button>
+      </form>
+    </div>'''
+
+    personlig_aktiv = hent_innstilling('personlig_splash', '') == '1'
+
+    personlig_html = f'''
+    <div class="kort" style="border-color:{'#8b5cf6' if personlig_aktiv else '#374151'}">
+      <h2 style="color:{'#8b5cf6' if personlig_aktiv else '#94a3b8'}">Personaliserte ukemeldinger {'✓ Aktiv' if personlig_aktiv else '○ Av'}</h2>
+      <p style="font-size:0.82rem;color:#94a3b8;margin-bottom:12px">Viser tilpassede splash-meldinger basert på brukerens aktivitet siste 7 dager. Vises maks én gang per uke. Admin-nyheter trumfer alltid.</p>
+      <details style="margin-bottom:12px">
+        <summary style="font-size:0.82rem;color:#64748b;cursor:pointer">Vis meldingsvarianter</summary>
+        <div style="font-size:0.8rem;color:#94a3b8;margin-top:8px;line-height:1.6">
+          <p><strong style="color:#e5e7eb">Ikke innlogget:</strong> Oppfordring til å opprette bruker</p>
+          <p><strong style="color:#e5e7eb">0 bidrag:</strong> Vennlig oppfordring til å legge inn priser</p>
+          <p><strong style="color:#e5e7eb">1–19 bidrag:</strong> Takk med personlig antall</p>
+          <p><strong style="color:#e5e7eb">20+ bidrag:</strong> Ekstra anerkjennelse for superbrukere</p>
+        </div>
+      </details>
+      <form method="post" style="margin:0">
+        <input type="hidden" name="action" value="toggle_personlig">
+        <button class="admin-btn" style="border-color:#8b5cf6;color:#8b5cf6">{'Slå av' if personlig_aktiv else 'Slå på'}</button>
       </form>
     </div>'''
 
@@ -966,6 +990,7 @@ def admin_nyhet():
 </style></head><body><div class="container">
 <nav><a href="/admin">← Admin</a></nav>
 <h1>Nyhetsmelding</h1>
+{personlig_html}
 {aktiv_html}
 <div class="kort">
   <h2>Publiser nyhet</h2>
