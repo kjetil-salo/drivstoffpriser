@@ -11,6 +11,9 @@ services:
       STATS_KEY: "staging"
       BASE_URL: "http://100.76.35.106:3004"
       DATA_DIR: "/app/data"
+      OCR_MODELL: "${OCR_MODELL:-gemini}"
+      GEMINI_API_KEY: "${GEMINI_API_KEY:-}"
+      GEMINI_MODELL: "${GEMINI_MODELL:-gemini-1.5-flash}"
       LOG_LEVEL: "DEBUG"
     volumes:
       - drivstoff-staging-data:/app/data

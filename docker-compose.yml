@@ -15,6 +15,9 @@ services:
       REGISTRER_KODE: "${REGISTRER_KODE:-}"
       PARTNER_API_KEY: "${PARTNER_API_KEY:-}"
       ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+      OCR_MODELL: "${OCR_MODELL:-gemini}"
+      GEMINI_API_KEY: "${GEMINI_API_KEY:-}"
+      GEMINI_MODELL: "${GEMINI_MODELL:-gemini-1.5-flash}"
       LOG_LEVEL: "WARNING"
     volumes:
       - drivstoff-data:/app/data
