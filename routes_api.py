@@ -1226,11 +1226,22 @@ def gjenkjenn_priser():
 
     try:
         if ocr_modell == 'gemini':
-            priser = _ocr_via_gemini(bilde_b64, content_type, forventet_kjede=forventet_kjede)
+            try:
+                priser = _ocr_via_gemini(bilde_b64, content_type, forventet_kjede=forventet_kjede)
+                brukt_modell = priser.get('_modell') or 'gemini'
+                if not _har_ocr_priser(priser):
+                    logger.warning(f'Gemini OCR fant ingen priser for bruker={bruker_id}; prøver Haiku fallback')
+                    priser = _ocr_via_haiku(bilde_b64, content_type, forventet_kjede=forventet_kjede)
+                    brukt_modell = 'haiku-fallback'
+            except (ValueError, httpx.HTTPError, KeyError, json.JSONDecodeError, IndexError, RuntimeError) as e:
+                logger.warning(f'Gemini OCR feilet for bruker={bruker_id}; prøver Haiku fallback: {e}')
+                priser = _ocr_via_haiku(bilde_b64, content_type, forventet_kjede=forventet_kjede)
+                brukt_modell = 'haiku-fallback'
         else:
             priser = _ocr_via_haiku(bilde_b64, content_type, forventet_kjede=forventet_kjede)
-        logger.info(f'OCR-gjenkjenning: bruker={bruker_id} modell={ocr_modell} resultat={priser}')
-        priser['_modell'] = ocr_modell
+            brukt_modell = 'haiku'
+        logger.info(f'OCR-gjenkjenning: bruker={bruker_id} modell={brukt_modell} resultat={priser}')
+        priser['_modell'] = brukt_modell
         return jsonify(priser)
     except ValueError as e:
         logger.error(f'OCR konfigurasjonsfeil: {e}')
