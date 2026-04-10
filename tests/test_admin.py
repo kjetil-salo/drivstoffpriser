@@ -1,6 +1,7 @@
 """Tester for admin-ruter."""
 
 import db as db_mod
+import sqlite3
 from werkzeug.security import generate_password_hash
 
 
@@ -72,3 +73,30 @@ class TestPrislogg:
         html = resp.data.decode()
         assert 'Shell' in html
         assert 'admin@test.no' in html
+
+
+class TestAdminDrivstofftyper:
+    def test_kan_fjerne_98_og_lagre_til_db(self, admin_client):
+        db_mod.lagre_stasjon('Teststasjon', 'Shell', 60.39, 5.33, 'node/98-test')
+        stasjon = db_mod.finn_stasjoner_by_navn('Teststasjon')[0]
+
+        resp = admin_client.post('/admin/drivstofftyper', data={
+            'stasjon_id': stasjon['id'],
+            'lagre': '1',
+            'sok': 'Teststasjon',
+            'har_bensin': 'on',
+            'har_diesel': 'on',
+        })
+
+        assert resp.status_code == 200
+        html = resp.data.decode()
+        assert f'✓ Drivstofftyper oppdatert for stasjon {stasjon["id"]}.' in html
+
+        with sqlite3.connect(db_mod.DB_PATH) as conn:
+            row = conn.execute(
+                '''SELECT har_bensin, har_bensin98, har_diesel, har_diesel_avgiftsfri
+                   FROM stasjoner WHERE id = ?''',
+                (stasjon['id'],)
+            ).fetchone()
+
+        assert row == (1, 0, 1, 0)

@@ -644,13 +644,7 @@ def admin_drivstofftyper():
     stasjon = None
 
     if request.method == 'POST':
-        if 'sok' in request.form:
-            sok = request.form.get('sok', '').strip()
-            if sok:
-                resultater = finn_stasjoner_by_navn(sok)
-                if not resultater:
-                    melding = f'Ingen stasjoner funnet for «{sok}».'
-        elif 'stasjon_id' in request.form and 'lagre' in request.form:
+        if 'stasjon_id' in request.form and 'lagre' in request.form:
             stasjon_id = request.form.get('stasjon_id', type=int)
             sok = request.form.get('sok', '').strip()
             har_bensin = 'har_bensin' in request.form
@@ -661,6 +655,12 @@ def admin_drivstofftyper():
             melding = f'✓ Drivstofftyper oppdatert for stasjon {stasjon_id}.'
             if sok:
                 resultater = finn_stasjoner_by_navn(sok)
+        elif 'sok' in request.form:
+            sok = request.form.get('sok', '').strip()
+            if sok:
+                resultater = finn_stasjoner_by_navn(sok)
+                if not resultater:
+                    melding = f'Ingen stasjoner funnet for «{sok}».'
 
     def checked(v):
         return 'checked' if v else ''
