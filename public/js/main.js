@@ -3,6 +3,7 @@ import { hentPosisjon, startFollowWatch } from './location.js';
 import { initMap, sentrerKart, panTilPosisjon, visUserPosisjon, oppdaterUserMarker, registrerBrukerDrag, visStasjoner, oppdaterStasjonPriser, initKartBevegelse, refreshKartInnstillinger, getKartSenter } from './map.js';
 import { visListe, oppdaterKort } from './list.js';
 import { initSheet, visStasjonSheet, oppdaterSheetStasjon, lukkSheet, refreshSheetInnstillinger } from './station-sheet.js';
+import { initHurtigpris, åpneHurtigKamera } from './hurtigpris.js';
 import { initSearch } from './search.js';
 import { initInnstillinger, getInnstillinger } from './settings.js';
 import { initAddStation, openAddStation } from './add-station.js';
@@ -205,6 +206,18 @@ initAddStation((nyStasjon) => {
     visStasjoner(stasjoner, visStasjonSheet);
     if (viewListe.style.display !== 'none') visListe(stasjoner, visStasjonSheet);
     sentrerKart(s.lat, s.lon, 16);
+});
+
+// ── Kamera-knapp (admin/moderator/kamera) — hurtigpris ──
+const cameraBtn = document.getElementById('camera-btn');
+const _r = window.__roller || [];
+if (window.__erAdmin || _r.includes('moderator') || _r.includes('kamera')) {
+    cameraBtn.removeAttribute('hidden');
+}
+initHurtigpris(prisOppdatert);
+cameraBtn.addEventListener('click', () => {
+    if (!stasjoner.length) return;
+    åpneHurtigKamera(stasjoner);
 });
 
 // ── Init kart med siste kjente posisjon ───────────

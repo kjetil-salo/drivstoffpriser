@@ -97,6 +97,7 @@
     <div id="map"></div>
     <button id="loc-btn" aria-label="Hent posisjon"><span aria-hidden="true">📍</span></button>
     <button id="add-station-btn" hidden aria-label="Legg til stasjon">+</button>
+    <button id="camera-btn" hidden aria-label="Ta bilde av pristavle">📷</button>
   </main>
 
   <!-- Listevisning -->
@@ -376,7 +377,18 @@ Vil du hjelpe til? Opprett en gratis bruker og oppdater priser på stasjoner næ
 
       <!-- Redigering (inline) -->
       <div id="sheet-edit" hidden>
-        <h3 class="sheet-edit-tittel">Endre pris</h3>
+        <h3 class="sheet-edit-tittel" id="sheet-edit-tittel">Endre pris</h3>
+        <div id="sheet-ocr" hidden>
+          <label class="btn-kamera" for="sheet-ocr-input">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            Ta bilde av pristavle
+          </label>
+          <input id="sheet-ocr-input" type="file" accept="image/*" capture="environment" hidden>
+          <div id="sheet-ocr-preview" hidden>
+            <img id="sheet-ocr-img" alt="Bilde av pristavle">
+          </div>
+          <div id="sheet-ocr-status" role="status" aria-live="polite" hidden></div>
+        </div>
         <div class="pris-input-gruppe">
           <label for="sheet-bensin-input">95 oktan (kr/liter)</label>
           <input id="sheet-bensin-input" type="text" inputmode="decimal" placeholder="f.eks. 21,35" autocomplete="off">
@@ -458,6 +470,31 @@ Vil du hjelpe til? Opprett en gratis bruker og oppdater priser på stasjoner næ
     <div id="del-modal-url">drivstoffprisene.no</div>
     <button id="del-modal-lukk">Lukk</button>
   </div>
+
+  <!-- Hurtigpris (fullskjerm prisjeger-modus) -->
+  <div id="hurtigpris-backdrop" class="hurtigpris-backdrop" hidden></div>
+  <div id="hurtigpris" class="hurtigpris" hidden role="dialog" aria-label="Hurtigregistrering av pris">
+    <div class="hurtigpris-header">
+      <span class="hurtigpris-tittel">Registrer pris</span>
+      <button id="hurtigpris-lukk" class="hurtigpris-lukk" aria-label="Lukk">&times;</button>
+    </div>
+    <div class="hurtigpris-kropp">
+      <div id="hurtigpris-stasjon" class="hurtigpris-stasjon"></div>
+      <div id="hurtigpris-status" class="hurtigpris-status" role="status" aria-live="polite"></div>
+      <img id="hurtigpris-img" class="hurtigpris-img" hidden alt="Pristavle">
+      <div id="hurtigpris-felt" class="hurtigpris-felt" hidden>
+        <label class="hurtigpris-label">95 oktan <input id="hp-bensin" type="text" inputmode="decimal" autocomplete="off"></label>
+        <label class="hurtigpris-label">98 oktan <input id="hp-bensin98" type="text" inputmode="decimal" autocomplete="off"></label>
+        <label class="hurtigpris-label">Diesel <input id="hp-diesel" type="text" inputmode="decimal" autocomplete="off"></label>
+        <label class="hurtigpris-label">Avg.fri diesel <input id="hp-avgfri" type="text" inputmode="decimal" autocomplete="off"></label>
+      </div>
+    </div>
+    <div id="hurtigpris-bunn" class="hurtigpris-bunn" hidden>
+      <button id="hurtigpris-lagre" class="hurtigpris-lagre-btn">Lagre pris</button>
+      <button id="hurtigpris-feil-btn" class="hurtigpris-feil-btn">Feil stasjon?</button>
+    </div>
+  </div>
+  <input id="hurtigpris-kamera" type="file" accept="image/*" capture="environment" hidden>
 
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script type="module" src="/js/main.js"></script>

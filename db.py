@@ -188,6 +188,23 @@ def _migrer_db():
                 tidspunkt TEXT DEFAULT (datetime('now'))
             )''')
             conn.execute('CREATE INDEX idx_rate_limit ON rate_limit(type, nokkel, tidspunkt)')
+        if 'ocr_statistikk' not in tabeller:
+            conn.execute('''CREATE TABLE ocr_statistikk (
+                id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+                bruker_id          INTEGER,
+                tidspunkt          TEXT DEFAULT (datetime('now')),
+                kilde              TEXT,
+                tesseract_ok       INTEGER DEFAULT 0,
+                tesseract_ms       INTEGER,
+                tesseract_resultat TEXT,
+                tesseract_raatekst TEXT,
+                claude_ok          INTEGER DEFAULT 0,
+                claude_ms          INTEGER,
+                claude_resultat    TEXT,
+                lagret_priser      TEXT,
+                tesseract_feil     TEXT,
+                claude_feil        TEXT
+            )''')
 
 
 def sjekk_rate_limit(type: str, nokkel: str, maks: int, vindu_sekunder: int) -> bool:
@@ -264,9 +281,21 @@ _pris_lock = threading.Lock()
 
 
 def lagre_pris(stasjon_id, bensin, diesel, bensin98=None, bruker_id=None, diesel_avgiftsfri=None, min_intervall=300):
-    """Lagrer pris. Oppdaterer siste rad hvis bruker korrigerer innen intervallet, ellers insert."""
+    """Lagrer pris. Oppdaterer siste rad hvis bruker korrigerer innen intervallet, ellers insert.
+    NULL-verdier bevares fra forrige pris slik at en delvis oppdatering ikke sletter eksisterende priser."""
     with _pris_lock:
         with get_conn() as conn:
+            # Hent forrige verdier så vi ikke overskriver med NULL
+            forrige = conn.execute(
+                "SELECT bensin, diesel, bensin98, diesel_avgiftsfri FROM priser WHERE stasjon_id=? ORDER BY id DESC LIMIT 1",
+                (stasjon_id,)
+            ).fetchone()
+            if forrige:
+                bensin = bensin if bensin is not None else forrige[0]
+                diesel = diesel if diesel is not None else forrige[1]
+                bensin98 = bensin98 if bensin98 is not None else forrige[2]
+                diesel_avgiftsfri = diesel_avgiftsfri if diesel_avgiftsfri is not None else forrige[3]
+
             if bruker_id is not None:
                 sist = conn.execute(
                     "SELECT id, tidspunkt FROM priser WHERE bruker_id=? AND stasjon_id=? ORDER BY tidspunkt DESC LIMIT 1",

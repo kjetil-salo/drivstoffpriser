@@ -1,6 +1,7 @@
 import { oppdaterPris, settKjede, endreNavn, foreslåEndring } from './api.js';
 import { getInnstillinger } from './settings.js';
 import { getKjedeFarge, getKjedeInitials, getKjedeLogo } from './kjede.js';
+import { initOcr, visOcrForRolle, skjulOcrPreview, loggOcrVedLagring } from './ocr.js';
 
 let aktivStasjon = null;
 let onPrisOppdatert = null;
@@ -67,6 +68,21 @@ export function initSheet(onOppdatert) {
     forslagAvbrytEl.addEventListener('click', lukkForslagModal);
     forslagBackdropEl.addEventListener('click', lukkForslagModal);
     forslagLagreEl.addEventListener('click', sendEndringsforslag);
+
+    // OCR: kamera-prisgjenkjenning for admin/moderator
+    initOcr((priser) => {
+        if (priser.bensin != null) bensinInput.value = formatPrisInput(priser.bensin);
+        if (priser.bensin98 != null) bensin98Input.value = formatPrisInput(priser.bensin98);
+        if (priser.diesel != null) dieselInput.value = formatPrisInput(priser.diesel);
+        if (priser.diesel_avgiftsfri != null) dieselAvgiftsfriInput.value = formatPrisInput(priser.diesel_avgiftsfri);
+        // Advarsel hvis gjenkjent kjede ikke matcher stasjonens kjede
+        if (priser.kjede && aktivStasjon?.kjede && priser.kjede.toLowerCase() !== aktivStasjon.kjede.toLowerCase()) {
+            const ocrStatus = document.getElementById('sheet-ocr-status');
+            ocrStatus.textContent = `Gjenkjent kjede: ${priser.kjede} (stasjonen er ${aktivStasjon.kjede}) — sjekk at du er på rett stasjon!`;
+            ocrStatus.className = 'ocr-status ocr-status-advarsel';
+            ocrStatus.removeAttribute('hidden');
+        }
+    });
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && forslagModalEl.classList.contains('open')) lukkForslagModal();
     });
@@ -197,6 +213,8 @@ function visVisModus() {
 }
 
 function visEditModus() {
+    const tittelEl = document.getElementById('sheet-edit-tittel');
+    tittelEl.textContent = aktivStasjon.navn || 'Endre pris';
     bensinInput.value = aktivStasjon.bensin != null ? formatPrisInput(aktivStasjon.bensin) : '';
     bensin98Input.value = aktivStasjon.bensin98 != null ? formatPrisInput(aktivStasjon.bensin98) : '';
     dieselInput.value = aktivStasjon.diesel != null ? formatPrisInput(aktivStasjon.diesel) : '';
@@ -205,6 +223,8 @@ function visEditModus() {
     editLagreBtn.disabled = false;
     viewEl.setAttribute('hidden', '');
     editEl.removeAttribute('hidden');
+    visOcrForRolle();
+    skjulOcrPreview();
     bensinInput.focus();
 }
 
@@ -375,6 +395,9 @@ async function lagrePris() {
             editLagreBtn.disabled = false;
             return;
         }
+        // Logg OCR-statistikk ved vellykket lagring
+        loggOcrVedLagring({ stasjon_id: aktivStasjon.id, bensin, diesel, bensin98, diesel_avgiftsfri });
+
         const _nd = new Date(), _p = n => String(n).padStart(2, '0');
         const naa = `${_nd.getFullYear()}-${_p(_nd.getMonth()+1)}-${_p(_nd.getDate())} ${_p(_nd.getHours())}:${_p(_nd.getMinutes())}:${_p(_nd.getSeconds())}`;
 

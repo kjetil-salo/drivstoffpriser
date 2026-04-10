@@ -13,6 +13,9 @@ import time
 import httpx
 from flask import Blueprint, request, jsonify, make_response, session
 
+import base64
+import json
+
 from db import (get_stasjoner_med_priser, lagre_pris, logg_visning,
                 antall_stasjoner_med_pris, finn_bruker_id, DB_PATH,
                 opprett_stasjon, hent_billigste_priser_24t,
@@ -21,7 +24,8 @@ from db import (get_stasjoner_med_priser, lagre_pris, logg_visning,
                 hent_min_plassering, logg_blogg_visning,
                 legg_til_endringsforslag, unike_enheter_per_dag,
                 prisoppdateringer_per_time_24t,
-                prisoppdateringer_rullende_24t_uke)
+                prisoppdateringer_rullende_24t_uke,
+                har_rolle)
 
 logger = logging.getLogger('drivstoff')
 
@@ -819,4 +823,153 @@ def blogg_vis():
     if not slug:
         return jsonify({'ok': False}), 400
     logg_blogg_visning(slug)
+    return jsonify({'ok': True})
+
+
+_OCR_GRENSE_PER_DAG = 50  # maks kall per bruker per dag
+_ocr_bruk = {}  # {bruker_id: (dato, antall)}
+
+
+@api_bp.route('/api/gjenkjenn-priser', methods=['POST'])
+@krever_innlogging
+def gjenkjenn_priser():
+    """Gjenkjenn drivstoffpriser fra bilde via Claude Vision API.
+    Kun for admin/moderator. Eksperimentell funksjon."""
+    bruker_id = session.get('bruker_id')
+    bruker = finn_bruker_id(bruker_id)
+    if not bruker or not (bruker.get('er_admin') or har_rolle(bruker, 'moderator') or har_rolle(bruker, 'kamera')):
+        return jsonify({'error': 'Ingen tilgang til kamera'}), 403
+
+    # Rate limit: maks N kall per bruker per dag
+    i_dag = datetime.now().date()
+    dato, antall = _ocr_bruk.get(bruker_id, (i_dag, 0))
+    if dato != i_dag:
+        antall = 0
+    if antall >= _OCR_GRENSE_PER_DAG:
+        return jsonify({'error': f'Maks {_OCR_GRENSE_PER_DAG} bildeanalyser per dag'}), 429
+    _ocr_bruk[bruker_id] = (i_dag, antall + 1)
+
+    api_key = os.environ.get('ANTHROPIC_API_KEY', '')
+    if not api_key:
+        return jsonify({'error': 'AI-tjeneste ikke konfigurert'}), 503
+
+    fil = request.files.get('bilde')
+    if not fil:
+        return jsonify({'error': 'Ingen bilde lastet opp'}), 400
+
+    # Maks 5 MB
+    bilde_data = fil.read()
+    if len(bilde_data) > 5 * 1024 * 1024:
+        return jsonify({'error': 'Bilde for stort (maks 5 MB)'}), 400
+
+    content_type = fil.content_type or 'image/jpeg'
+    if content_type not in ('image/jpeg', 'image/png', 'image/webp', 'image/gif'):
+        content_type = 'image/jpeg'
+
+    bilde_b64 = base64.b64encode(bilde_data).decode('utf-8')
+
+    prompt = """Du er en prisavleser for norske bensinstasjoner. Din ENESTE oppgave er å lese drivstoffpriser fra pristavler/prisdisplay.
+
+AVVIS bildet og returner alle null-verdier hvis:
+- Bildet ikke viser en pristavle eller prisdisplay fra en bensinstasjon
+- Prisene ikke er lesbare
+- Du er usikker på noen av sifrene
+
+Returner KUN gyldig JSON uten annen tekst:
+{"bensin": null, "diesel": null, "bensin98": null, "diesel_avgiftsfri": null, "kjede": null}
+
+Det finnes kun fire drivstofftyper. Hver kjede har egne produktnavn, men de betyr alltid det samme:
+- "bensin" = vanlig bensin. På tavlen: "95", "Blyfri", "B", "miles 95", "Futura 95", eller bare den øverste prisen uten etikett.
+- "bensin98" = høyoktan bensin. På tavlen: "98", "V-Power", "miles 98", "Futura 98", "Extra".
+- "diesel" = vanlig diesel. På tavlen: "D", "Diesel", "HVO", "HVO100", "Blank diesel", "Biodiesel", "miles D", "Diesel Gold", "B-diesel".
+- "diesel_avgiftsfri" = avgiftsfri/farget diesel. På tavlen: "FD", "Farget", "Avgiftsfri", "Anleggsdiesel".
+
+Bruk sunn fornuft: uansett hva produktet heter, avgjør om det er bensin 95, bensin 98, diesel eller avgiftsfri diesel.
+Noen tavler viser bare 2–3 typer. Sett null for typer som ikke finnes på tavlen.
+
+Format:
+- Desimaltall med punktum (f.eks. 21.35)
+- Priser er alltid mellom 10.00 og 40.00 kr/liter. Verdier utenfor dette er feil — sett null.
+- Sett null for typer du ikke finner
+
+Kjede:
+- "kjede" = kjedelogo eller -navn synlig i bildet (f.eks. "Circle K", "Shell", "Esso"). Ellers null.
+
+Nøyaktighet:
+- Les hvert siffer individuelt. LED-display forveksler lett 1/7, 6/8, 3/8.
+- Er du usikker på ET ENESTE siffer, sett hele prisen til null. Feil pris er verre enn manglende pris."""
+
+    try:
+        resp = httpx.post(
+            'https://api.anthropic.com/v1/messages',
+            headers={
+                'x-api-key': api_key,
+                'anthropic-version': '2023-06-01',
+                'content-type': 'application/json',
+            },
+            json={
+                'model': 'claude-haiku-4-5-20251001',
+                'max_tokens': 256,
+                'messages': [{
+                    'role': 'user',
+                    'content': [
+                        {
+                            'type': 'image',
+                            'source': {
+                                'type': 'base64',
+                                'media_type': content_type,
+                                'data': bilde_b64,
+                            }
+                        },
+                        {'type': 'text', 'text': prompt}
+                    ]
+                }]
+            },
+            timeout=15.0,
+        )
+        resp.raise_for_status()
+    except httpx.HTTPError as e:
+        logger.error(f'Claude API-feil: {e}')
+        return jsonify({'error': 'AI-tjeneste midlertidig utilgjengelig'}), 503
+
+    try:
+        api_data = resp.json()
+        tekst = api_data['content'][0]['text'].strip()
+        # Ekstraher JSON fra eventuell markdown code block
+        if tekst.startswith('```'):
+            tekst = tekst.split('\n', 1)[1].rsplit('```', 1)[0].strip()
+        priser = json.loads(tekst)
+        logger.info(f'OCR-gjenkjenning: bruker={bruker_id} resultat={priser}')
+        return jsonify(priser)
+    except (KeyError, json.JSONDecodeError, IndexError) as e:
+        logger.error(f'Kunne ikke parse Claude-svar: {e}, tekst={tekst[:200] if "tekst" in dir() else "?"}')
+        return jsonify({'error': 'Kunne ikke tolke AI-svar'}), 502
+
+
+@api_bp.route('/api/ocr-statistikk', methods=['POST'])
+@krever_innlogging
+def ocr_statistikk():
+    """Logg OCR-statistikk: tesseract vs claude, hva brukeren faktisk lagret."""
+    data = request.get_json(silent=True) or {}
+    bruker_id = session.get('bruker_id')
+
+    with get_conn() as conn:
+        conn.execute('''INSERT INTO ocr_statistikk
+            (bruker_id, kilde, tesseract_ok, tesseract_ms, tesseract_resultat,
+             tesseract_raatekst, claude_ok, claude_ms, claude_resultat,
+             lagret_priser, tesseract_feil, claude_feil)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+            (bruker_id,
+             data.get('kilde'),
+             1 if data.get('tesseract_ok') else 0,
+             data.get('tesseract_ms'),
+             json.dumps(data.get('tesseract_resultat')) if data.get('tesseract_resultat') else None,
+             (data.get('tesseract_raatekst') or '')[:2000],
+             1 if data.get('claude_ok') else 0,
+             data.get('claude_ms'),
+             json.dumps(data.get('claude_resultat')) if data.get('claude_resultat') else None,
+             json.dumps(data.get('lagret')) if data.get('lagret') else None,
+             data.get('tesseract_feil'),
+             data.get('claude_feil')))
+
     return jsonify({'ok': True})
