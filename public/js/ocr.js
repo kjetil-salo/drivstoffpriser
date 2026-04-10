@@ -39,9 +39,10 @@ export function initOcr(onPriserGjenkjent) {
             let tesseractRaatekst = null;
             const tStart = performance.now();
             try {
-                const res = await gjenkjennMedTesseract(nedskalert);
-                tesseractPriser = res.priser;
-                tesseractRaatekst = res.raatekst;
+                // Midlertidig deaktivert: lokal Tesseract.js-OCR gir for darlig kvalitet.
+                // const res = await gjenkjennMedTesseract(nedskalert);
+                // tesseractPriser = res.priser;
+                // tesseractRaatekst = res.raatekst;
             } catch (err) {
                 console.warn('Tesseract feilet:', err);
                 sisteOcrStat.tesseract_feil = err.message;
@@ -120,9 +121,10 @@ export async function gjenkjennPriserFraBilde(bildeFile, onStatus) {
     let tesseractRaatekst = null;
     const tStart = performance.now();
     try {
-        const res = await gjenkjennMedTesseract(nedskalert);
-        tesseractPriser = res.priser;
-        tesseractRaatekst = res.raatekst;
+        // Midlertidig deaktivert: lokal Tesseract.js-OCR gir for darlig kvalitet.
+        // const res = await gjenkjennMedTesseract(nedskalert);
+        // tesseractPriser = res.priser;
+        // tesseractRaatekst = res.raatekst;
     } catch (err) {
         console.warn('Tesseract feilet:', err);
         stat.tesseract_feil = err.message;
