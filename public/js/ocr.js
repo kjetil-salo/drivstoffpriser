@@ -16,7 +16,7 @@ let tesseractLoading = false;
 // Statistikk for siste OCR-analyse (sendes til backend ved lagring)
 let sisteOcrStat = null;
 
-export function initOcr(onPriserGjenkjent) {
+export function initOcr(onPriserGjenkjent, getKontekst = null) {
     ocrInput.addEventListener('change', async (e) => {
         const fil = e.target.files?.[0];
         if (!fil) return;
@@ -36,9 +36,10 @@ export function initOcr(onPriserGjenkjent) {
             visOcrStatus('Analyserer med AI ...', false);
             let priser = null;
             let kilde = 'ai';
+            const kontekst = typeof getKontekst === 'function' ? getKontekst() : null;
             const cStart = performance.now();
             try {
-                priser = await gjenkjennMedBackend(nedskalert);
+                priser = await gjenkjennMedBackend(nedskalert, kontekst);
                 kilde = priser._modell || 'ai';
                 sisteOcrStat.claude_ms = Math.round(performance.now() - cStart);
                 sisteOcrStat.claude_resultat = priser;
@@ -85,7 +86,7 @@ export function loggOcrVedLagring(lagretPriser) {
  * Gjenkjenn priser fra en bildefil. Gjenbrukbar pipeline (Tesseract → Claude fallback).
  * Returnerer { priser, kilde, stat } eller kaster feil.
  */
-export async function gjenkjennPriserFraBilde(bildeFile, onStatus) {
+export async function gjenkjennPriserFraBilde(bildeFile, onStatus, kontekst = null) {
     const stat = { tidspunkt: new Date().toISOString() };
 
     if (onStatus) onStatus('Forbereder bilde …');
@@ -96,7 +97,7 @@ export async function gjenkjennPriserFraBilde(bildeFile, onStatus) {
     let kilde = 'ai';
     const cStart = performance.now();
     try {
-        priser = await gjenkjennMedBackend(nedskalert);
+        priser = await gjenkjennMedBackend(nedskalert, kontekst);
         kilde = priser._modell || 'ai';
         stat.claude_ms = Math.round(performance.now() - cStart);
         stat.claude_resultat = priser;
@@ -280,9 +281,12 @@ function dedup(priser) {
 }
 
 /** Send bilde til backend for AI-analyse. Returnerer priser + _modell. */
-async function gjenkjennMedBackend(bildeBlob) {
+async function gjenkjennMedBackend(bildeBlob, kontekst = null) {
     const formData = new FormData();
     formData.append('bilde', bildeBlob, 'pristavle.jpg');
+    if (kontekst?.forventet_kjede) {
+        formData.append('forventet_kjede', kontekst.forventet_kjede);
+    }
 
     const resp = await fetch('/api/gjenkjenn-priser', {
         method: 'POST',

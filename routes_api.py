@@ -15,6 +15,7 @@ from flask import Blueprint, request, jsonify, make_response, session
 
 import base64
 import json
+import re
 
 from db import (get_stasjoner_med_priser, lagre_pris, logg_visning,
                 antall_stasjoner_med_pris, finn_bruker_id, DB_PATH,
@@ -846,7 +847,11 @@ _OCR_GRENSE_PER_DAG = 50  # maks kall per bruker per dag
 _ocr_bruk = {}  # {bruker_id: (dato, antall)}
 
 
-_OCR_PROMPT = """Du er en prisavleser for norske bensinstasjoner. Din ENESTE oppgave er å lese drivstoffpriser fra pristavler/prisdisplay.
+_OCR_MIN_PRIS = 15.0
+_OCR_MAX_PRIS = 35.0
+
+
+_OCR_PROMPT_BASE = """Du er en prisavleser for norske bensinstasjoner. Din ENESTE oppgave er å lese drivstoffpriser fra pristavler/prisdisplay.
 
 AVVIS bildet og returner alle null-verdier hvis:
 - Bildet ikke viser en pristavle eller prisdisplay fra en bensinstasjon
@@ -854,7 +859,7 @@ AVVIS bildet og returner alle null-verdier hvis:
 - Du er usikker på enkeltsiffer og kan ikke korrigere med prislogikken nedenfor
 
 Returner KUN gyldig JSON uten annen tekst:
-{"bensin": null, "diesel": null, "bensin98": null, "diesel_avgiftsfri": null, "kjede": null}
+{"bensin": null, "diesel": null, "bensin98": null, "diesel_avgiftsfri": null, "kjede": null, "confidence": "low", "uncertain_fields": []}
 
 Det finnes kun fire drivstofftyper. Hver kjede har egne produktnavn, men de betyr alltid det samme:
 - "bensin" = vanlig bensin. På tavlen: "95", "Blyfri", "B", "miles 95", "Futura 95", eller bare den øverste prisen uten etikett.
@@ -866,7 +871,7 @@ Bruk sunn fornuft: uansett hva produktet heter, avgjør om det er bensin 95, ben
 Noen tavler viser bare 2–3 typer. Sett null for typer som ikke finnes på tavlen.
 
 Prislogikk (bruk dette aktivt til å korrigere lesefeil):
-- Priser er ALLTID mellom 15.00 og 30.00 kr/liter.
+- Priser er ALLTID mellom 15.00 og 35.00 kr/liter.
 - bensin98 er ALLTID dyrere enn bensin (95) — typisk 1–4 kr mer. Eks: bensin=18.79 → bensin98 må være > 18.79. Hvis du har lest bensin98 < bensin, er noe feil — se gjennom sifrene på nytt.
 - Diesel er vanligvis billigere enn eller omtrent lik bensin 95.
 - Avgiftsfri diesel er ALLTID billigst av alle — typisk 5–10 kr under vanlig diesel. Hvis du har lest avgiftsfri diesel som dyrere enn diesel, er noe feil — sett null for den.
@@ -874,7 +879,7 @@ Prislogikk (bruk dette aktivt til å korrigere lesefeil):
 Format:
 - Desimaltall med punktum (f.eks. 21.35)
 - Priser er ALLTID på formen XX.XX — nøyaktig to siffer før og to siffer etter desimaltegnet.
-- Eksempler på korreksjon: "2608" → 26.08, "6.08" → sannsynligvis 26.08, "260.8" → 26.08. Verdier som ikke lar seg korrigere til XX.XX i området 15–30 — sett null.
+- Eksempler på korreksjon: "2608" → 26.08, "6.08" → sannsynligvis 26.08, "260.8" → 26.08. Verdier som ikke lar seg korrigere til XX.XX i området 15–35 — sett null.
 - Sett null for typer du ikke finner
 
 Kjede:
@@ -883,10 +888,101 @@ Kjede:
 Nøyaktighet — LED-display:
 - Røde/oransje LED-display: sifrene 1 og 7 forveksles svært lett. Sjekk: har sifferet et topphorisontalt segment? Da er det trolig 7, ikke 1. Eks: "18.19" der 95-oktan er i nærheten av 21.29 (98-oktan), er feil — den laveste prisen for 95 kan gjerne være 18.79 (7 lest som 1).
 - 6 og 8, 3 og 8, 9 og 5 forveksles også på LED. Bruk alltid prislogikken over til å velge riktig siffer.
-- Returner null kun hvis prisen ikke lar seg tolke til et plausibelt XX.XX-tall i området 15–30 selv etter korreksjonsforsøk."""
+- Returner null kun hvis prisen ikke lar seg tolke til et plausibelt XX.XX-tall i området 15–35 selv etter korreksjonsforsøk.
+
+Ekstra regler for robusthet:
+- Ignorer all tekst som ikke er drivstofftype eller pris, som bilvask, tilbud, kaffe, åpningstider og lignende.
+- Hvis du ikke sikkert klarer å koble en pris til riktig drivstofftype, bruk null for den typen.
+- Hvis du finner 2–4 plausible priser, men er usikker på én av dem, returner de sikre prisene og bruk null for den usikre.
+- Sett "confidence" til low, medium eller high.
+- Sett "uncertain_fields" til en liste med feltnavn du er usikker på, ellers [].
+"""
 
 
-def _ocr_via_haiku(bilde_b64, content_type):
+def _lag_ocr_prompt(forventet_kjede=None):
+    if forventet_kjede:
+        return (
+            _OCR_PROMPT_BASE +
+            f'\nMykt hint: bildet er sannsynligvis fra kjeden "{forventet_kjede}". '
+            'Bruk dette bare som støtte hvis logo/visuell profil stemmer. '
+            'Hvis bildet tydelig viser en annen kjede, stol på bildet, ikke hintet.'
+        )
+    return _OCR_PROMPT_BASE
+
+
+def _parse_ocr_pris(verdi):
+    if verdi is None:
+        return None
+    if isinstance(verdi, (int, float)):
+        tall = float(verdi)
+        if _OCR_MIN_PRIS <= tall <= _OCR_MAX_PRIS:
+            return round(tall, 2)
+        if 1500 <= tall <= 3500:
+            return round(tall / 100, 2)
+        return None
+
+    tekst = str(verdi).strip().lower()
+    if not tekst or tekst in ('null', 'none', 'ukjent', 'unknown'):
+        return None
+
+    tekst = tekst.replace(',', '.')
+    tekst = re.sub(r'[^0-9.]', '', tekst)
+    if not tekst:
+        return None
+
+    if re.fullmatch(r'\d{4}', tekst):
+        tall = int(tekst) / 100
+    elif re.fullmatch(r'\d{2}\.\d{2}', tekst) or re.fullmatch(r'\d{1,2}\.\d{2}', tekst):
+        tall = float(tekst)
+    else:
+        return None
+
+    if not (_OCR_MIN_PRIS <= tall <= _OCR_MAX_PRIS):
+        return None
+    return round(tall, 2)
+
+
+def _normaliser_ocr_resultat(data):
+    if not isinstance(data, dict):
+        raise ValueError('OCR-svar må være et objekt')
+
+    resultat = {
+        'bensin': _parse_ocr_pris(data.get('bensin')),
+        'diesel': _parse_ocr_pris(data.get('diesel')),
+        'bensin98': _parse_ocr_pris(data.get('bensin98')),
+        'diesel_avgiftsfri': _parse_ocr_pris(data.get('diesel_avgiftsfri')),
+        'kjede': None,
+    }
+
+    kjede = data.get('kjede')
+    if isinstance(kjede, str):
+        kjede = kjede.strip()
+        if kjede:
+            resultat['kjede'] = kjede[:60]
+
+    if resultat['bensin'] is not None and resultat['bensin98'] is not None and resultat['bensin98'] < resultat['bensin']:
+        diff = resultat['bensin'] - resultat['bensin98']
+        if 0.2 <= diff <= 4.5:
+            resultat['bensin'], resultat['bensin98'] = resultat['bensin98'], resultat['bensin']
+        else:
+            resultat['bensin98'] = None
+
+    if resultat['diesel'] is not None and resultat['diesel_avgiftsfri'] is not None and resultat['diesel_avgiftsfri'] > resultat['diesel']:
+        diff = resultat['diesel_avgiftsfri'] - resultat['diesel']
+        if 2.0 <= diff <= 12.0:
+            resultat['diesel'], resultat['diesel_avgiftsfri'] = resultat['diesel_avgiftsfri'], resultat['diesel']
+        else:
+            resultat['diesel_avgiftsfri'] = None
+
+    if resultat['diesel_avgiftsfri'] is not None:
+        andre = [v for k, v in resultat.items() if k in ('bensin', 'bensin98', 'diesel') and v is not None]
+        if andre and resultat['diesel_avgiftsfri'] >= min(andre):
+            resultat['diesel_avgiftsfri'] = None
+
+    return resultat
+
+
+def _ocr_via_haiku(bilde_b64, content_type, forventet_kjede=None):
     api_key = os.environ.get('ANTHROPIC_API_KEY', '')
     if not api_key:
         raise ValueError('ANTHROPIC_API_KEY ikke satt')
@@ -911,7 +1007,7 @@ def _ocr_via_haiku(bilde_b64, content_type):
                             'data': bilde_b64,
                         }
                     },
-                    {'type': 'text', 'text': _OCR_PROMPT}
+                    {'type': 'text', 'text': _lag_ocr_prompt(forventet_kjede)}
                 ]
             }]
         },
@@ -921,10 +1017,10 @@ def _ocr_via_haiku(bilde_b64, content_type):
     tekst = resp.json()['content'][0]['text'].strip()
     if tekst.startswith('```'):
         tekst = tekst.split('\n', 1)[1].rsplit('```', 1)[0].strip()
-    return json.loads(tekst)
+    return _normaliser_ocr_resultat(json.loads(tekst))
 
 
-def _ocr_via_gemini(bilde_b64, content_type):
+def _ocr_via_gemini(bilde_b64, content_type, forventet_kjede=None):
     api_key = os.environ.get('GEMINI_API_KEY', '')
     if not api_key:
         raise ValueError('GEMINI_API_KEY ikke satt')
@@ -937,10 +1033,27 @@ def _ocr_via_gemini(bilde_b64, content_type):
             'contents': [{
                 'parts': [
                     {'inline_data': {'mime_type': content_type, 'data': bilde_b64}},
-                    {'text': _OCR_PROMPT},
+                    {'text': _lag_ocr_prompt(forventet_kjede)},
                 ]
             }],
-            'generationConfig': {'maxOutputTokens': 256, 'temperature': 0},
+            'generationConfig': {
+                'maxOutputTokens': 256,
+                'temperature': 0,
+                'responseMimeType': 'application/json',
+                'responseSchema': {
+                    'type': 'OBJECT',
+                    'properties': {
+                        'bensin': {'type': 'NUMBER', 'nullable': True},
+                        'diesel': {'type': 'NUMBER', 'nullable': True},
+                        'bensin98': {'type': 'NUMBER', 'nullable': True},
+                        'diesel_avgiftsfri': {'type': 'NUMBER', 'nullable': True},
+                        'kjede': {'type': 'STRING', 'nullable': True},
+                        'confidence': {'type': 'STRING', 'enum': ['low', 'medium', 'high']},
+                        'uncertain_fields': {'type': 'ARRAY', 'items': {'type': 'STRING'}},
+                    },
+                    'required': ['bensin', 'diesel', 'bensin98', 'diesel_avgiftsfri', 'kjede', 'confidence', 'uncertain_fields'],
+                },
+            },
         },
         timeout=15.0,
     )
@@ -948,7 +1061,7 @@ def _ocr_via_gemini(bilde_b64, content_type):
     tekst = resp.json()['candidates'][0]['content']['parts'][0]['text'].strip()
     if tekst.startswith('```'):
         tekst = tekst.split('\n', 1)[1].rsplit('```', 1)[0].strip()
-    return json.loads(tekst)
+    return _normaliser_ocr_resultat(json.loads(tekst))
 
 
 @api_bp.route('/api/gjenkjenn-priser', methods=['POST'])
@@ -984,12 +1097,13 @@ def gjenkjenn_priser():
 
     bilde_b64 = base64.b64encode(bilde_data).decode('utf-8')
     ocr_modell = os.environ.get('OCR_MODELL', 'haiku').lower()
+    forventet_kjede = (request.form.get('forventet_kjede') or '').strip()[:60] or None
 
     try:
         if ocr_modell == 'gemini':
-            priser = _ocr_via_gemini(bilde_b64, content_type)
+            priser = _ocr_via_gemini(bilde_b64, content_type, forventet_kjede=forventet_kjede)
         else:
-            priser = _ocr_via_haiku(bilde_b64, content_type)
+            priser = _ocr_via_haiku(bilde_b64, content_type, forventet_kjede=forventet_kjede)
         logger.info(f'OCR-gjenkjenning: bruker={bruker_id} modell={ocr_modell} resultat={priser}')
         priser['_modell'] = ocr_modell
         return jsonify(priser)

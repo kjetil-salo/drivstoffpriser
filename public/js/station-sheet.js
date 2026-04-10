@@ -70,19 +70,22 @@ export function initSheet(onOppdatert) {
     forslagLagreEl.addEventListener('click', sendEndringsforslag);
 
     // OCR: kamera-prisgjenkjenning for admin/moderator
-    initOcr((priser) => {
-        if (priser.bensin != null) bensinInput.value = formatPrisInput(priser.bensin);
-        if (priser.bensin98 != null) bensin98Input.value = formatPrisInput(priser.bensin98);
-        if (priser.diesel != null) dieselInput.value = formatPrisInput(priser.diesel);
-        if (priser.diesel_avgiftsfri != null) dieselAvgiftsfriInput.value = formatPrisInput(priser.diesel_avgiftsfri);
-        // Advarsel hvis gjenkjent kjede ikke matcher stasjonens kjede
-        if (priser.kjede && aktivStasjon?.kjede && priser.kjede.toLowerCase() !== aktivStasjon.kjede.toLowerCase()) {
-            const ocrStatus = document.getElementById('sheet-ocr-status');
-            ocrStatus.textContent = `Gjenkjent kjede: ${priser.kjede} (stasjonen er ${aktivStasjon.kjede}) — sjekk at du er på rett stasjon!`;
-            ocrStatus.className = 'ocr-status ocr-status-advarsel';
-            ocrStatus.removeAttribute('hidden');
-        }
-    });
+    initOcr(
+        (priser) => {
+            if (priser.bensin != null) bensinInput.value = formatPrisInput(priser.bensin);
+            if (priser.bensin98 != null) bensin98Input.value = formatPrisInput(priser.bensin98);
+            if (priser.diesel != null) dieselInput.value = formatPrisInput(priser.diesel);
+            if (priser.diesel_avgiftsfri != null) dieselAvgiftsfriInput.value = formatPrisInput(priser.diesel_avgiftsfri);
+            // Advarsel hvis gjenkjent kjede ikke matcher stasjonens kjede
+            if (priser.kjede && aktivStasjon?.kjede && priser.kjede.toLowerCase() !== aktivStasjon.kjede.toLowerCase()) {
+                const ocrStatus = document.getElementById('sheet-ocr-status');
+                ocrStatus.textContent = `Gjenkjent kjede: ${priser.kjede} (stasjonen er ${aktivStasjon.kjede}) — sjekk at du er på rett stasjon!`;
+                ocrStatus.className = 'ocr-status ocr-status-advarsel';
+                ocrStatus.removeAttribute('hidden');
+            }
+        },
+        () => ({ forventet_kjede: aktivStasjon?.kjede || '' })
+    );
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && forslagModalEl.classList.contains('open')) lukkForslagModal();
     });
@@ -531,4 +534,3 @@ function formaterTid(tidStr) {
         return tidStr;
     }
 }
-

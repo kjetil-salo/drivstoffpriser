@@ -109,9 +109,13 @@ async function onBilde(e) {
     visStatus('Analyserer pristavle …', 'loading');
 
     try {
-        const resultat = await gjenkjennPriserFraBilde(fil, (tekst) => {
-            visStatus(tekst, 'loading');
-        });
+        const resultat = await gjenkjennPriserFraBilde(
+            fil,
+            (tekst) => {
+                visStatus(tekst, 'loading');
+            },
+            { forventet_kjede: valgtStasjon?.kjede || '' }
+        );
 
         if (resultat.priser) {
             fyllPriser(resultat.priser);
