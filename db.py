@@ -546,9 +546,19 @@ def antall_brukere() -> int:
         return conn.execute("SELECT COUNT(*) FROM brukere").fetchone()[0]
 
 
+def antall_priser_for_bruker(bruker_id: int) -> int:
+    with get_conn() as conn:
+        return conn.execute(
+            "SELECT COUNT(*) FROM priser WHERE bruker_id = ?",
+            (bruker_id,)
+        ).fetchone()[0]
+
+
 def har_rolle(bruker: dict, rolle: str) -> bool:
     if not bruker:
         return False
+    if rolle == 'kamera' and antall_priser_for_bruker(bruker['id']) > 50:
+        return True
     return rolle in (bruker.get('roller') or '').split()
 
 

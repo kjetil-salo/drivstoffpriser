@@ -149,10 +149,13 @@ def meg():
     if not bruker:
         session.clear()
         return jsonify({'innlogget': False})
+    roller = (bruker.get('roller') or '').split()
+    if har_rolle(bruker, 'kamera') and 'kamera' not in roller:
+        roller.append('kamera')
     return jsonify({'innlogget': True, 'brukernavn': bruker['brukernavn'],
                     'kallenavn': bruker.get('kallenavn') or '', 'bruker_id': bruker['id'],
                     'er_admin': bool(bruker['er_admin']),
-                    'roller': (bruker.get('roller') or '').split()})
+                    'roller': roller})
 
 
 @api_bp.route('/api/stasjoner')
@@ -868,7 +871,25 @@ Det finnes kun fire drivstofftyper. Hver kjede har egne produktnavn, men de bety
 - "diesel_avgiftsfri" = avgiftsfri/farget diesel. På tavlen: "FD", "Farget", "Avgiftsfri", "Anleggsdiesel".
 
 Bruk sunn fornuft: uansett hva produktet heter, avgjør om det er bensin 95, bensin 98, diesel eller avgiftsfri diesel.
-Noen tavler viser bare 2–3 typer. Sett null for typer som ikke finnes på tavlen.
+Noen tavler viser bare 2–3 typer. Dette er normalt. Sett null for typer som ikke finnes på tavlen.
+I de aller fleste tilfeller er bare 2 prisrader synlige. Hvis bare 2 rader er synlige, er det som hovedregel bensin 95 og diesel, med mindre etikettene tydelig viser noe annet.
+Hvis 3 prisrader er synlige, er det som hovedregel bensin 95, bensin 98 og diesel. Det finnes ingen fast plassering for 98 på skiltet. Stol alltid mest på etiketten på hver rad, ikke på vertikal rekkefølge.
+
+Arbeidsmåte:
+1. Finn først selve prisradene visuelt. Se etter en rad som inneholder både drivstoffetikett og en pris.
+2. Les etiketten på raden først, og les deretter prisen på samme rad.
+3. Match radene til feltene i JSON:
+   - "95" eller "miles 95" -> bensin
+   - "98", "V-Power", "miles 98" -> bensin98
+   - "D", "Diesel", "miles D" -> diesel
+   - "FD", "Avgiftsfri", "Farget" -> diesel_avgiftsfri
+4. Hvis bare 1–2 prisrader er synlige, er dette normalt. Returner disse og sett resten til null.
+5. Prioriter tydelig etikett + tydelig pris på samme rad over generelle antakelser.
+6. Ikke flytt en pris fra én rad til en annen bare fordi prisnivået virker mer sannsynlig. Hvis raden tydelig viser "D", skal den raden mappes til diesel. Hvis raden tydelig viser "95", skal den raden mappes til bensin.
+7. Hvis en tavle har to synlige rader, og den øverste raden er merket "D" mens nederste er merket "95", skal øverste pris være diesel og nederste pris være bensin.
+8. Hvis en tavle har to synlige rader og etikettene er delvis uklare, anta bensin 95 og diesel før du vurderer bensin98 eller avgiftsfri diesel.
+9. Hvis en tavle har tre synlige rader, anta som hovedregel at de tre typene er bensin 95, bensin 98 og diesel.
+10. Ved tre synlige rader: ikke anta at 98 ligger på en bestemt rad. Bruk etiketten på hver rad for å avgjøre hvilken pris som er 95, 98 og diesel.
 
 Prislogikk (bruk dette aktivt til å korrigere lesefeil):
 - Priser er ALLTID mellom 15.00 og 35.00 kr/liter.
@@ -888,6 +909,7 @@ Kjede:
 Nøyaktighet — LED-display:
 - Røde/oransje LED-display: sifrene 1 og 7 forveksles svært lett. Sjekk: har sifferet et topphorisontalt segment? Da er det trolig 7, ikke 1. Eks: "18.19" der 95-oktan er i nærheten av 21.29 (98-oktan), er feil — den laveste prisen for 95 kan gjerne være 18.79 (7 lest som 1).
 - 6 og 8, 3 og 8, 9 og 5 forveksles også på LED. Bruk alltid prislogikken over til å velge riktig siffer.
+- I tall som ligner "20.19" på røde LED-skilt, vurder alltid om tredje siffer egentlig er 7 og tallet derfor er "20.79". Dette er en vanlig feil.
 - Returner null kun hvis prisen ikke lar seg tolke til et plausibelt XX.XX-tall i området 15–35 selv etter korreksjonsforsøk.
 
 Ekstra regler for robusthet:
@@ -896,6 +918,49 @@ Ekstra regler for robusthet:
 - Hvis du finner 2–4 plausible priser, men er usikker på én av dem, returner de sikre prisene og bruk null for den usikre.
 - Sett "confidence" til low, medium eller high.
 - Sett "uncertain_fields" til en liste med feltnavn du er usikker på, ellers [].
+
+Eksempler:
+Eksempel 1:
+- Rad 1 viser "95 miles" og prisen "15.99"
+- Rad 2 viser "D miles" og prisen "20.97"
+- Ingen andre prisrader er synlige
+Svar:
+{"bensin": 15.99, "diesel": 20.97, "bensin98": null, "diesel_avgiftsfri": null, "kjede": "Circle K", "confidence": "high", "uncertain_fields": []}
+
+Eksempel 2:
+- Rad 1 viser "95" og "22.49"
+- Rad 2 viser "98" og "24.39"
+- Rad 3 viser "Diesel" og "21.79"
+Svar:
+{"bensin": 22.49, "diesel": 21.79, "bensin98": 24.39, "diesel_avgiftsfri": null, "kjede": null, "confidence": "high", "uncertain_fields": []}
+
+Eksempel 3:
+- Du ser en tydelig dieselrad, men tallene på 95-raden er uklare
+Svar:
+{"bensin": null, "diesel": 19.87, "bensin98": null, "diesel_avgiftsfri": null, "kjede": null, "confidence": "medium", "uncertain_fields": ["bensin"]}
+
+Eksempel 4:
+- Tavlen viser to rader
+- Øverste rad er merket "D" og prisen ser ut som "20.79"
+- Nederste rad er merket "95" og prisen er "15.89"
+- Ikke bytt om radene
+Svar:
+{"bensin": 15.89, "diesel": 20.79, "bensin98": null, "diesel_avgiftsfri": null, "kjede": "Uno-X", "confidence": "high", "uncertain_fields": []}
+
+Eksempel 5:
+- Tavlen viser bare to prisrader
+- Du ser ingen tydelig 98-rad og ingen tydelig avgiftsfri-rad
+- Etikettene er litt vanskelige, men bildet ligner et vanlig norsk skilt med 95 og diesel
+Svar:
+{"bensin": 19.99, "diesel": 20.79, "bensin98": null, "diesel_avgiftsfri": null, "kjede": null, "confidence": "medium", "uncertain_fields": []}
+
+Eksempel 6:
+- Tavlen viser tre prisrader
+- De tre radene er 95, 98 og diesel
+- 98 kan stå øverst, i midten eller nederst
+- Bruk etiketten på hver rad, ikke fast radplass
+Svar:
+{"bensin": 21.49, "diesel": 20.89, "bensin98": 23.29, "diesel_avgiftsfri": null, "kjede": null, "confidence": "medium", "uncertain_fields": []}
 """
 
 
