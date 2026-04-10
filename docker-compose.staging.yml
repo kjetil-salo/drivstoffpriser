@@ -13,7 +13,8 @@ services:
       DATA_DIR: "/app/data"
       OCR_MODELL: "${OCR_MODELL:-gemini}"
       GEMINI_API_KEY: "${GEMINI_API_KEY:-}"
-      GEMINI_MODELL: "${GEMINI_MODELL:-gemini-2.5-flash}"
+      GEMINI_MODELL: "${GEMINI_MODELL:-gemini-flash-latest}"
+      GEMINI_MODELLER: "${GEMINI_MODELLER:-gemini-flash-latest,gemini-2.5-flash}"
       LOG_LEVEL: "DEBUG"
     volumes:
       - drivstoff-staging-data:/app/data

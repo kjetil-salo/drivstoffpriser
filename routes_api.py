@@ -1117,44 +1117,57 @@ def _gemini_json_request(bilde_b64, content_type, prompt):
     api_key = os.environ.get('GEMINI_API_KEY', '')
     if not api_key:
         raise ValueError('GEMINI_API_KEY ikke satt')
-    modell = os.environ.get('GEMINI_MODELL', 'gemini-2.5-flash')
-    resp = httpx.post(
-        f'https://generativelanguage.googleapis.com/v1beta/models/{modell}:generateContent',
-        params={'key': api_key},
-        headers={'content-type': 'application/json'},
-        json={
-            'contents': [{
-                'parts': [
-                    {'inline_data': {'mime_type': content_type, 'data': bilde_b64}},
-                    {'text': prompt},
-                ]
-            }],
-            'generationConfig': {
-                'maxOutputTokens': 256,
-                'temperature': 0,
-                'responseMimeType': 'application/json',
-                'responseSchema': {
-                    'type': 'OBJECT',
-                    'properties': {
-                        'bensin': {'type': 'NUMBER', 'nullable': True},
-                        'diesel': {'type': 'NUMBER', 'nullable': True},
-                        'bensin98': {'type': 'NUMBER', 'nullable': True},
-                        'diesel_avgiftsfri': {'type': 'NUMBER', 'nullable': True},
-                        'kjede': {'type': 'STRING', 'nullable': True},
-                        'confidence': {'type': 'STRING', 'enum': ['low', 'medium', 'high']},
-                        'uncertain_fields': {'type': 'ARRAY', 'items': {'type': 'STRING'}},
+    modeller = os.environ.get('GEMINI_MODELLER') or os.environ.get('GEMINI_MODELL', 'gemini-flash-latest')
+    siste_feil = None
+    for modell in [m.strip() for m in modeller.split(',') if m.strip()]:
+        try:
+            resp = httpx.post(
+                f'https://generativelanguage.googleapis.com/v1beta/models/{modell}:generateContent',
+                params={'key': api_key},
+                headers={'content-type': 'application/json'},
+                json={
+                    'contents': [{
+                        'parts': [
+                            {'inline_data': {'mime_type': content_type, 'data': bilde_b64}},
+                            {'text': prompt},
+                        ]
+                    }],
+                    'generationConfig': {
+                        'maxOutputTokens': 256,
+                        'temperature': 0,
+                        'responseMimeType': 'application/json',
+                        'responseSchema': {
+                            'type': 'OBJECT',
+                            'properties': {
+                                'bensin': {'type': 'NUMBER', 'nullable': True},
+                                'diesel': {'type': 'NUMBER', 'nullable': True},
+                                'bensin98': {'type': 'NUMBER', 'nullable': True},
+                                'diesel_avgiftsfri': {'type': 'NUMBER', 'nullable': True},
+                                'kjede': {'type': 'STRING', 'nullable': True},
+                                'confidence': {'type': 'STRING', 'enum': ['low', 'medium', 'high']},
+                                'uncertain_fields': {'type': 'ARRAY', 'items': {'type': 'STRING'}},
+                            },
+                            'required': ['bensin', 'diesel', 'bensin98', 'diesel_avgiftsfri', 'kjede', 'confidence', 'uncertain_fields'],
+                        },
                     },
-                    'required': ['bensin', 'diesel', 'bensin98', 'diesel_avgiftsfri', 'kjede', 'confidence', 'uncertain_fields'],
                 },
-            },
-        },
-        timeout=15.0,
-    )
-    resp.raise_for_status()
-    tekst = resp.json()['candidates'][0]['content']['parts'][0]['text'].strip()
-    if tekst.startswith('```'):
-        tekst = tekst.split('\n', 1)[1].rsplit('```', 1)[0].strip()
-    return json.loads(tekst)
+                timeout=15.0,
+            )
+            resp.raise_for_status()
+            tekst = resp.json()['candidates'][0]['content']['parts'][0]['text'].strip()
+            if tekst.startswith('```'):
+                tekst = tekst.split('\n', 1)[1].rsplit('```', 1)[0].strip()
+            resultat = json.loads(tekst)
+            resultat['_modell'] = modell
+            return resultat
+        except (httpx.HTTPError, KeyError, IndexError, json.JSONDecodeError) as e:
+            siste_feil = e
+            logger.warning(f'Gemini OCR feilet med modell={modell}: {e}')
+    if isinstance(siste_feil, httpx.HTTPError):
+        raise siste_feil
+    if siste_feil:
+        raise RuntimeError(f'Kunne ikke tolke Gemini-svar: {siste_feil}')
+    raise ValueError('Ingen Gemini-modeller konfigurert')
 
 
 def _ocr_via_gemini(bilde_b64, content_type, forventet_kjede=None):
