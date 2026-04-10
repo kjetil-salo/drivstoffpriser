@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <meta name="theme-color" content="#1a1a2e">
+  <title>Mars i data: nedgang, prissprang og avgiftskuttet – Drivstoffprisene</title>
+  <link rel="stylesheet" href="/css/tokens.css">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--color-bg);
+      color: var(--color-text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 16px;
+      min-height: 100vh;
+    }
+
+    header {
+      position: sticky;
+      top: 0;
+      background: rgba(15, 23, 42, 0.92);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--border-color);
+      padding: 0 var(--space-lg);
+      height: 48px;
+      display: flex;
+      align-items: center;
+      gap: var(--space-md);
+      z-index: 10;
+    }
+
+    header a { color: var(--color-muted); text-decoration: none; font-size: var(--font-sm); }
+    header a:hover { color: var(--color-text); }
+    header .sep { color: var(--border-color-medium); }
+    header .side-tittel { color: var(--color-text); font-weight: 600; font-size: var(--font-base); }
+
+    main {
+      max-width: 680px;
+      margin: 0 auto;
+      padding: var(--space-lg);
+    }
+
+    .meta {
+      font-size: var(--font-xs);
+      color: var(--color-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: var(--space-sm);
+    }
+
+    h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      line-height: 1.25;
+      margin-bottom: var(--space-lg);
+    }
+
+    h2 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--color-text);
+      margin: var(--space-xl) 0 var(--space-sm);
+    }
+
+    p {
+      font-size: var(--font-base);
+      line-height: 1.75;
+      color: #cbd5e1;
+      margin-bottom: var(--space-md);
+    }
+
+    .graf-bilde {
+      width: 100%;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-color);
+      margin: var(--space-lg) 0 var(--space-sm);
+      display: block;
+    }
+
+    .graf-tekst {
+      font-size: var(--font-xs);
+      color: var(--color-muted);
+      text-align: center;
+      margin-bottom: var(--space-lg);
+    }
+
+    .tall-rad {
+      display: flex;
+      gap: var(--space-md);
+      margin: var(--space-lg) 0;
+      flex-wrap: wrap;
+    }
+
+    .tall-kort {
+      flex: 1;
+      min-width: 120px;
+      background: var(--color-card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: var(--space-md);
+      text-align: center;
+    }
+
+    .tall-verdi {
+      font-size: 1.9rem;
+      font-weight: 700;
+      color: var(--color-success);
+      display: block;
+    }
+
+    .tall-label {
+      font-size: var(--font-xs);
+      color: var(--color-muted);
+      margin-top: var(--space-xs);
+    }
+
+    .faktaboks {
+      background: #1c1a10;
+      border: 1px solid #78350f;
+      border-radius: var(--radius-md);
+      padding: var(--space-md) var(--space-lg);
+      margin: var(--space-lg) 0;
+    }
+
+    .faktaboks-tittel {
+      font-size: var(--font-sm);
+      font-weight: 700;
+      color: #fbbf24;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: var(--space-sm);
+    }
+
+    .faktaboks p {
+      margin-bottom: var(--space-sm);
+      color: #e2e8f0;
+    }
+
+    .faktaboks p:last-child { margin-bottom: 0; }
+
+    .prisrad {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: var(--space-xs) 0;
+      border-bottom: 1px solid #2d2a15;
+      color: #e2e8f0;
+      font-size: var(--font-sm);
+    }
+
+    .prisrad:last-child { border-bottom: none; }
+
+    .prisrad .kutt {
+      font-weight: 700;
+      color: #4ade80;
+    }
+
+    .cta {
+      background: var(--color-accent-soft);
+      border: 1px solid var(--color-accent);
+      border-radius: var(--radius-md);
+      padding: var(--space-md) var(--space-lg);
+      margin-top: var(--space-lg);
+    }
+
+    .cta p { margin-bottom: var(--space-sm); }
+    .cta p:last-child { margin-bottom: 0; }
+    .cta a { color: var(--color-accent); font-weight: 600; text-decoration: none; }
+    .cta a:hover { text-decoration: underline; }
+
+    :focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/">⛽ Drivstoffprisene</a>
+    <span class="sep">/</span>
+    <a href="/blogg/">Prisanalyse</a>
+    <span class="sep">/</span>
+    <span class="side-tittel">Mars i data</span>
+  </header>
+
+  <main>
+    <p class="meta">31. mars 2026</p>
+    <h1>Mars i data: nedgang, prissprang og avgiftskuttet som slår inn i morgen</h1>
+
+    <p>
+      Vi har nå tolv dager med prisdata fra brukere over hele landet. Nok til å se tydelige mønstre –
+      og nok til å si noe om hva som venter fra 1. april.
+    </p>
+
+    <div class="tall-rad">
+      <div class="tall-kort">
+        <span class="tall-verdi">673</span>
+        <div class="tall-label">registrerte brukere</div>
+      </div>
+      <div class="tall-kort">
+        <span class="tall-verdi">10 720</span>
+        <div class="tall-label">unike enheter</div>
+      </div>
+      <div class="tall-kort">
+        <span class="tall-verdi">21 715</span>
+        <div class="tall-label">sidevisninger totalt</div>
+      </div>
+      <div class="tall-kort">
+        <span class="tall-verdi">1 562</span>
+        <div class="tall-label">prisregistreringer</div>
+      </div>
+    </div>
+
+    <p>
+      Fra 436 brukere forrige uke til 673 i dag. Over 10 000 unike enheter har besøkt appen –
+      og siden Cloudflare håndterer mye av trafikken uten å treffe serveren vår, er det reelle
+      tallet høyere. Over 200 brukere har ikke bare åpnet appen, men aktivt lagt inn priser.
+      Det er de som gjør at vi kan skrive denne analysen.
+    </p>
+
+    <h2>Bensinprisen har falt nesten 3,50 kr siden åpningen</h2>
+
+    <p>
+      Da de første prisene kom inn 19. mars, lå snittet på 26,13 kr/liter for bensin 95. I dag,
+      tolv dager senere, er det 22,70 kr – en nedgang på 3,43 kr. Diesel har falt fra 28,05 kr til
+      25,56 kr i samme periode.
+    </p>
+
+    <img class="graf-bilde" src="/blogg/graf-trend.png" alt="Linjegraf som viser at gjennomsnittlig bensinpris har falt fra 26,13 kr til 22,70 kr fra 19. til 31. mars 2026">
+    <p class="graf-tekst">Gjennomsnittlig pumpepris, basert på innrapporterte priser fra brukere av appen</p>
+
+    <p>
+      Trenden er ikke tilfeldig. Råoljeprisen har falt de siste ukene, og norske oljeselskaper har
+      justert i takt. Men fallet er ikke jevnt – det kommer i rykk, gjerne over natten eller tidlig
+      om morgenen.
+    </p>
+
+    <h2>Billigst eller dyrest – det kan bety nesten 3 kr forskjell</h2>
+
+    <p>
+      Ikke alle kjeder beveger seg like raskt. Ser vi på snittprisene fra 25–31. mars, skiller det
+      nesten 1,60 kr mellom billigste og dyreste kjede på bensin. Tanken og Driv-stasjoner ligger
+      konsekvent i bunn. YX, Best og Bunker Oil er i toppen.
+    </p>
+
+    <img class="graf-bilde" src="/blogg/graf-kjeder.png" alt="Søylediagram som viser gjennomsnittlig bensinpris per kjede, sortert fra billigst til dyrest">
+    <p class="graf-tekst">Snittpris bensin 95 per kjede, 25–31. mars. Kun kjeder med minst 5 prisregistreringer er med.</p>
+
+    <p>
+      Kjøper du alltid på den dyreste kjeden nær deg, og det finnes et rimeligere alternativ i
+      nærheten, kan du spare 150–200 kr per måneden på en vanlig bil – bare ved å bytte stasjon.
+    </p>
+
+    <h2>Noen stasjoner skifter pris 11 ganger på én dag</h2>
+
+    <p>
+      Det som overrasker mest i dataene er ikke trenden over uker – det er de dramatiske
+      svingningene innenfor én og samme dag. 27. mars var Circle K Haukås ved Bergen registrert med
+      elleve prisendringer. Naboen St1 Haukås Nyborg hadde ni.
+    </p>
+
+    <img class="graf-bilde" src="/blogg/graf-prishopp.png" alt="Trappediagram som viser bensinprisen på St1 Haukås Nyborg 27–28. mars med et markert hopp på over 3 kr og rask delprisjustering etterpå">
+    <p class="graf-tekst">Bensinprisen på St1 Haukås Nyborg 27–28. mars. Én stasjon, tolv timer, 3,40 kr i bevegelse.</p>
+
+    <p>
+      Mønsteret er klassisk: prisene kryper nedover utover morgenen, gjerne 20–40 øre om gangen,
+      for så å hoppe brått opp igjen på ettermiddagen. St1 Haukås falt til 22,89 kr – for deretter
+      å sprette til 26,09 kr på under en time. Deretter ned igjen til 25,19 kr samme kveld.
+    </p>
+
+    <p>
+      Dette er ikke unikt for disse stasjonene. Det er slik norsk drivstoffprising fungerer.
+      Oljeselskapene følger hverandre tett, og den som senker prisen om morgenen lokker til seg
+      kunder – inntil en konkurrent setter opp igjen og de andre følger etter. Kjenner du ikke til
+      dette mønsteret, kan du betale 3 kr mer per liter bare fordi du tanket på feil tidspunkt.
+    </p>
+
+    <h2>Fra i morgen: historiens største enkeltdagskutt</h2>
+
+    <div class="faktaboks">
+      <div class="faktaboks-tittel">Avgiftskutt fra 1. april 2026</div>
+      <p>
+        Stortinget vedtok mot regjeringens vilje (Høyre, Frp, KrF og Sp stemte for) å fjerne
+        veibruksavgiften på bensin og diesel midlertidig. Kuttet gjelder 1. april – 1. september 2026.
+      </p>
+      <div class="prisrad">
+        <span>Bensin 95</span>
+        <span class="kutt">−4,41 kr/liter</span>
+      </div>
+      <div class="prisrad">
+        <span>Diesel</span>
+        <span class="kutt">−2,85 kr/liter</span>
+      </div>
+      <div class="prisrad">
+        <span>Diesel (inkl. CO2-avgiftskutt)</span>
+        <span class="kutt">−4,18 kr/liter</span>
+      </div>
+      <p style="margin-top: var(--space-sm); font-size: var(--font-xs); color: var(--color-muted);">
+        Finansminister Jens Stoltenberg sa han ikke ønsket kuttet, men vil følge opp Stortingets vedtak.
+        Kostnaden for staten: anslagsvis 8 milliarder kroner.
+      </p>
+    </div>
+
+    <p>
+      I morgen tidlig forventer vi at prisene stuper på pumpene over hele landet. Snittet vi ser
+      i dag – 22,70 kr for bensin – kan i teorien falle til rundt 18 kr. For diesel kan vi se priser
+      under 22 kr.
+    </p>
+
+    <p>
+      Om kjedene faktisk sender hele kuttet videre med én gang, er et åpent spørsmål.
+      Finansministeren sa han «gikk ut fra at bensinstasjonene følger opp». Sp-leder Vedum var mer
+      direkte: «Nå er det Stortinget som styrer.»
+    </p>
+
+    <p>
+      Drivstoffprisene vil være et av de første stedene du kan se om kuttet faktisk slår inn –
+      stasjon for stasjon, time for time. Sjekk inn i morgen.
+    </p>
+
+    <div class="cta">
+      <p><strong>Hjelp oss dokumentere kuttet.</strong></p>
+      <p>
+        Tanker du 1. april? <a href="/">Legg inn prisen du ser</a> – så bygger vi i fellesskap
+        et bilde av om avgiftskuttet faktisk når frem til pumpa, og hvem som er raskest.
+      </p>
+    </div>
+  </main>
+<script>fetch('/api/blogg/vis',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug:'priser-mars-2026'})});</script>
+</body>
+</html>

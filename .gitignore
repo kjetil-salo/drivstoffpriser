@@ -8,3 +8,8 @@ drivstoff.db
 test-results/
 .env
 .claude/
+.DS_Store
+app.log
+drivstoff.db.backup-*
+drivstoffpriser-image-*.tar
+stasjonskart.png
