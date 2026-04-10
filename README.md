@@ -1,6 +1,6 @@
 # Drivstoffpriser
 
-Mobilapp for sanntids bensinpriser i Norge. Viser stasjoner fra OpenStreetMap på et interaktivt kart med crowdsourcede priser fra innloggede brukere.
+Mobilapp/PWA for drivstoffpriser i Norge. Viser stasjoner fra OpenStreetMap på kart og i liste, med crowdsourcede priser fra innloggede brukere og moderatorverktøy for kvalitetssikring.
 
 Tilgjengelig på [drivstoff.ksalo.no](https://drivstoff.ksalo.no)
 
@@ -19,14 +19,19 @@ Tilgjengelig på [drivstoff.ksalo.no](https://drivstoff.ksalo.no)
 
 ### Funksjoner
 
-- **Kartvisning** — Interaktivt kart med fargekodede markører etter prisalder
-- **Listevisning** — Sorterbar liste etter avstand, 95 oktan, 98 oktan eller diesel
-- **Statistikk** — Billigste og dyreste priser siste 24 timer, side om side per drivstofftype
+- **Kartvisning** — Interaktivt Leaflet-kart med fargekodede markører etter prisalder
+- **Listevisning** — Sortering på avstand og drivstoffpris
+- **Drivstofftyper** — 95 oktan, 98 oktan, diesel og avgiftsfri diesel
+- **Statistikk** — Billigste og dyreste priser siste 24 timer, antall prisoppdateringer og toppliste
+- **Bidragsmodus** — Egen visning for raske prisoppdateringer i felt
 - **Stedssøk** — Søk etter by eller sted med tastaturnavigasjon
 - **Navigasjon** — Åpne veibeskrivelse direkte fra stasjonskortet
 - **Prisrapportering** — Logg inn og rapporter priser på dugnad
 - **Legg til stasjon** — Mangler det en stasjon? Legg den til med kartpinne
-- **Innstillinger** — Velg hvilke drivstofftyper som vises
+- **Endringsforslag** — Foreslå nytt navn, kjede eller meld stasjon som nedlagt
+- **Hurtigpris / OCR** — Kamera- og OCR-støtte for roller som har tilgang
+- **Personlige splash-meldinger** — Ukentlige meldinger basert på aktivitet
+- **Blogg og infosider** — Egne sider for blogg, om og personvern
 - **Offline-støtte** — Fungerer uten nett med cachet data
 
 ### Pin-farger på kartet
@@ -38,13 +43,15 @@ Tilgjengelig på [drivstoff.ksalo.no](https://drivstoff.ksalo.no)
 | 🟣 Lilla | Pris 2–7 dager gammel |
 | ⚫ Grå | Eldre pris eller ingen pris |
 
-### Innlogging
+### Innlogging og roller
 
-Alle kan se priser. For å rapportere priser trenger du en konto:
+Alle kan se priser. For å rapportere priser trenger du en konto.
 
-- **Registrer deg** med e-post, passord og tilgangskode
-- **Glemt passord?** Tilbakestillingslenke sendes på e-post
-- **Invitasjon** — admin kan sende invitasjonslenker
+- **Registrering** med e-post og passord
+- **Glemt passord** med tilbakestillingslenke på e-post
+- **Invitasjoner** kan genereres fra admin
+- **Kallenavn** kan settes på "Min konto" og brukes i topplister
+- **Roller** brukes for admin, moderator og spesialtilganger som kamera/OCR
 
 ---
 
@@ -83,7 +90,8 @@ Alle kan se priser. For å rapportere priser trenger du en konto:
 | Database | SQLite med WAL-modus |
 | Kartdata | OpenStreetMap via Overpass API (daglig bakgrunnsoppdatering) |
 | Geocoding | Photon (komoot.io) |
-| E-post | Resend (passordreset) |
+| OCR | Tesseract.js i frontend + backend-endepunkt for gjenkjenning/logging |
+| E-post | Resend (passordreset og enkelte adminflyter) |
 | Hosting | Raspberry Pi + Docker + Cloudflare Tunnel |
 | Failover | Fly.io — DB synkes automatisk fra Pi hver 4. time (kl 00, 04, 08, 12, 16, 20) |
 | PWA | Service Worker, manifest, offline-støtte |
@@ -94,14 +102,14 @@ Alle kan se priser. For å rapportere priser trenger du en konto:
 ```
 drivstoffpriser/
 ├── server.py              # Flask-app, oppstart, logging
-├── routes_api.py          # API-endepunkter (stasjoner, priser, statistikk)
-├── routes_auth.py         # Innlogging, registrering, passordreset
-├── routes_admin.py        # Admin-panel, brukeradmin, statistikk
-├── db.py                  # SQLite-modell, romlig filtrering, migrering
+├── routes_api.py          # API-endepunkter for stasjoner, priser, statistikk, OCR, blogg m.m.
+├── routes_auth.py         # Innlogging, registrering, passordreset, min konto
+├── routes_admin.py        # Admin-/moderatorpanel, moderering, import, toppliste
+├── db.py                  # SQLite-modell, migreringer, rapporter, toppliste, rate limit
 ├── osm.py                 # Bakgrunnsoppdatering av stasjoner
 ├── seed_stasjoner.py      # Overpass API-integrasjon (hent alle stasjoner)
 ├── public/
-│   ├── index.html         # SPA med tre visninger (kart, liste, statistikk)
+│   ├── index.html         # Hovedapp med kart, liste, statistikk og dialoger
 │   ├── sw.js              # Service Worker (cache-strategier)
 │   ├── manifest.json      # PWA-konfigurasjon
 │   ├── css/
@@ -116,15 +124,22 @@ drivstoffpriser/
 │       ├── search.js      # Stedssøk med Photon
 │       ├── settings.js    # Drivstofftype-filter
 │       ├── add-station.js # Legg til stasjon med kartpinne
-│       ├── stats.js       # Statistikkfanen
+│       ├── stats.js       # Statistikk, toppliste og promo
 │       ├── kjede.js       # Kjedelogoer og farger
+│       ├── hurtigpris.js  # Kamera-/hurtigprisflyt
+│       ├── ocr.js         # OCR-klient og logging
+│       ├── bidrag.js      # Bidragsmodus
 │       └── api.js         # Fetch-wrapper mot backend
+├── docs/
+│   └── datasamarbeid.md   # Notater om partner-/datasamarbeid
 ├── tests/
 │   ├── conftest.py        # Pytest-fixtures
 │   ├── test_api.py        # API-endepunkt-tester
 │   ├── test_auth.py       # Autentiserings-tester
 │   ├── test_admin.py      # Admin-panel-tester
 │   ├── test_db.py         # Databasefunksjons-tester
+│   ├── test_api_utvidet.py
+│   ├── test_db_utvidet.py
 │   └── sheet.spec.js      # E2E-tester (Playwright)
 ├── Dockerfile
 ├── docker-compose.yml
@@ -138,38 +153,65 @@ drivstoffpriser/
 
 | Metode | Endepunkt | Beskrivelse |
 |--------|-----------|-------------|
-| `GET` | `/api/stasjoner?lat=&lon=` | Stasjoner innen 30 km (maks 30, kun Norge) |
+| `GET` | `/api/stasjoner?lat=&lon=&radius=` | Stasjoner innen valgt radius (kun Norge) |
 | `GET` | `/api/stedssok?q=` | Geocoding via Photon (komoot.io) |
 | `GET` | `/api/statistikk` | Billigste/dyreste priser og antall oppdateringer siste 24t |
+| `GET` | `/api/toppliste` | Toppliste totalt og siste uke |
 | `GET` | `/api/totalt-med-pris` | Antall stasjoner med registrert pris |
 | `GET` | `/api/meg` | Innlogget bruker-info |
 | `GET` | `/api/instance` | Sjekk om dette er backup-instansen |
+| `GET` | `/api/nyhet` | Aktiv splash-/nyhetsmelding |
+| `GET` | `/api/prisregistreringer-per-time` | Prisoppdateringer siste 24 timer per time |
+| `GET` | `/api/prisregistreringer-uke` | Rullerende 24t-trend for siste uke |
+| `GET` | `/api/enheter-per-dag` | Unike enheter per dag |
+| `GET` | `/api/share/prices` | Delingsvennlig prisvisning |
 | `POST` | `/api/logview` | Logg sidevisning |
+| `POST` | `/api/blogg/vis` | Logg bloggvisning |
 | `GET` | `/health` | Helsesjekk |
+| `GET` | `/om` | Om-side |
+| `GET` | `/personvern` | Personvern-side |
 
 #### Krever innlogging
 
 | Metode | Endepunkt | Beskrivelse |
 |--------|-----------|-------------|
-| `POST` | `/api/pris` | Rapporter pris (stasjon_id, bensin, diesel, bensin98) |
+| `POST` | `/api/pris` | Rapporter pris (95, 98, diesel, avgiftsfri diesel) |
 | `POST` | `/api/stasjon` | Opprett stasjon (duplikatsjekk innen 50 m) |
+| `POST` | `/api/rapporter-nedlagt` | Meld stasjon som nedlagt |
+| `POST` | `/api/foreslaa-endring` | Foreslå nytt navn/kjede |
+| `POST` | `/api/gjenkjenn-priser` | OCR/gjenkjenning av priser fra bilde |
+| `POST` | `/api/ocr-statistikk` | Logg OCR-resultater |
 
-#### Admin
+#### Admin og moderator
 
 | Metode | Endepunkt | Beskrivelse |
 |--------|-----------|-------------|
 | `GET` | `/admin` | Dashboard |
+| `GET` | `/admin/steder` | Brukeropprettede / ventende stasjoner |
 | `GET` | `/admin/oversikt` | Statistikk med 30-dagers trend og timevisning |
 | `GET` | `/admin/prislogg` | Siste 200 prisoppdateringer |
 | `GET` | `/admin/kart` | Kart over alle priser |
+| `GET` | `/admin/rapporter` | Meldte stasjoner |
+| `GET` | `/admin/endringsforslag` | Foreslåtte endringer |
+| `GET` | `/admin/deaktiverte` | Deaktiverte stasjoner |
+| `GET` | `/admin/brukere` | Brukeradministrasjon |
+| `GET` | `/admin/toppliste` | Utvidet toppliste |
+| `GET` | `/admin/import` | Import av partnerdata |
 | `POST` | `/admin/invitasjon` | Generer invitasjonslenke |
+| `POST` | `/admin/toggle-registrering` | Åpne/steng registrering |
 | `PUT` | `/api/sync-db` | DB-synk fra Pi til Fly.io (X-Sync-Key) |
 
 ### Dataflyt
 
 **Stasjoner** hentes daglig i bakgrunnen fra Overpass API (alle bensinstasjoner i Norge). Round-robin over tre Overpass-endepunkter med backoff ved feil.
 
-**Priser** rapporteres av brukere og lagres som historikk. Siste pris hentes med `MAX(id) GROUP BY stasjon_id`.
+**Priser** rapporteres av brukere og lagres som historikk. Ved raske korrigeringer fra samme bruker oppdateres siste rad innenfor et kort intervall i stedet for å lage duplikater.
+
+**Brukeropprettede stasjoner** opprettes fra appen, får duplikatsjekk innen 50 meter og kan modereres i admin.
+
+**Moderering** skjer via rapporter om nedlagte stasjoner, endringsforslag, deaktivering/reaktivering og godkjenning av ventende stasjoner.
+
+**OCR / hurtigpris** lar brukere med riktig rolle ta bilde av pristavle, gjenkjenne verdier og logge kvaliteten på resultatet.
 
 **Romlig filtrering** bruker bounding box i SQL (indeksert) etterfulgt av Haversine-beregning for nøyaktig avstand.
 
@@ -177,16 +219,22 @@ drivstoffpriser/
 
 ```sql
 stasjoner       -- navn, kjede, lat/lon, osm_id (UNIQUE), lagt_til_av
-priser          -- stasjon_id, bensin, diesel, bensin98, tidspunkt, bruker_id
-brukere         -- brukernavn (e-post), passord_hash, er_admin
+priser          -- stasjon_id, bensin, diesel, bensin98, diesel_avgiftsfri, tidspunkt, bruker_id
+brukere         -- brukernavn (e-post), passord_hash, roller, kallenavn
 invitasjoner    -- token, opprettet, utloper, brukt
 tilbakestilling -- token, epost, utloper, brukt
 visninger       -- device_id, user_agent, ts
+innstillinger   -- nøkkel/verdi for feature flags og admin-innhold
+rapporter       -- meldinger om nedlagte stasjoner
+endringsforslag -- forslag til navn/kjede
+rate_limit      -- enkel IP-/nøkkelbasert rate limiting
+blogg_visninger -- logging av bloggtrafikk
+ocr_statistikk  -- logging av OCR-flyt og kvalitet
 ```
 
-Indekser på `stasjoner(lat, lon)`, `visninger(device_id)` og `visninger(ts)`.
+Indekser finnes blant annet på `stasjoner(lat, lon)`, `visninger(device_id)`, `visninger(ts)` og `rate_limit(type, nokkel, tidspunkt)`.
 
-Passord hashes med PBKDF2:SHA256. Sesjoner via signerte Flask-cookies (90 dager). Passordreset via engangslenke (1t utløp).
+Passord hashes med Werkzeug/PBKDF2. Sesjoner via signerte Flask-cookies (90 dager). Passordreset via engangslenke (1t utløp).
 
 ### Service Worker
 
@@ -208,6 +256,7 @@ Gamle cache-versjoner ryddes automatisk ved oppdatering.
 - `aria-expanded`, `aria-selected`, `aria-controls` for tilstandshåndtering
 - `:focus-visible` for synlige fokusindikatorer
 - Tillater zoom (ingen `user-scalable=no`)
+- Listevisningen fungerer som tastaturalternativ til kartet
 
 ### Kjøre lokalt
 
@@ -230,6 +279,8 @@ npm install
 npx playwright install webkit chromium
 npx playwright test
 ```
+
+Det finnes også utvidede testfiler i [`tests/`](./tests) for nyere API- og DB-funksjonalitet.
 
 ### Deploy
 
