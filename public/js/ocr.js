@@ -33,55 +33,30 @@ export function initOcr(onPriserGjenkjent) {
             // Skaler ned bildet for ytelse
             const nedskalert = await skalerBilde(fil, 1280);
 
-            // Prøv Tesseract.js først
-            visOcrStatus('Analyserer med lokal OCR ...', false);
-            let tesseractPriser = null;
-            let tesseractRaatekst = null;
-            const tStart = performance.now();
+            visOcrStatus('Analyserer med AI ...', false);
+            let priser = null;
+            let kilde = 'ai';
+            const cStart = performance.now();
             try {
-                // Midlertidig deaktivert: lokal Tesseract.js-OCR gir for darlig kvalitet.
-                // const res = await gjenkjennMedTesseract(nedskalert);
-                // tesseractPriser = res.priser;
-                // tesseractRaatekst = res.raatekst;
+                priser = await gjenkjennMedBackend(nedskalert);
+                kilde = priser._modell || 'ai';
+                sisteOcrStat.claude_ms = Math.round(performance.now() - cStart);
+                sisteOcrStat.claude_resultat = priser;
+                sisteOcrStat.claude_ok = !!(priser && harGyldigePriser(priser));
             } catch (err) {
-                console.warn('Tesseract feilet:', err);
-                sisteOcrStat.tesseract_feil = err.message;
-            }
-            const tTid = Math.round(performance.now() - tStart);
-
-            sisteOcrStat.tesseract_ms = tTid;
-            sisteOcrStat.tesseract_resultat = tesseractPriser;
-            sisteOcrStat.tesseract_raatekst = tesseractRaatekst;
-            sisteOcrStat.tesseract_ok = !!(tesseractPriser && harGyldigePriser(tesseractPriser));
-
-            let priser = tesseractPriser;
-            let kilde = 'tesseract';
-
-            if (!priser || !harGyldigePriser(priser)) {
-                // Fallback til Claude API
-                visOcrStatus('Lokal OCR fant ikke priser — sender til AI ...', false);
-                const cStart = performance.now();
-                try {
-                    priser = await gjenkjennMedBackend(nedskalert);
-                    kilde = 'claude';
-                    sisteOcrStat.claude_ms = Math.round(performance.now() - cStart);
-                    sisteOcrStat.claude_resultat = priser;
-                    sisteOcrStat.claude_ok = !!(priser && harGyldigePriser(priser));
-                } catch (err) {
-                    sisteOcrStat.claude_ms = Math.round(performance.now() - cStart);
-                    sisteOcrStat.claude_feil = err.message;
-                    sisteOcrStat.claude_ok = false;
-                    loggOcrStat(sisteOcrStat);
-                    visOcrStatus('Kunne ikke gjenkjenne priser. Tast inn manuelt.', true);
-                    console.error('Backend OCR feilet:', err);
-                    return;
-                }
+                sisteOcrStat.claude_ms = Math.round(performance.now() - cStart);
+                sisteOcrStat.claude_feil = err.message;
+                sisteOcrStat.claude_ok = false;
+                loggOcrStat(sisteOcrStat);
+                visOcrStatus('Kunne ikke gjenkjenne priser. Tast inn manuelt.', true);
+                console.error('Backend OCR feilet:', err);
+                return;
             }
 
             sisteOcrStat.kilde = kilde;
 
             if (priser && harGyldigePriser(priser)) {
-                const kildeTekst = kilde === 'tesseract' ? 'lokal OCR' : 'AI';
+                const kildeTekst = kilde === 'tesseract' ? 'lokal OCR' : `AI${modellHint(kilde)}`;
                 visOcrStatus(`Priser gjenkjent (${kildeTekst})! Sjekk og lagre.`, false, true);
                 loggOcrStat(sisteOcrStat);
                 onPriserGjenkjent(priser);
@@ -116,43 +91,22 @@ export async function gjenkjennPriserFraBilde(bildeFile, onStatus) {
     if (onStatus) onStatus('Forbereder bilde …');
     const nedskalert = await skalerBilde(bildeFile, 1280);
 
-    if (onStatus) onStatus('Analyserer med lokal OCR …');
-    let tesseractPriser = null;
-    let tesseractRaatekst = null;
-    const tStart = performance.now();
+    if (onStatus) onStatus('Analyserer med AI …');
+    let priser = null;
+    let kilde = 'ai';
+    const cStart = performance.now();
     try {
-        // Midlertidig deaktivert: lokal Tesseract.js-OCR gir for darlig kvalitet.
-        // const res = await gjenkjennMedTesseract(nedskalert);
-        // tesseractPriser = res.priser;
-        // tesseractRaatekst = res.raatekst;
+        priser = await gjenkjennMedBackend(nedskalert);
+        kilde = priser._modell || 'ai';
+        stat.claude_ms = Math.round(performance.now() - cStart);
+        stat.claude_resultat = priser;
+        stat.claude_ok = !!(priser && harGyldigePriser(priser));
     } catch (err) {
-        console.warn('Tesseract feilet:', err);
-        stat.tesseract_feil = err.message;
-    }
-    stat.tesseract_ms = Math.round(performance.now() - tStart);
-    stat.tesseract_resultat = tesseractPriser;
-    stat.tesseract_raatekst = tesseractRaatekst;
-    stat.tesseract_ok = !!(tesseractPriser && harGyldigePriser(tesseractPriser));
-
-    let priser = tesseractPriser;
-    let kilde = 'tesseract';
-
-    if (!priser || !harGyldigePriser(priser)) {
-        if (onStatus) onStatus('Lokal OCR fant ikke priser — sender til AI …');
-        const cStart = performance.now();
-        try {
-            priser = await gjenkjennMedBackend(nedskalert);
-            kilde = 'claude';
-            stat.claude_ms = Math.round(performance.now() - cStart);
-            stat.claude_resultat = priser;
-            stat.claude_ok = !!(priser && harGyldigePriser(priser));
-        } catch (err) {
-            stat.claude_ms = Math.round(performance.now() - cStart);
-            stat.claude_feil = err.message;
-            stat.claude_ok = false;
-            loggOcrStat(stat);
-            throw new Error('Kunne ikke gjenkjenne priser');
-        }
+        stat.claude_ms = Math.round(performance.now() - cStart);
+        stat.claude_feil = err.message;
+        stat.claude_ok = false;
+        loggOcrStat(stat);
+        throw new Error('Kunne ikke gjenkjenne priser');
     }
 
     stat.kilde = kilde;
@@ -266,7 +220,7 @@ function parserOcrTekst(tekst) {
         const pris = finnPrisILinje(linjer[i]);
 
         if (pris == null) continue;
-        if (pris < 10 || pris > 40) continue;
+        if (pris < 15 || pris > 30) continue;
 
         // Sjekk spesifikke termer før generelle
         if (linje.includes('98')) {
@@ -289,7 +243,7 @@ function parserOcrTekst(tekst) {
         const allePriser = [];
         for (const linje of linjer) {
             const p = finnPrisILinje(linje);
-            if (p != null && p >= 10 && p <= 40) allePriser.push(p);
+            if (p != null && p >= 15 && p <= 30) allePriser.push(p);
         }
         const unike = dedup(allePriser);
         if (unike.length >= 1) resultat.bensin = unike[0];
@@ -308,7 +262,7 @@ function finnPrisILinje(linje) {
     const match4 = linje.match(/\b(\d{4})\b/);
     if (match4) {
         const v = parseInt(match4[1]);
-        if (v >= 1000 && v <= 4000) {
+        if (v >= 1500 && v <= 3000) {
             return v / 100;
         }
     }
@@ -325,7 +279,7 @@ function dedup(priser) {
     return resultat;
 }
 
-/** Fallback: send bilde til backend for Claude API-analyse. */
+/** Send bilde til backend for AI-analyse. Returnerer priser + _modell. */
 async function gjenkjennMedBackend(bildeBlob) {
     const formData = new FormData();
     formData.append('bilde', bildeBlob, 'pristavle.jpg');
@@ -348,4 +302,10 @@ async function gjenkjennMedBackend(bildeBlob) {
     }
 
     return resp.json();
+}
+
+function modellHint(modell) {
+    if (modell === 'gemini') return ' [G]';
+    if (modell === 'haiku') return ' [H]';
+    return ' [AI]';
 }

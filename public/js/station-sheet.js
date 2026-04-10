@@ -181,10 +181,10 @@ function fyllVisning(s) {
 
     const inn = getInnstillinger();
     const typer = [
-        inn.bensin              ? { label: '95 oktan',        v: s.bensin,              ts: s.bensin_tidspunkt              } : null,
-        inn.bensin98            ? { label: '98 oktan',        v: s.bensin98,            ts: s.bensin98_tidspunkt            } : null,
-        inn.diesel              ? { label: 'Diesel',          v: s.diesel,              ts: s.diesel_tidspunkt              } : null,
-        inn.diesel_avgiftsfri   ? { label: 'Avg.fri diesel',  v: s.diesel_avgiftsfri,   ts: s.diesel_avgiftsfri_tidspunkt   } : null,
+        inn.bensin            && s.har_bensin !== false            ? { label: '95 oktan',       v: s.bensin,             ts: s.bensin_tidspunkt             } : null,
+        inn.bensin98          && s.har_bensin98 !== false          ? { label: '98 oktan',       v: s.bensin98,           ts: s.bensin98_tidspunkt           } : null,
+        inn.diesel            && s.har_diesel !== false            ? { label: 'Diesel',         v: s.diesel,             ts: s.diesel_tidspunkt             } : null,
+        inn.diesel_avgiftsfri && s.har_diesel_avgiftsfri !== false ? { label: 'Avg.fri diesel', v: s.diesel_avgiftsfri,  ts: s.diesel_avgiftsfri_tidspunkt  } : null,
     ].filter(Boolean);
     prisContainer.innerHTML = typer.map((t, i) => `
         ${i > 0 ? '<div class="sheet-divider"></div>' : ''}
@@ -219,6 +219,13 @@ function visEditModus() {
     bensin98Input.value = aktivStasjon.bensin98 != null ? formatPrisInput(aktivStasjon.bensin98) : '';
     dieselInput.value = aktivStasjon.diesel != null ? formatPrisInput(aktivStasjon.diesel) : '';
     dieselAvgiftsfriInput.value = aktivStasjon.diesel_avgiftsfri != null ? formatPrisInput(aktivStasjon.diesel_avgiftsfri) : '';
+
+    const skjul = (id, vis) => document.getElementById(id)?.toggleAttribute('hidden', !vis);
+    skjul('sheet-gruppe-bensin',            aktivStasjon.har_bensin !== false);
+    skjul('sheet-gruppe-bensin98',          aktivStasjon.har_bensin98 !== false);
+    skjul('sheet-gruppe-diesel',            aktivStasjon.har_diesel !== false);
+    skjul('sheet-gruppe-diesel-avgiftsfri', aktivStasjon.har_diesel_avgiftsfri !== false);
+
     visPrisStatus('', null);
     editLagreBtn.disabled = false;
     viewEl.setAttribute('hidden', '');

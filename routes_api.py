@@ -846,11 +846,116 @@ _OCR_GRENSE_PER_DAG = 50  # maks kall per bruker per dag
 _ocr_bruk = {}  # {bruker_id: (dato, antall)}
 
 
+_OCR_PROMPT = """Du er en prisavleser for norske bensinstasjoner. Din ENESTE oppgave er å lese drivstoffpriser fra pristavler/prisdisplay.
+
+AVVIS bildet og returner alle null-verdier hvis:
+- Bildet ikke viser en pristavle eller prisdisplay fra en bensinstasjon
+- Prisene ikke er lesbare (for langt unna, uskarp, refleks)
+- Du er usikker på enkeltsiffer og kan ikke korrigere med prislogikken nedenfor
+
+Returner KUN gyldig JSON uten annen tekst:
+{"bensin": null, "diesel": null, "bensin98": null, "diesel_avgiftsfri": null, "kjede": null}
+
+Det finnes kun fire drivstofftyper. Hver kjede har egne produktnavn, men de betyr alltid det samme:
+- "bensin" = vanlig bensin. På tavlen: "95", "Blyfri", "B", "miles 95", "Futura 95", eller bare den øverste prisen uten etikett.
+- "bensin98" = høyoktan bensin. På tavlen: "98", "V-Power", "miles 98", "Futura 98", "Extra".
+- "diesel" = vanlig diesel. På tavlen: "D", "Diesel", "HVO", "HVO100", "Blank diesel", "Biodiesel", "Miljødiesel", "miles D", "Diesel Gold", "B-diesel", "XTL".
+- "diesel_avgiftsfri" = avgiftsfri/farget diesel. På tavlen: "FD", "Farget", "Avgiftsfri", "Anleggsdiesel".
+
+Bruk sunn fornuft: uansett hva produktet heter, avgjør om det er bensin 95, bensin 98, diesel eller avgiftsfri diesel.
+Noen tavler viser bare 2–3 typer. Sett null for typer som ikke finnes på tavlen.
+
+Prislogikk (bruk dette aktivt til å korrigere lesefeil):
+- Priser er ALLTID mellom 15.00 og 30.00 kr/liter.
+- bensin98 er ALLTID dyrere enn bensin (95) — typisk 1–4 kr mer. Eks: bensin=18.79 → bensin98 må være > 18.79. Hvis du har lest bensin98 < bensin, er noe feil — se gjennom sifrene på nytt.
+- Diesel er vanligvis billigere enn eller omtrent lik bensin 95.
+- Avgiftsfri diesel er ALLTID billigst av alle — typisk 5–10 kr under vanlig diesel. Hvis du har lest avgiftsfri diesel som dyrere enn diesel, er noe feil — sett null for den.
+
+Format:
+- Desimaltall med punktum (f.eks. 21.35)
+- Priser er ALLTID på formen XX.XX — nøyaktig to siffer før og to siffer etter desimaltegnet.
+- Eksempler på korreksjon: "2608" → 26.08, "6.08" → sannsynligvis 26.08, "260.8" → 26.08. Verdier som ikke lar seg korrigere til XX.XX i området 15–30 — sett null.
+- Sett null for typer du ikke finner
+
+Kjede:
+- "kjede" = kjedelogo eller -navn synlig i bildet (f.eks. "Circle K", "Shell", "Esso"). Ellers null.
+
+Nøyaktighet — LED-display:
+- Røde/oransje LED-display: sifrene 1 og 7 forveksles svært lett. Sjekk: har sifferet et topphorisontalt segment? Da er det trolig 7, ikke 1. Eks: "18.19" der 95-oktan er i nærheten av 21.29 (98-oktan), er feil — den laveste prisen for 95 kan gjerne være 18.79 (7 lest som 1).
+- 6 og 8, 3 og 8, 9 og 5 forveksles også på LED. Bruk alltid prislogikken over til å velge riktig siffer.
+- Returner null kun hvis prisen ikke lar seg tolke til et plausibelt XX.XX-tall i området 15–30 selv etter korreksjonsforsøk."""
+
+
+def _ocr_via_haiku(bilde_b64, content_type):
+    api_key = os.environ.get('ANTHROPIC_API_KEY', '')
+    if not api_key:
+        raise ValueError('ANTHROPIC_API_KEY ikke satt')
+    resp = httpx.post(
+        'https://api.anthropic.com/v1/messages',
+        headers={
+            'x-api-key': api_key,
+            'anthropic-version': '2023-06-01',
+            'content-type': 'application/json',
+        },
+        json={
+            'model': 'claude-haiku-4-5-20251001',
+            'max_tokens': 256,
+            'messages': [{
+                'role': 'user',
+                'content': [
+                    {
+                        'type': 'image',
+                        'source': {
+                            'type': 'base64',
+                            'media_type': content_type,
+                            'data': bilde_b64,
+                        }
+                    },
+                    {'type': 'text', 'text': _OCR_PROMPT}
+                ]
+            }]
+        },
+        timeout=15.0,
+    )
+    resp.raise_for_status()
+    tekst = resp.json()['content'][0]['text'].strip()
+    if tekst.startswith('```'):
+        tekst = tekst.split('\n', 1)[1].rsplit('```', 1)[0].strip()
+    return json.loads(tekst)
+
+
+def _ocr_via_gemini(bilde_b64, content_type):
+    api_key = os.environ.get('GEMINI_API_KEY', '')
+    if not api_key:
+        raise ValueError('GEMINI_API_KEY ikke satt')
+    modell = os.environ.get('GEMINI_MODELL', 'gemini-1.5-flash')
+    resp = httpx.post(
+        f'https://generativelanguage.googleapis.com/v1beta/models/{modell}:generateContent',
+        params={'key': api_key},
+        headers={'content-type': 'application/json'},
+        json={
+            'contents': [{
+                'parts': [
+                    {'inline_data': {'mime_type': content_type, 'data': bilde_b64}},
+                    {'text': _OCR_PROMPT},
+                ]
+            }],
+            'generationConfig': {'maxOutputTokens': 256, 'temperature': 0},
+        },
+        timeout=15.0,
+    )
+    resp.raise_for_status()
+    tekst = resp.json()['candidates'][0]['content']['parts'][0]['text'].strip()
+    if tekst.startswith('```'):
+        tekst = tekst.split('\n', 1)[1].rsplit('```', 1)[0].strip()
+    return json.loads(tekst)
+
+
 @api_bp.route('/api/gjenkjenn-priser', methods=['POST'])
 @krever_innlogging
 def gjenkjenn_priser():
-    """Gjenkjenn drivstoffpriser fra bilde via Claude Vision API.
-    Kun for admin/moderator. Eksperimentell funksjon."""
+    """Gjenkjenn drivstoffpriser fra bilde via AI Vision API.
+    Modell styres av env-var OCR_MODELL (haiku|gemini). Kun for admin/moderator."""
     bruker_id = session.get('bruker_id')
     bruker = finn_bruker_id(bruker_id)
     if not bruker or not (bruker.get('er_admin') or har_rolle(bruker, 'moderator') or har_rolle(bruker, 'kamera')):
@@ -865,15 +970,10 @@ def gjenkjenn_priser():
         return jsonify({'error': f'Maks {_OCR_GRENSE_PER_DAG} bildeanalyser per dag'}), 429
     _ocr_bruk[bruker_id] = (i_dag, antall + 1)
 
-    api_key = os.environ.get('ANTHROPIC_API_KEY', '')
-    if not api_key:
-        return jsonify({'error': 'AI-tjeneste ikke konfigurert'}), 503
-
     fil = request.files.get('bilde')
     if not fil:
         return jsonify({'error': 'Ingen bilde lastet opp'}), 400
 
-    # Maks 5 MB
     bilde_data = fil.read()
     if len(bilde_data) > 5 * 1024 * 1024:
         return jsonify({'error': 'Bilde for stort (maks 5 MB)'}), 400
@@ -883,82 +983,24 @@ def gjenkjenn_priser():
         content_type = 'image/jpeg'
 
     bilde_b64 = base64.b64encode(bilde_data).decode('utf-8')
-
-    prompt = """Du er en prisavleser for norske bensinstasjoner. Din ENESTE oppgave er å lese drivstoffpriser fra pristavler/prisdisplay.
-
-AVVIS bildet og returner alle null-verdier hvis:
-- Bildet ikke viser en pristavle eller prisdisplay fra en bensinstasjon
-- Prisene ikke er lesbare
-- Du er usikker på noen av sifrene
-
-Returner KUN gyldig JSON uten annen tekst:
-{"bensin": null, "diesel": null, "bensin98": null, "diesel_avgiftsfri": null, "kjede": null}
-
-Det finnes kun fire drivstofftyper. Hver kjede har egne produktnavn, men de betyr alltid det samme:
-- "bensin" = vanlig bensin. På tavlen: "95", "Blyfri", "B", "miles 95", "Futura 95", eller bare den øverste prisen uten etikett.
-- "bensin98" = høyoktan bensin. På tavlen: "98", "V-Power", "miles 98", "Futura 98", "Extra".
-- "diesel" = vanlig diesel. På tavlen: "D", "Diesel", "HVO", "HVO100", "Blank diesel", "Biodiesel", "miles D", "Diesel Gold", "B-diesel".
-- "diesel_avgiftsfri" = avgiftsfri/farget diesel. På tavlen: "FD", "Farget", "Avgiftsfri", "Anleggsdiesel".
-
-Bruk sunn fornuft: uansett hva produktet heter, avgjør om det er bensin 95, bensin 98, diesel eller avgiftsfri diesel.
-Noen tavler viser bare 2–3 typer. Sett null for typer som ikke finnes på tavlen.
-
-Format:
-- Desimaltall med punktum (f.eks. 21.35)
-- Priser er alltid mellom 10.00 og 40.00 kr/liter. Verdier utenfor dette er feil — sett null.
-- Sett null for typer du ikke finner
-
-Kjede:
-- "kjede" = kjedelogo eller -navn synlig i bildet (f.eks. "Circle K", "Shell", "Esso"). Ellers null.
-
-Nøyaktighet:
-- Les hvert siffer individuelt. LED-display forveksler lett 1/7, 6/8, 3/8.
-- Er du usikker på ET ENESTE siffer, sett hele prisen til null. Feil pris er verre enn manglende pris."""
+    ocr_modell = os.environ.get('OCR_MODELL', 'haiku').lower()
 
     try:
-        resp = httpx.post(
-            'https://api.anthropic.com/v1/messages',
-            headers={
-                'x-api-key': api_key,
-                'anthropic-version': '2023-06-01',
-                'content-type': 'application/json',
-            },
-            json={
-                'model': 'claude-haiku-4-5-20251001',
-                'max_tokens': 256,
-                'messages': [{
-                    'role': 'user',
-                    'content': [
-                        {
-                            'type': 'image',
-                            'source': {
-                                'type': 'base64',
-                                'media_type': content_type,
-                                'data': bilde_b64,
-                            }
-                        },
-                        {'type': 'text', 'text': prompt}
-                    ]
-                }]
-            },
-            timeout=15.0,
-        )
-        resp.raise_for_status()
-    except httpx.HTTPError as e:
-        logger.error(f'Claude API-feil: {e}')
-        return jsonify({'error': 'AI-tjeneste midlertidig utilgjengelig'}), 503
-
-    try:
-        api_data = resp.json()
-        tekst = api_data['content'][0]['text'].strip()
-        # Ekstraher JSON fra eventuell markdown code block
-        if tekst.startswith('```'):
-            tekst = tekst.split('\n', 1)[1].rsplit('```', 1)[0].strip()
-        priser = json.loads(tekst)
-        logger.info(f'OCR-gjenkjenning: bruker={bruker_id} resultat={priser}')
+        if ocr_modell == 'gemini':
+            priser = _ocr_via_gemini(bilde_b64, content_type)
+        else:
+            priser = _ocr_via_haiku(bilde_b64, content_type)
+        logger.info(f'OCR-gjenkjenning: bruker={bruker_id} modell={ocr_modell} resultat={priser}')
+        priser['_modell'] = ocr_modell
         return jsonify(priser)
+    except ValueError as e:
+        logger.error(f'OCR konfigurasjonsfeil: {e}')
+        return jsonify({'error': 'AI-tjeneste ikke konfigurert'}), 503
+    except httpx.HTTPError as e:
+        logger.error(f'OCR API-feil ({ocr_modell}): {e}')
+        return jsonify({'error': 'AI-tjeneste midlertidig utilgjengelig'}), 503
     except (KeyError, json.JSONDecodeError, IndexError) as e:
-        logger.error(f'Kunne ikke parse Claude-svar: {e}, tekst={tekst[:200] if "tekst" in dir() else "?"}')
+        logger.error(f'OCR parse-feil ({ocr_modell}): {e}')
         return jsonify({'error': 'Kunne ikke tolke AI-svar'}), 502
 
 

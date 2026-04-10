@@ -150,6 +150,14 @@ def _migrer_db():
             conn.execute("ALTER TABLE stasjoner ADD COLUMN navn_låst INTEGER NOT NULL DEFAULT 0")
         if 'kjede_låst' not in stasjon_kolonner:
             conn.execute("ALTER TABLE stasjoner ADD COLUMN kjede_låst INTEGER NOT NULL DEFAULT 0")
+        if 'har_bensin' not in stasjon_kolonner:
+            conn.execute("ALTER TABLE stasjoner ADD COLUMN har_bensin INTEGER NOT NULL DEFAULT 1")
+        if 'har_bensin98' not in stasjon_kolonner:
+            conn.execute("ALTER TABLE stasjoner ADD COLUMN har_bensin98 INTEGER NOT NULL DEFAULT 1")
+        if 'har_diesel' not in stasjon_kolonner:
+            conn.execute("ALTER TABLE stasjoner ADD COLUMN har_diesel INTEGER NOT NULL DEFAULT 1")
+        if 'har_diesel_avgiftsfri' not in stasjon_kolonner:
+            conn.execute("ALTER TABLE stasjoner ADD COLUMN har_diesel_avgiftsfri INTEGER NOT NULL DEFAULT 1")
 
         # Rapporter-tabell og blogg_visninger (migrering)
         tabeller = [r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
@@ -977,7 +985,9 @@ def finn_stasjoner_by_navn(navn: str) -> list:
     with get_conn() as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
-            '''SELECT id, navn, kjede, lat, lon FROM stasjoner
+            '''SELECT id, navn, kjede, lat, lon,
+                      har_bensin, har_bensin98, har_diesel, har_diesel_avgiftsfri
+               FROM stasjoner
                WHERE godkjent != 0 AND LOWER(navn) LIKE ?
                LIMIT 5''',
             (f'%{navn.lower()}%',)
@@ -1048,6 +1058,7 @@ def get_stasjoner_med_priser(user_lat, user_lon, radius_m=30000, limit=30):
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
             '''SELECT s.id, s.navn, s.kjede, s.lat, s.lon, s.lagt_til_av,
+                      s.har_bensin, s.har_bensin98, s.har_diesel, s.har_diesel_avgiftsfri,
                       (SELECT NULLIF(bensin,   0) FROM priser WHERE stasjon_id=s.id ORDER BY id DESC LIMIT 1) AS bensin,
                       (SELECT tidspunkt FROM priser WHERE stasjon_id=s.id AND bensin  IS NOT NULL AND bensin   > 0 ORDER BY id DESC LIMIT 1) AS bensin_tidspunkt,
                       (SELECT NULLIF(diesel,   0) FROM priser WHERE stasjon_id=s.id ORDER BY id DESC LIMIT 1) AS diesel,
@@ -1083,7 +1094,23 @@ def get_stasjoner_med_priser(user_lat, user_lon, radius_m=30000, limit=30):
                 'diesel_avgiftsfri_tidspunkt': row['diesel_avgiftsfri_tidspunkt'],
                 'avstand_m': round(dist),
                 'brukeropprettet': row['lagt_til_av'] is not None,
+                'har_bensin': bool(row['har_bensin']),
+                'har_bensin98': bool(row['har_bensin98']),
+                'har_diesel': bool(row['har_diesel']),
+                'har_diesel_avgiftsfri': bool(row['har_diesel_avgiftsfri']),
             })
 
     result.sort(key=lambda x: x['avstand_m'])
     return result[:limit]
+
+
+def sett_drivstofftyper(stasjon_id, har_bensin, har_bensin98, har_diesel, har_diesel_avgiftsfri):
+    with get_conn() as conn:
+        conn.execute(
+            '''UPDATE stasjoner SET har_bensin=?, har_bensin98=?, har_diesel=?, har_diesel_avgiftsfri=?
+               WHERE id=?''',
+            (1 if har_bensin else 0, 1 if har_bensin98 else 0,
+             1 if har_diesel else 0, 1 if har_diesel_avgiftsfri else 0,
+             stasjon_id)
+        )
+    return True

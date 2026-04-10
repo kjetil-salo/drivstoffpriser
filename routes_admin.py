@@ -28,7 +28,7 @@ from db import (finn_bruker_id, hent_alle_brukere, slett_bruker, har_rolle, sett
                 hent_blogg_stats, finn_stasjoner_by_navn, endre_navn_stasjon,
                 hent_endringsforslag, slett_endringsforslag, antall_ubehandlede_endringsforslag,
                 hent_ventende_stasjoner, antall_ventende_stasjoner, godkjenn_stasjon,
-                unike_enheter_per_dag)
+                unike_enheter_per_dag, sett_drivstofftyper)
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -212,6 +212,11 @@ def admin():
     <div class="tile-ikon">&#127942;</div>
     <div class="tile-tittel">Toppliste</div>
     <div class="tile-info">Topp 50 bidragsytere</div>
+  </a>
+  <a href="/admin/drivstofftyper" class="tile">
+    <div class="tile-ikon">&#9981;</div>
+    <div class="tile-tittel">Drivstofftyper</div>
+    <div class="tile-info">Aktiver/deaktiver per stasjon</div>
   </a>
 {admin_tiles}
 </div>
@@ -616,6 +621,118 @@ def admin_endre_stasjon():
 </style></head><body><div class="container">
 <nav><a href="/admin">&#8592; Admin</a></nav>
 <h1>Endre stasjonsnavn</h1>
+<div class="kort">
+  <form method="post">
+    <div class="sok-rad">
+      <input class="sok-felt" type="text" name="sok" placeholder="S&#248;k etter stasjonsnavn..." value="{sok}" required>
+      <button class="sok-btn" type="submit">S&#248;k</button>
+    </div>
+  </form>
+  {melding_html}
+  {tabell_html}
+</div>
+</div></body></html>'''
+
+
+@admin_bp.route('/admin/drivstofftyper', methods=['GET', 'POST'])
+@krever_innlogging
+@krever_moderator
+def admin_drivstofftyper():
+    melding = ''
+    resultater = []
+    sok = ''
+    stasjon = None
+
+    if request.method == 'POST':
+        if 'sok' in request.form:
+            sok = request.form.get('sok', '').strip()
+            if sok:
+                resultater = finn_stasjoner_by_navn(sok)
+                if not resultater:
+                    melding = f'Ingen stasjoner funnet for «{sok}».'
+        elif 'stasjon_id' in request.form and 'lagre' in request.form:
+            stasjon_id = request.form.get('stasjon_id', type=int)
+            sok = request.form.get('sok', '').strip()
+            har_bensin = 'har_bensin' in request.form
+            har_bensin98 = 'har_bensin98' in request.form
+            har_diesel = 'har_diesel' in request.form
+            har_diesel_avgiftsfri = 'har_diesel_avgiftsfri' in request.form
+            sett_drivstofftyper(stasjon_id, har_bensin, har_bensin98, har_diesel, har_diesel_avgiftsfri)
+            melding = f'✓ Drivstofftyper oppdatert for stasjon {stasjon_id}.'
+            if sok:
+                resultater = finn_stasjoner_by_navn(sok)
+
+    def checked(v):
+        return 'checked' if v else ''
+
+    resultat_rader = ''
+    for s in resultater:
+        kart_url = f'https://www.google.com/maps?q={s["lat"]},{s["lon"]}'
+        kjede_txt = f' ({s["kjede"]})' if s.get('kjede') else ''
+        har_b   = s.get('har_bensin', 1)
+        har_b98 = s.get('har_bensin98', 1)
+        har_d   = s.get('har_diesel', 1)
+        har_daf = s.get('har_diesel_avgiftsfri', 1)
+        resultat_rader += f'''
+<tr>
+  <td><a href="{kart_url}" target="_blank" style="color:#93c5fd;text-decoration:none">{s["navn"]}{kjede_txt}</a></td>
+  <td>
+    <form method="post" style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:0">
+      <input type="hidden" name="stasjon_id" value="{s['id']}">
+      <input type="hidden" name="lagre" value="1">
+      <input type="hidden" name="sok" value="{sok}">
+      <label style="display:flex;gap:4px;align-items:center;font-size:0.82rem">
+        <input type="checkbox" name="har_bensin" {checked(har_b)}> 95
+      </label>
+      <label style="display:flex;gap:4px;align-items:center;font-size:0.82rem">
+        <input type="checkbox" name="har_bensin98" {checked(har_b98)}> 98
+      </label>
+      <label style="display:flex;gap:4px;align-items:center;font-size:0.82rem">
+        <input type="checkbox" name="har_diesel" {checked(har_d)}> Diesel
+      </label>
+      <label style="display:flex;gap:4px;align-items:center;font-size:0.82rem">
+        <input type="checkbox" name="har_diesel_avgiftsfri" {checked(har_daf)}> Avg.fri
+      </label>
+      <button style="background:transparent;border:1px solid #3b82f6;color:#3b82f6;
+        font-size:0.75rem;padding:4px 10px;border-radius:4px;cursor:pointer">Lagre</button>
+    </form>
+  </td>
+</tr>'''
+
+    tabell_html = (
+        f'<table><tr><th>Stasjon</th><th>Drivstofftyper</th></tr>{resultat_rader}</table>'
+        if resultat_rader else ''
+    )
+    melding_html = (
+        f'<p style="margin-bottom:1rem;color:{"#22c55e" if "✓" in melding else "#f59e0b"}">{melding}</p>'
+        if melding else ''
+    )
+
+    return f'''<!DOCTYPE html><html lang="no"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Drivstofftyper – Admin</title>
+<style>
+  *{{box-sizing:border-box;margin:0;padding:0}}
+  body{{font-family:system-ui,sans-serif;background:#0f172a;color:#e5e7eb;padding:2rem 1rem}}
+  .container{{max-width:800px;margin:0 auto}}
+  h1{{font-size:1.3rem;margin-bottom:0.5rem;color:#f1f5f9}}
+  p.ingress{{color:#94a3b8;font-size:0.85rem;margin-bottom:2rem}}
+  .kort{{background:#111827;border:1px solid #1f2937;border-radius:10px;padding:1.5rem;margin-bottom:1.5rem}}
+  table{{width:100%;border-collapse:collapse;font-size:0.88rem;margin-top:1rem}}
+  td,th{{padding:8px 10px;border-bottom:1px solid #1f2937;text-align:left;vertical-align:middle}}
+  th{{color:#94a3b8;font-weight:500}}
+  nav{{margin-bottom:1.5rem;font-size:0.85rem}}
+  nav a{{color:#94a3b8}}
+  .sok-rad{{display:flex;gap:8px;align-items:center}}
+  .sok-felt{{background:#1f2937;border:1px solid #374151;border-radius:6px;color:#e5e7eb;
+             padding:8px 12px;font-size:0.9rem;flex:1}}
+  .sok-btn{{background:transparent;border:1px solid #3b82f6;color:#3b82f6;
+            font-size:0.85rem;padding:8px 16px;border-radius:6px;cursor:pointer;white-space:nowrap}}
+  input[type=checkbox]{{width:16px;height:16px;cursor:pointer}}
+</style></head><body><div class="container">
+<nav><a href="/admin">&#8592; Admin</a></nav>
+<h1>Drivstofftyper per stasjon</h1>
+<p class="ingress">Fjern haken for drivstofftyper stasjonen ikke tilbyr. Brukere vil ikke se disse feltene når de registrerer pris.</p>
 <div class="kort">
   <form method="post">
     <div class="sok-rad">

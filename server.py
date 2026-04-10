@@ -56,6 +56,10 @@ app.register_blueprint(auth_bp)
 app.register_blueprint(admin_bp)
 app.register_blueprint(api_bp)
 
+# Kjøres ved oppstart uansett om det er gunicorn eller direkte
+init_db()
+_migrer_db()
+
 
 @app.before_request
 def tving_https():
@@ -166,8 +170,6 @@ def blogg():
 
 
 if __name__ == '__main__':
-    init_db()
-    _migrer_db()
     start_bakgrunnsoppdatering()
     port = int(os.environ.get('PORT', 7342))
     debug = os.environ.get('FLASK_DEBUG', '0') == '1'
