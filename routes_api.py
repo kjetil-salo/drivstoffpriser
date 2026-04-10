@@ -964,6 +964,30 @@ Svar:
 """
 
 
+_OCR_PROMPT_FALLBACK = """Du leser et enkelt norsk drivstoffskilt med vanligvis 2 eller 3 prisrader.
+
+Oppgaven er mye enklere enn vanlig:
+- Finn bare synlige prisrader.
+- Les etiketten til venstre og prisen på samme rad.
+- Returner kun prisene du er rimelig sikker på.
+
+Viktige regler:
+- Hvis du ser bare 2 rader, er det nesten alltid bensin 95 og diesel.
+- Hvis du ser 3 rader, er det vanligvis bensin 95, bensin 98 og diesel.
+- Det finnes ingen fast vertikal plassering for 98.
+- Hvis en rad tydelig er merket "95", skal den mappes til bensin.
+- Hvis en rad tydelig er merket "98", skal den mappes til bensin98.
+- Hvis en rad tydelig er merket "D" eller "Diesel", skal den mappes til diesel.
+- Ikke gjett avgiftsfri diesel hvis den ikke er tydelig synlig.
+- Røde LED-tall kan forveksle 1 og 7. Vurder alltid om 20.19 egentlig er 20.79 hvis segmentene ligner.
+- Prisene skal være mellom 15.00 og 35.00.
+- Hvis du kun klarer å lese 95 og diesel, er det et gyldig svar.
+
+Returner KUN gyldig JSON uten annen tekst:
+{"bensin": null, "diesel": null, "bensin98": null, "diesel_avgiftsfri": null, "kjede": null, "confidence": "low", "uncertain_fields": []}
+"""
+
+
 def _lag_ocr_prompt(forventet_kjede=None):
     if forventet_kjede:
         return (
@@ -1005,6 +1029,10 @@ def _parse_ocr_pris(verdi):
     if not (_OCR_MIN_PRIS <= tall <= _OCR_MAX_PRIS):
         return None
     return round(tall, 2)
+
+
+def _har_ocr_priser(data: dict) -> bool:
+    return any(data.get(felt) is not None for felt in ('bensin', 'diesel', 'bensin98', 'diesel_avgiftsfri'))
 
 
 def _normaliser_ocr_resultat(data):
@@ -1085,7 +1113,7 @@ def _ocr_via_haiku(bilde_b64, content_type, forventet_kjede=None):
     return _normaliser_ocr_resultat(json.loads(tekst))
 
 
-def _ocr_via_gemini(bilde_b64, content_type, forventet_kjede=None):
+def _gemini_json_request(bilde_b64, content_type, prompt):
     api_key = os.environ.get('GEMINI_API_KEY', '')
     if not api_key:
         raise ValueError('GEMINI_API_KEY ikke satt')
@@ -1098,7 +1126,7 @@ def _ocr_via_gemini(bilde_b64, content_type, forventet_kjede=None):
             'contents': [{
                 'parts': [
                     {'inline_data': {'mime_type': content_type, 'data': bilde_b64}},
-                    {'text': _lag_ocr_prompt(forventet_kjede)},
+                    {'text': prompt},
                 ]
             }],
             'generationConfig': {
@@ -1126,7 +1154,26 @@ def _ocr_via_gemini(bilde_b64, content_type, forventet_kjede=None):
     tekst = resp.json()['candidates'][0]['content']['parts'][0]['text'].strip()
     if tekst.startswith('```'):
         tekst = tekst.split('\n', 1)[1].rsplit('```', 1)[0].strip()
-    return _normaliser_ocr_resultat(json.loads(tekst))
+    return json.loads(tekst)
+
+
+def _ocr_via_gemini(bilde_b64, content_type, forventet_kjede=None):
+    primar = _normaliser_ocr_resultat(
+        _gemini_json_request(bilde_b64, content_type, _lag_ocr_prompt(forventet_kjede))
+    )
+    if _har_ocr_priser(primar):
+        return primar
+
+    fallback_prompt = _OCR_PROMPT_FALLBACK
+    if forventet_kjede:
+        fallback_prompt += (
+            f'\nMykt hint: skiltet er sannsynligvis fra kjeden "{forventet_kjede}". '
+            'Bruk bare dette hvis logo eller design stemmer.'
+        )
+    fallback = _normaliser_ocr_resultat(
+        _gemini_json_request(bilde_b64, content_type, fallback_prompt)
+    )
+    return fallback if _har_ocr_priser(fallback) else primar
 
 
 @api_bp.route('/api/gjenkjenn-priser', methods=['POST'])
