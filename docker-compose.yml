@@ -17,7 +17,7 @@ services:
       ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
       OCR_MODELL: "${OCR_MODELL:-gemini}"
       GEMINI_API_KEY: "${GEMINI_API_KEY:-}"
-      GEMINI_MODELL: "${GEMINI_MODELL:-gemini-1.5-flash}"
+      GEMINI_MODELL: "${GEMINI_MODELL:-gemini-2.5-flash}"
       LOG_LEVEL: "WARNING"
     volumes:
       - drivstoff-data:/app/data

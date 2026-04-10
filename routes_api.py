@@ -1117,7 +1117,7 @@ def _gemini_json_request(bilde_b64, content_type, prompt):
     api_key = os.environ.get('GEMINI_API_KEY', '')
     if not api_key:
         raise ValueError('GEMINI_API_KEY ikke satt')
-    modell = os.environ.get('GEMINI_MODELL', 'gemini-1.5-flash')
+    modell = os.environ.get('GEMINI_MODELL', 'gemini-2.5-flash')
     resp = httpx.post(
         f'https://generativelanguage.googleapis.com/v1beta/models/{modell}:generateContent',
         params={'key': api_key},
