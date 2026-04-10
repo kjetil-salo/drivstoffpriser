@@ -544,13 +544,14 @@ def om():
 </style></head><body><div class="container">
 <a class="tilbake" href="/">&#8592; Tilbake til appen</a>
 <h1>Drivstoffpriser</h1>
-<p class="undertittel">Finn billigst drivstoff i n&#230;rheten &#8212; gratis og drevet av brukerne.</p>
+<p class="undertittel">Finn billigst drivstoff i n&#230;rheten &#8212; gratis, mobilvennlig og drevet av brukerne.</p>
 <p style="margin-top:0.5rem"><a href="/blogg/" style="color:#93c5fd;font-weight:600">&#128211; Les prisanalyse-bloggen &#8594;</a></p>
 
 <div class="kort">
   <h2>Hva er dette?</h2>
-  <p>En gratis webapp der brukerne selv registrerer og oppdaterer drivstoffpriser. Jo flere som bidrar, jo bedre og ferskere priser f&#229;r alle.</p>
-  <p>Appen st&#248;tter <strong>95 oktan</strong>, <strong>98 oktan</strong>, <strong>Diesel</strong> og <strong>Avgiftsfri diesel</strong>.</p>
+  <p>Drivstoffpriser er en gratis PWA/webapp der brukerne selv registrerer og oppdaterer drivstoffpriser. Jo flere som bidrar, jo ferskere og mer nyttige priser f&#229;r alle.</p>
+  <p>Appen st&#248;tter <strong>95 oktan</strong>, <strong>98 oktan</strong>, <strong>diesel</strong> og <strong>avgiftsfri diesel</strong>.</p>
+  <p>Du kan bruke appen helt uten konto for &#229; se kart, liste og statistikk. Konto trengs bare hvis du vil bidra med prisoppdateringer, legge til stasjoner eller sende inn forslag.</p>
   <p style="margin-top:0.5rem;font-size:0.85rem;color:#94a3b8">Liker du appen? En liten donasjon hjelper med &#229; dekke serverdrift.</p>
   <a class="donasjon" href="https://qr.vipps.no/box/4aa50659-cefa-415b-b638-fa1f73e65d1e/pay-in" target="_blank" rel="noopener">
     <svg viewBox="0 0 128 32" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -564,33 +565,46 @@ def om():
   <h2>Slik bruker du appen</h2>
   <div class="steg">
     <span class="steg-nr">1</span>
-    <span class="steg-tekst"><strong>Hent posisjon</strong> eller <strong>s&#248;k etter et sted</strong> for &#229; se stasjoner i n&#230;rheten.</span>
+    <span class="steg-tekst"><strong>Hent posisjon</strong> eller <strong>s&#248;k etter et sted</strong> for &#229; finne stasjoner i n&#230;rheten eller i et annet omr&#229;de.</span>
   </div>
   <div class="steg">
     <span class="steg-nr">2</span>
-    <span class="steg-tekst"><strong>Trykk p&#229; en stasjon</strong> p&#229; kartet eller i listen for &#229; se priser, avstand og navigere dit.</span>
+    <span class="steg-tekst"><strong>Bytt mellom Kart, Liste og Statistikk</strong> nederst i appen. Trykk p&#229; en stasjon for priser, avstand, kjede og navigasjon.</span>
   </div>
   <div class="steg">
     <span class="steg-nr">3</span>
-    <span class="steg-tekst"><strong>Oppdater priser</strong> n&#229;r du er innom en stasjon &#8212; trykk &#171;Endre pris&#187; og legg inn det du ser p&#229; pumpa. Du kan ogs&#229; bekrefte at eksisterende priser stemmer.</span>
+    <span class="steg-tekst"><strong>Logg inn for &#229; bidra</strong>. N&#229;r du er ved en stasjon kan du trykke &#171;Endre pris&#187; og legge inn prisene du ser p&#229; tavla eller pumpa.</span>
   </div>
   <div class="steg">
     <span class="steg-nr">4</span>
-    <span class="steg-tekst"><strong>Mangler en stasjon?</strong> Logg inn og trykk <strong>+</strong> i toppmenyen for &#229; legge den til.</span>
+    <span class="steg-tekst"><strong>Mangler noe eller er noe feil?</strong> Logg inn og legg til stasjon, foresl&#229; nytt navn/kjede eller meld at en stasjon er nedlagt.</span>
+  </div>
+  <div class="steg">
+    <span class="steg-nr">5</span>
+    <span class="steg-tekst"><strong>Tips:</strong> Legg appen til p&#229; hjem-skjermen for raskere tilgang og en mer app-lignende opplevelse p&#229; mobilen.</span>
   </div>
 </div>
 
 <div class="kort">
-  <h2>Funksjoner</h2>
+  <h2>Hva finner du i appen?</h2>
   <ul>
-    <li><strong>Kart</strong> &#8212; se stasjoner rundt deg med fargekodede mark&#248;rer og priser</li>
-    <li><strong>Liste</strong> &#8212; stasjoner sortert etter avstand med priser og kjedelogo</li>
-    <li><strong>Statistikk</strong> &#8212; billigste priser siste 24 timer og antall oppdateringer</li>
+    <li><strong>Kart</strong> &#8212; se stasjoner rundt deg med fargekodede mark&#248;rer basert p&#229; hvor gamle prisene er</li>
+    <li><strong>Liste</strong> &#8212; sammenlign stasjoner sortert etter avstand eller pris</li>
+    <li><strong>Statistikk</strong> &#8212; billigste og dyreste priser siste 24 timer, antall oppdateringer og toppliste</li>
     <li><strong>S&#248;k</strong> &#8212; finn stasjoner i andre byer og omr&#229;der</li>
-    <li><strong>Navigering</strong> &#8212; trykk &#171;Naviger hit&#187; for &#229; &#229;pne veibeskrivelse</li>
-    <li><strong>Innstillinger</strong> &#8212; velg hvilke drivstofftyper du vil se</li>
-    <li><strong>Fungerer offline</strong> &#8212; sist viste priser er tilgjengelige uten nett</li>
-    <li><strong>Legg til p&#229; hjem-skjermen</strong> &#8212; appen kan installeres som en app p&#229; telefonen</li>
+    <li><strong>Innstillinger</strong> &#8212; velg drivstofftyper, s&#248;keradius og kartvisning</li>
+    <li><strong>Bidra</strong> &#8212; oppdater priser, legg til stasjoner og send inn endringsforslag</li>
+    <li><strong>Bidragsmodus</strong> &#8212; egen side for raskere prisoppdateringer for aktive brukere</li>
+    <li><strong>Fungerer offline</strong> &#8212; sist viste data er tilgjengelige uten nett</li>
+  </ul>
+</div>
+
+<div class="kort">
+  <h2>N&#229;r trenger du konto?</h2>
+  <ul>
+    <li><strong>Ikke innlogget:</strong> Du kan se stasjoner, priser, statistikk, blogg og bruke s&#248;k og navigasjon</li>
+    <li><strong>Innlogget:</strong> Du kan oppdatere priser, legge til stasjoner, velge kallenavn og sende inn forslag</li>
+    <li><strong>Moderator / admin:</strong> Har i tillegg tilgang til moderering, adminpanel og enkelte ekstra verkt&#248;y</li>
   </ul>
 </div>
 
@@ -606,6 +620,7 @@ def om():
   <h2>Installer p&#229; telefonen</h2>
   <p><strong>iPhone (Safari):</strong> Trykk p&#229; del-ikonet og velg &#171;Legg til p&#229; Hjem-skjerm&#187;.</p>
   <p><strong>Android (Chrome):</strong> Trykk p&#229; menyen (tre prikker) og velg &#171;Legg til p&#229; startskjermen&#187;.</p>
+  <p style="margin-top:0.5rem;color:#94a3b8;font-size:0.85rem">Hvis GPS oppf&#248;rer seg rart i en innebygd nettleser, fungerer appen som regel best i Safari eller Chrome.</p>
 </div>
 
 <div class="kort">
@@ -617,22 +632,23 @@ def om():
 
 <div class="kort">
   <h2>Versjonshistorikk</h2>
-  <p><strong>v1.2.0</strong> <span class="tag">28. mars 2026</span></p>
+  <p><strong>v1.3.x</strong> <span class="tag">april 2026</span></p>
+  <ul>
+    <li>Personlige splash-meldinger og bedre hjelpetekster i appen</li>
+    <li>Flere forbedringer for redigering av priser og stasjonsdetaljer</li>
+    <li>Utvidet blogg og analyseinnhold p&#229; <a href="/blogg/">/blogg/</a></li>
+  </ul>
+  <p style="margin-top:1rem"><strong>v1.2.x</strong> <span class="tag">slutten av mars 2026</span></p>
   <ul>
     <li>Toppliste over mest aktive bidragsytere i statistikk-fanen</li>
-    <li>Del appen enkelt med venner via innstillinger-menyen</li>
-    <li>Prisanalyse-blogg: ukentlige analyser p&#229; <a href="/blogg/">/blogg/</a></li>
+    <li>Deling fra innstillinger og bedre bidragsflyt</li>
+    <li>Prisanalyse-blogg med ukentlige analyser</li>
   </ul>
-  <p style="margin-top:1rem"><strong>v1.1.2</strong> <span class="tag">26.&#8211;27. mars 2026</span></p>
+  <p style="margin-top:1rem"><strong>v1.1.x</strong> <span class="tag">mars 2026</span></p>
   <ul>
-    <li>Registrering er n&#229; &#229;pen for alle &#8212; ingen tilgangskode trengs</li>
-    <li>Ny kjede: Tanken</li>
+    <li>Registrering ble &#229;pnet for alle</li>
+    <li>Valgbar s&#248;keradius og flere drivstofftyper</li>
     <li>Du kan n&#229; melde fra om nedlagte stasjoner</li>
-  </ul>
-  <p style="margin-top:1rem"><strong>v1.1.0</strong> <span class="tag">25. mars 2026</span></p>
-  <ul>
-    <li>Ny innstilling: velg s&#248;keradius (5&#8211;100 km)</li>
-    <li>Fikset s&#248;kefelt som ikke reagerte p&#229; klikk</li>
   </ul>
   <p style="margin-top:1rem"><strong>v1.0.0</strong> <span class="tag">mars 2026</span></p>
   <ul>
