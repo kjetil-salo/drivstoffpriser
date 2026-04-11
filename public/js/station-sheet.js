@@ -153,6 +153,7 @@ export function refreshSheetInnstillinger() {
 
 export function lukkSheet() {
     sheet.classList.remove('open');
+    sheet.classList.remove('edit-modus');
     backdrop.classList.remove('open');
     if (tidligereFokus) { tidligereFokus.focus(); tidligereFokus = null; }
 }
@@ -209,6 +210,7 @@ function fyllVisning(s) {
 }
 
 function visVisModus() {
+    sheet.classList.remove('edit-modus');
     viewEl.removeAttribute('hidden');
     editEl.setAttribute('hidden', '');
     visPrisStatus('', null);
@@ -231,11 +233,19 @@ function visEditModus() {
 
     visPrisStatus('', null);
     editLagreBtn.disabled = false;
+    sheet.classList.add('edit-modus');
     viewEl.setAttribute('hidden', '');
     editEl.removeAttribute('hidden');
     visOcrForRolle();
     skjulOcrPreview();
-    bensinInput.focus();
+    document.getElementById('sheet-scroll')?.scrollTo({ top: 0, behavior: 'smooth' });
+    if (!erTouchMobil()) {
+        setTimeout(() => bensinInput.focus(), 80);
+    }
+}
+
+function erTouchMobil() {
+    return window.matchMedia?.('(pointer: coarse)').matches || window.innerWidth < 700;
 }
 
 async function bekreftPris() {

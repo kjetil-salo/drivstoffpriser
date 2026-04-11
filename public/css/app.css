@@ -1172,6 +1172,12 @@ html, body {
   overscroll-behavior: contain;
 }
 #stasjon-sheet.open { transform: translateY(0); }
+#stasjon-sheet.edit-modus {
+  max-height: 92dvh;
+}
+#stasjon-sheet.edit-modus #sheet-scroll {
+  max-height: calc(92dvh - 20px);
+}
 
 .sheet-handle {
   width: 36px; height: 4px;
