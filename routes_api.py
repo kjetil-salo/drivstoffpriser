@@ -1092,6 +1092,7 @@ Kjede:
 Nøyaktighet — LED-display:
 - Røde/oransje LED-display: sifrene 1 og 7 forveksles svært lett. Sjekk: har sifferet et topphorisontalt segment? Da er det trolig 7, ikke 1. Eks: "18.19" der 95-oktan er i nærheten av 21.29 (98-oktan), er feil — den laveste prisen for 95 kan gjerne være 18.79 (7 lest som 1).
 - 8 og 9 forveksles svært ofte på LED-skilt. Sjekk spesielt nedre venstre segment: hvis nedre venstre segment er tent, er sifferet trolig 8; hvis nedre venstre segment mangler mens øvre/midtre/nedre og høyre side er tent, er det trolig 9. Ikke velg 8 eller 9 uten å kontrollere dette segmentet.
+- 4 og 9 kan også ligne på LED-skilt. Sjekk topp- og bunnsegmentene: 9 har vanligvis både toppsegment og bunnsegment tent, mens 4 vanligvis mangler toppsegment og bunnsegment og består mest av midtsegment + øvre venstre + høyre side. Ikke les 19.49 som 19.99 eller omvendt uten å sjekke disse segmentene.
 - 6 og 8, 3 og 8, 9 og 5 forveksles også på LED. Bruk alltid prislogikken over til å velge riktig siffer.
 - I tall som ligner "20.19" på røde LED-skilt, vurder alltid om tredje siffer egentlig er 7 og tallet derfor er "20.79". Dette er en vanlig feil.
 - Returner null kun hvis prisen ikke lar seg tolke til et plausibelt XX.XX-tall i området 15–35 selv etter korreksjonsforsøk.
@@ -1180,6 +1181,7 @@ Ekstra instruks for Haiku:
 - Hvis tre rader er synlige og etikettene er uklare, er beste antakelse 95 oktan, 98 oktan og diesel. Bruk etiketter hvis de er synlige; 98 har ingen fast plass.
 - Røde LED-tall er punktmatrise/segmenter. Ikke les "20.79" som "2019" eller "20.19" hvis det tredje sifferet har tydelig 7-form.
 - Sjekk 8 og 9 ekstra nøye: 8 har nedre venstre del/segment, 9 mangler vanligvis nedre venstre del/segment.
+- Sjekk 4 og 9 ekstra nøye: 9 har topp og bunn, 4 mangler vanligvis topp og bunn.
 - Alle priser skal normaliseres til XX.XX. Eksempel: 1599 -> 15.99, 1949 -> 19.49, 2079 -> 20.79.
 - Det er bedre å returnere to sikre priser med confidence "medium" enn å returnere alle null.
 - Returner likevel null for felt som ikke har en synlig eller plausibel rad.
