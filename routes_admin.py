@@ -117,6 +117,16 @@ def _punkt_til_segment_m(lat, lon, a, b):
 
 
 def _geokod_sted(q: str):
+    if q.startswith('pos:'):
+        deler = q[4:].split(',')
+        if len(deler) == 2:
+            try:
+                lat, lon = float(deler[0]), float(deler[1])
+                if 57 <= lat <= 72 and 4 <= lon <= 32:
+                    return {'navn': 'Min posisjon', 'lat': lat, 'lon': lon}
+            except ValueError:
+                pass
+
     resp = httpx.get(
         'https://photon.komoot.io/api/',
         params={'q': q, 'limit': 1, 'bbox': '4.0,57.0,31.5,71.5'},
@@ -1768,6 +1778,9 @@ def admin_rutepris():
   .kort{{background:#111827;border:1px solid #1f2937;border-radius:12px;padding:1.25rem;margin-bottom:1rem}}
   form{{display:grid;grid-template-columns:1fr 1fr 170px 130px auto;gap:0.75rem;align-items:end}}
   .felt-wrap{{position:relative}}
+  .input-rad{{display:flex;gap:0.4rem}}
+  .pos-btn{{width:auto;background:#1f2937;border:1px solid #3b82f6;color:#bfdbfe;padding:0.7rem 0.75rem;white-space:nowrap}}
+  .pos-btn:hover{{background:#1e3a8a}}
   label{{font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:0.35rem}}
   input,select{{width:100%;background:#1f2937;border:1px solid #374151;border-radius:8px;color:#e5e7eb;padding:0.7rem 0.8rem;font-size:0.95rem}}
   button{{background:#2563eb;border:0;border-radius:8px;color:white;padding:0.75rem 1.1rem;font-weight:700;cursor:pointer}}
@@ -1792,7 +1805,7 @@ def admin_rutepris():
 <p class="ingress">Admin-prototype. Bruker Photon for stedssøk, OSRM for rute og egne prisdata for å finne stasjoner nær ruta. Ingen AI involvert.</p>
 <div class="kort">
   <form method="post">
-    <div class="felt-wrap"><label>Fra</label><input id="rute-fra" name="fra" value="{html.escape(fra_txt)}" placeholder="f.eks. Bergen" autocomplete="off" required><div id="rute-fra-resultater" class="autocomplete" hidden></div></div>
+    <div class="felt-wrap"><label>Fra</label><div class="input-rad"><input id="rute-fra" name="fra" value="{html.escape(fra_txt)}" placeholder="f.eks. Bergen" autocomplete="off" required><button class="pos-btn" id="bruk-posisjon" type="button">Her</button></div><div id="rute-fra-resultater" class="autocomplete" hidden></div></div>
     <div class="felt-wrap"><label>Til</label><input id="rute-til" name="til" value="{html.escape(til_txt)}" placeholder="f.eks. Oslo" autocomplete="off" required><div id="rute-til-resultater" class="autocomplete" hidden></div></div>
     <div><label>Drivstoff</label><select name="drivstoff">
       <option value="bensin" {valgt('bensin')}>95 oktan</option>
@@ -1910,6 +1923,30 @@ function initAutocomplete(inputId, resultId) {{
 
 initAutocomplete('rute-fra', 'rute-fra-resultater');
 initAutocomplete('rute-til', 'rute-til-resultater');
+
+document.getElementById('bruk-posisjon').addEventListener('click', () => {{
+  const btn = document.getElementById('bruk-posisjon');
+  const input = document.getElementById('rute-fra');
+  if (!navigator.geolocation) {{
+    alert('Nettleseren støtter ikke posisjon.');
+    return;
+  }}
+  btn.disabled = true;
+  btn.textContent = 'Henter...';
+  navigator.geolocation.getCurrentPosition(
+    pos => {{
+      input.value = `pos:${{pos.coords.latitude.toFixed(6)}},${{pos.coords.longitude.toFixed(6)}}`;
+      btn.textContent = 'Her';
+      btn.disabled = false;
+    }},
+    () => {{
+      alert('Kunne ikke hente posisjon. Sjekk posisjonstilgang i nettleseren.');
+      btn.textContent = 'Her';
+      btn.disabled = false;
+    }},
+    {{ enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }}
+  );
+}});
 </script></body></html>'''
 
 
