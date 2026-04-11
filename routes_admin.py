@@ -1767,9 +1767,16 @@ def admin_rutepris():
   .ingress{{font-size:0.9rem;color:#94a3b8;margin-bottom:1.25rem;line-height:1.5}}
   .kort{{background:#111827;border:1px solid #1f2937;border-radius:12px;padding:1.25rem;margin-bottom:1rem}}
   form{{display:grid;grid-template-columns:1fr 1fr 170px 130px auto;gap:0.75rem;align-items:end}}
+  .felt-wrap{{position:relative}}
   label{{font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:0.35rem}}
   input,select{{width:100%;background:#1f2937;border:1px solid #374151;border-radius:8px;color:#e5e7eb;padding:0.7rem 0.8rem;font-size:0.95rem}}
   button{{background:#2563eb;border:0;border-radius:8px;color:white;padding:0.75rem 1.1rem;font-weight:700;cursor:pointer}}
+  .autocomplete{{position:absolute;z-index:20;top:100%;left:0;right:0;margin-top:4px;background:#111827;border:1px solid #374151;border-radius:10px;box-shadow:0 18px 40px rgba(0,0,0,0.35);overflow:hidden}}
+  .autocomplete[hidden]{{display:none}}
+  .autocomplete-rad{{padding:0.65rem 0.8rem;border-bottom:1px solid #1f2937;cursor:pointer;color:#e5e7eb;font-size:0.9rem}}
+  .autocomplete-rad:last-child{{border-bottom:0}}
+  .autocomplete-rad:hover,.autocomplete-rad.aktiv{{background:#1f2937;color:#bfdbfe}}
+  .autocomplete-tom{{padding:0.65rem 0.8rem;color:#94a3b8;font-size:0.88rem}}
   .melding{{color:#f59e0b;margin-top:1rem}}
   .ruteinfo{{color:#cbd5e1;margin-bottom:1rem;font-size:0.9rem}}
   .grid{{display:grid;grid-template-columns:minmax(0,1fr) 420px;gap:1rem;align-items:start}}
@@ -1785,8 +1792,8 @@ def admin_rutepris():
 <p class="ingress">Admin-prototype. Bruker Photon for stedssøk, OSRM for rute og egne prisdata for å finne stasjoner nær ruta. Ingen AI involvert.</p>
 <div class="kort">
   <form method="post">
-    <div><label>Fra</label><input name="fra" value="{html.escape(fra_txt)}" placeholder="f.eks. Bergen" required></div>
-    <div><label>Til</label><input name="til" value="{html.escape(til_txt)}" placeholder="f.eks. Oslo" required></div>
+    <div class="felt-wrap"><label>Fra</label><input id="rute-fra" name="fra" value="{html.escape(fra_txt)}" placeholder="f.eks. Bergen" autocomplete="off" required><div id="rute-fra-resultater" class="autocomplete" hidden></div></div>
+    <div class="felt-wrap"><label>Til</label><input id="rute-til" name="til" value="{html.escape(til_txt)}" placeholder="f.eks. Oslo" autocomplete="off" required><div id="rute-til-resultater" class="autocomplete" hidden></div></div>
     <div><label>Drivstoff</label><select name="drivstoff">
       <option value="bensin" {valgt('bensin')}>95 oktan</option>
       <option value="bensin98" {valgt('bensin98')}>98 oktan</option>
@@ -1821,6 +1828,88 @@ data.treff.forEach((s, i) => {{
   bounds.push([s.lat, s.lon]);
 }});
 if (bounds.length) map.fitBounds(bounds, {{padding:[30,30]}});
+
+function initAutocomplete(inputId, resultId) {{
+  const input = document.getElementById(inputId);
+  const resultEl = document.getElementById(resultId);
+  let timer = null;
+  let resultater = [];
+  let aktiv = -1;
+
+  function lukk() {{
+    resultEl.hidden = true;
+    resultEl.innerHTML = '';
+    aktiv = -1;
+  }}
+
+  function marker() {{
+    resultEl.querySelectorAll('.autocomplete-rad').forEach((el, i) => {{
+      el.classList.toggle('aktiv', i === aktiv);
+    }});
+  }}
+
+  function velg(i) {{
+    const valgt = resultater[i];
+    if (!valgt) return;
+    input.value = valgt.navn;
+    lukk();
+  }}
+
+  async function sok(q) {{
+    try {{
+      const resp = await fetch(`/api/stedssok?q=${{encodeURIComponent(q)}}`);
+      resultater = await resp.json();
+      aktiv = -1;
+      if (!resultater.length) {{
+        resultEl.innerHTML = '<div class="autocomplete-tom">Ingen treff</div>';
+        resultEl.hidden = false;
+        return;
+      }}
+      resultEl.innerHTML = resultater.map((r, i) =>
+        `<div class="autocomplete-rad" data-i="${{i}}">${{r.navn}}</div>`
+      ).join('');
+      resultEl.hidden = false;
+      resultEl.querySelectorAll('.autocomplete-rad').forEach(el => {{
+        el.addEventListener('mousedown', e => {{
+          e.preventDefault();
+          velg(Number(el.dataset.i));
+        }});
+      }});
+    }} catch {{
+      lukk();
+    }}
+  }}
+
+  input.addEventListener('input', () => {{
+    clearTimeout(timer);
+    const q = input.value.trim();
+    if (q.length < 2) {{ lukk(); return; }}
+    timer = setTimeout(() => sok(q), 250);
+  }});
+
+  input.addEventListener('keydown', e => {{
+    const rader = resultEl.querySelectorAll('.autocomplete-rad');
+    if (e.key === 'Escape') {{ lukk(); return; }}
+    if (!rader.length) return;
+    if (e.key === 'ArrowDown') {{
+      e.preventDefault();
+      aktiv = Math.min(aktiv + 1, rader.length - 1);
+      marker();
+    }} else if (e.key === 'ArrowUp') {{
+      e.preventDefault();
+      aktiv = Math.max(aktiv - 1, 0);
+      marker();
+    }} else if (e.key === 'Enter' && aktiv >= 0) {{
+      e.preventDefault();
+      velg(aktiv);
+    }}
+  }});
+
+  input.addEventListener('blur', () => setTimeout(lukk, 150));
+}}
+
+initAutocomplete('rute-fra', 'rute-fra-resultater');
+initAutocomplete('rute-til', 'rute-til-resultater');
 </script></body></html>'''
 
 
