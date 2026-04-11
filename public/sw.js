@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v63';
+const CACHE_VERSION = 'v64';
 const STATIC_CACHE = `drivstoff-static-${CACHE_VERSION}`;
 const DATA_CACHE = `drivstoff-data-${CACHE_VERSION}`;
 
@@ -19,6 +19,7 @@ const STATIC_ASSETS = [
   '/js/stats.js',
   '/js/ocr.js',
   '/js/hurtigpris.js',
+  '/js/route-planner.js',
   '/icon.svg',
   '/apple-touch-icon.png',
   '/favicon.ico',
