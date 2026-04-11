@@ -68,7 +68,7 @@ html, body {
 #loc-btn {
   position: absolute;
   right: 14px;
-  top: 14px;
+  top: calc(14px + var(--kart-btn-index, 0) * 56px);
   z-index: 1000;
   width: 44px;
   height: 44px;
@@ -93,7 +93,7 @@ html, body {
 #route-btn {
   position: absolute;
   right: 14px;
-  top: 64px;
+  top: calc(14px + var(--kart-btn-index, 1) * 56px);
   z-index: 1000;
   width: 44px;
   height: 44px;
@@ -1525,9 +1525,9 @@ html, body {
 
 /* ── Legg til stasjon ────────────────────────────── */
 #add-station-btn {
-  position: fixed;
+  position: absolute;
   right: 14px;
-  top: 168px;
+  top: calc(14px + var(--kart-btn-index, 2) * 56px);
   z-index: 1000;
   width: 44px;
   height: 44px;
@@ -1551,9 +1551,9 @@ html, body {
 #add-station-btn[hidden] { display: none; }
 
 #camera-btn {
-  position: fixed;
+  position: absolute;
   right: 14px;
-  top: 220px;
+  top: calc(14px + var(--kart-btn-index, 3) * 56px);
   z-index: 1000;
   width: 44px;
   height: 44px;
