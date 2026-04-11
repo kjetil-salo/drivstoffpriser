@@ -1527,7 +1527,7 @@ html, body {
 #add-station-btn {
   position: fixed;
   right: 14px;
-  top: 116px;
+  top: 168px;
   z-index: 1000;
   width: 44px;
   height: 44px;
@@ -1553,7 +1553,7 @@ html, body {
 #camera-btn {
   position: fixed;
   right: 14px;
-  top: 168px;
+  top: 220px;
   z-index: 1000;
   width: 44px;
   height: 44px;
