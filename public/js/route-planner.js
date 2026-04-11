@@ -11,6 +11,7 @@ const DRIVSTOFF_NAVN = {
 let fraPos = null;
 let onResultat = null;
 let onStasjonKlikk = null;
+let onFjernRute = null;
 let getStartPos = null;
 
 const el = {
@@ -27,12 +28,16 @@ const el = {
     avvik: document.getElementById('rutepris-avvik'),
     sok: document.getElementById('rutepris-sok'),
     status: document.getElementById('rutepris-status'),
+    handlinger: document.getElementById('rutepris-handlinger'),
+    visKart: document.getElementById('rutepris-vis-kart'),
+    fjern: document.getElementById('rutepris-fjern'),
     resultater: document.getElementById('rutepris-resultater'),
 };
 
 export function initRuteplanlegger(options) {
     onResultat = options.onResultat;
     onStasjonKlikk = options.onStasjonKlikk;
+    onFjernRute = options.onFjernRute;
     getStartPos = options.getStartPos;
 
     el.btn.addEventListener('click', apne);
@@ -40,6 +45,8 @@ export function initRuteplanlegger(options) {
     el.backdrop.addEventListener('click', lukk);
     el.her.addEventListener('click', brukMinPosisjon);
     el.sok.addEventListener('click', sokRute);
+    el.visKart.addEventListener('click', lukk);
+    el.fjern.addEventListener('click', fjernRute);
     el.til.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') sokRute();
     });
@@ -95,6 +102,7 @@ async function sokRute() {
 
     el.sok.disabled = true;
     el.resultater.innerHTML = '';
+    el.handlinger.hidden = true;
     settStatus('Beregner rute og sjekker priser …');
     try {
         const data = await finnBilligstLangsRute({
@@ -105,12 +113,21 @@ async function sokRute() {
         });
         onResultat(data);
         visResultater(data);
+        el.handlinger.hidden = !data.treff.length;
         settStatus(lagStatusTekst(data), !data.treff.length);
     } catch (e) {
         settStatus(e.message || 'Kunne ikke beregne rute nå.', true);
     } finally {
         el.sok.disabled = false;
     }
+}
+
+function fjernRute() {
+    onFjernRute?.();
+    el.resultater.innerHTML = '';
+    el.handlinger.hidden = true;
+    settStatus('Ruten er fjernet fra kartet.');
+    lukk();
 }
 
 function lagStatusTekst(data) {

@@ -1721,6 +1721,31 @@ html, body {
   font-size: var(--font-sm);
 }
 
+.rutepris-handlinger {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: var(--space-sm);
+}
+.rutepris-handlinger[hidden] { display: none; }
+.rutepris-handlinger button {
+  min-height: 42px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color-medium);
+  background: rgba(148, 163, 184, 0.08);
+  color: var(--color-text);
+  font-weight: 700;
+  cursor: pointer;
+}
+#rutepris-vis-kart {
+  background: rgba(59, 130, 246, 0.16);
+  border-color: rgba(59, 130, 246, 0.55);
+  color: #bfdbfe;
+}
+#rutepris-fjern {
+  color: #fecaca;
+}
+
 .rutepris-resultat {
   width: 100%;
   display: grid;

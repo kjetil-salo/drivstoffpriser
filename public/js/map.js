@@ -8,6 +8,7 @@ const stasjonData = new Map();     // id → stasjon
 let stasjonOnKlikk = null;
 let sisteKartvisning = null;
 let ruteLag = null;
+let ruteAktiv = false;
 
 export function initMap(containerId, startPos) {
     const senter = startPos ? [startPos.lat, startPos.lon] : [59.91, 10.75];
@@ -45,6 +46,8 @@ export function getKartSenter() {
 export function visRutePris(data, onStasjonKlikk) {
     if (!map) return;
     fjernRutePris();
+    ruteAktiv = true;
+    stasjonMarkorer.forEach(m => m.remove());
 
     const gruppe = L.layerGroup().addTo(map);
     const bounds = [];
@@ -86,9 +89,13 @@ export function visRutePris(data, onStasjonKlikk) {
 }
 
 export function fjernRutePris() {
+    ruteAktiv = false;
     if (ruteLag) {
         ruteLag.remove();
         ruteLag = null;
+    }
+    if (stasjonOnKlikk) {
+        visStasjoner([...stasjonData.values()], stasjonOnKlikk);
     }
 }
 
@@ -144,6 +151,10 @@ export function visStasjoner(stasjoner, onKlikk) {
 
     stasjonOnKlikk = onKlikk;
     sisteKartvisning = getInnstillinger().kartvisning ?? 'kompakt';
+    if (ruteAktiv) {
+        stasjoner.forEach(s => stasjonData.set(s.id, s));
+        return;
+    }
     const billigsteId = finnBilligsteId(stasjoner);
     stasjoner.forEach(s => {
         stasjonData.set(s.id, s);

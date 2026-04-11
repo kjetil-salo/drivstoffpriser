@@ -1,6 +1,6 @@
 import { hentStasjoner } from './api.js';
 import { hentPosisjon, startFollowWatch } from './location.js';
-import { initMap, sentrerKart, panTilPosisjon, visUserPosisjon, oppdaterUserMarker, registrerBrukerDrag, visStasjoner, oppdaterStasjonPriser, initKartBevegelse, refreshKartInnstillinger, getKartSenter, visRutePris } from './map.js';
+import { initMap, sentrerKart, panTilPosisjon, visUserPosisjon, oppdaterUserMarker, registrerBrukerDrag, visStasjoner, oppdaterStasjonPriser, initKartBevegelse, refreshKartInnstillinger, getKartSenter, visRutePris, fjernRutePris } from './map.js';
 import { visListe, oppdaterKort } from './list.js';
 import { initSheet, visStasjonSheet, oppdaterSheetStasjon, lukkSheet, refreshSheetInnstillinger } from './station-sheet.js';
 import { initHurtigpris, åpneHurtigKamera } from './hurtigpris.js';
@@ -229,6 +229,7 @@ initRuteplanlegger({
     getStartPos: () => userPos || hentLagretPos() || getKartSenter(),
     onResultat: (data) => visRutePris(data, visStasjonSheet),
     onStasjonKlikk: visStasjonSheet,
+    onFjernRute: fjernRutePris,
 });
 
 // ── Velkomst-overlay ──────────────────────────────
