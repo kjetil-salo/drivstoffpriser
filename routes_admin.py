@@ -1,11 +1,15 @@
 """Admin-ruter: brukeradministrasjon og prislogg."""
 
+import html
+import json
+import math
 import os
 import secrets
 import logging
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 
+import httpx
 from flask import Blueprint, request, session, redirect, jsonify
 
 from datetime import datetime, timezone
@@ -87,6 +91,91 @@ def krever_moderator(f):
     return wrapper
 
 
+def _haversine_m(lat1, lon1, lat2, lon2):
+    r = 6371000
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    d_phi = math.radians(lat2 - lat1)
+    d_lam = math.radians(lon2 - lon1)
+    a = math.sin(d_phi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(d_lam / 2) ** 2
+    return 2 * r * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+
+def _punkt_til_segment_m(lat, lon, a, b):
+    """Omtrentlig avstand fra punkt til rutesegment, god nok for admin-prototype."""
+    lat0 = math.radians((lat + a[0] + b[0]) / 3)
+    meter_per_lat = 111_320
+    meter_per_lon = 111_320 * max(math.cos(lat0), 0.01)
+    px, py = lon * meter_per_lon, lat * meter_per_lat
+    ax, ay = a[1] * meter_per_lon, a[0] * meter_per_lat
+    bx, by = b[1] * meter_per_lon, b[0] * meter_per_lat
+    dx, dy = bx - ax, by - ay
+    if dx == 0 and dy == 0:
+        return math.hypot(px - ax, py - ay)
+    t = max(0, min(1, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy)))
+    nx, ny = ax + t * dx, ay + t * dy
+    return math.hypot(px - nx, py - ny)
+
+
+def _geokod_sted(q: str):
+    resp = httpx.get(
+        'https://photon.komoot.io/api/',
+        params={'q': q, 'limit': 1, 'bbox': '4.0,57.0,31.5,71.5'},
+        headers={'User-Agent': 'drivstoffpriser/1.0 admin-rutepris'},
+        timeout=8,
+    )
+    resp.raise_for_status()
+    for f in resp.json().get('features', []):
+        props = f.get('properties', {})
+        if props.get('countrycode', '').upper() != 'NO':
+            continue
+        coords = f.get('geometry', {}).get('coordinates', [])
+        if len(coords) >= 2:
+            deler = [props.get(k) for k in ('name', 'county', 'state') if props.get(k)]
+            return {'navn': ', '.join(dict.fromkeys(deler)) or q, 'lat': float(coords[1]), 'lon': float(coords[0])}
+    return None
+
+
+def _hent_osrm_rute(fra, til):
+    resp = httpx.get(
+        f'https://router.project-osrm.org/route/v1/driving/{fra["lon"]},{fra["lat"]};{til["lon"]},{til["lat"]}',
+        params={'overview': 'full', 'geometries': 'geojson', 'alternatives': 'false', 'steps': 'false'},
+        headers={'User-Agent': 'drivstoffpriser/1.0 admin-rutepris'},
+        timeout=15,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    routes = data.get('routes') or []
+    if not routes:
+        return None
+    coords = routes[0].get('geometry', {}).get('coordinates', [])
+    punkter = [(float(lat), float(lon)) for lon, lat in coords]
+    return {'punkter': punkter, 'km': routes[0].get('distance', 0) / 1000, 'min': routes[0].get('duration', 0) / 60}
+
+
+def _finn_billige_langs_rute(rute, drivstoff: str, maks_avvik_km: float, limit: int = 25):
+    stasjoner = stasjoner_med_pris_koordinater()
+    punkter = rute['punkter']
+    if len(punkter) < 2:
+        return []
+    margin = maks_avvik_km / 111
+    min_lat = min(p[0] for p in punkter) - margin
+    max_lat = max(p[0] for p in punkter) + margin
+    min_lon = min(p[1] for p in punkter) - margin
+    max_lon = max(p[1] for p in punkter) + margin
+    kandidater = []
+    for s in stasjoner:
+        pris = s.get(drivstoff)
+        if pris is None or pris <= 0:
+            continue
+        if not (min_lat <= s['lat'] <= max_lat and min_lon <= s['lon'] <= max_lon):
+            continue
+        avstand = min(_punkt_til_segment_m(s['lat'], s['lon'], punkter[i], punkter[i + 1]) for i in range(len(punkter) - 1))
+        if avstand <= maks_avvik_km * 1000:
+            kandidater.append({**s, 'pris': pris, 'avvik_m': round(avstand)})
+    kandidater.sort(key=lambda s: (s['pris'], s['avvik_m']))
+    return kandidater[:limit]
+
+
 @admin_bp.route('/admin')
 @krever_innlogging
 @krever_moderator
@@ -115,6 +204,11 @@ def admin():
     <div class="tile-ikon">&#128506;&#65039;</div>
     <div class="tile-tittel">Kart</div>
     <div class="tile-info">{stasjoner_antall} stasjoner med pris</div>
+  </a>
+  <a href="/admin/rutepris" class="tile">
+    <div class="tile-ikon">&#128663;</div>
+    <div class="tile-tittel">Billigst p&#229; vei</div>
+    <div class="tile-info">Finn pris langs rute</div>
   </a>
   <a href="/admin/import" class="tile">
     <div class="tile-ikon">&#128229;</div>
@@ -1568,6 +1662,165 @@ document.querySelectorAll('.legend span[data-kat]').forEach(el => {{
     (markorer[kat] || []).forEach(m => aktiv ? map.removeLayer(m) : map.addLayer(m));
   }});
 }});
+</script></body></html>'''
+
+
+@admin_bp.route('/admin/rutepris', methods=['GET', 'POST'])
+@krever_innlogging
+@krever_admin
+def admin_rutepris():
+    fra_txt = request.form.get('fra', '').strip() if request.method == 'POST' else ''
+    til_txt = request.form.get('til', '').strip() if request.method == 'POST' else ''
+    drivstoff = request.form.get('drivstoff', 'bensin') if request.method == 'POST' else 'bensin'
+    maks_avvik_km = request.form.get('maks_avvik_km', type=float) if request.method == 'POST' else 3.0
+    maks_avvik_km = max(0.5, min(maks_avvik_km or 3.0, 15.0))
+    gyldige_drivstoff = {
+        'bensin': '95 oktan',
+        'bensin98': '98 oktan',
+        'diesel': 'Diesel',
+        'diesel_avgiftsfri': 'Avgiftsfri diesel',
+    }
+    if drivstoff not in gyldige_drivstoff:
+        drivstoff = 'bensin'
+
+    melding = ''
+    fra = til = rute = None
+    treff = []
+    if request.method == 'POST':
+        if not fra_txt or not til_txt:
+            melding = 'Fyll inn både fra og til.'
+        else:
+            try:
+                fra = _geokod_sted(fra_txt)
+                til = _geokod_sted(til_txt)
+                if not fra or not til:
+                    melding = 'Fant ikke ett av stedene. Prøv mer presist stedsnavn.'
+                else:
+                    rute = _hent_osrm_rute(fra, til)
+                    if not rute:
+                        melding = 'Fant ingen kjørbar rute.'
+                    else:
+                        treff = _finn_billige_langs_rute(rute, drivstoff, maks_avvik_km)
+                        if not treff:
+                            melding = 'Fant ingen stasjoner med valgt pris langs ruta.'
+            except Exception as e:
+                logging.getLogger('drivstoff').warning(f'Rutepris feilet: {e}')
+                melding = 'Rutesøk feilet. Prøv igjen litt senere.'
+
+    def valgt(v):
+        return 'selected' if v == drivstoff else ''
+
+    rader = []
+    for idx, s in enumerate(treff, 1):
+        navn = html.escape(s['navn'] + (f' ({s["kjede"]})' if s.get('kjede') else ''))
+        kart_url = f'https://www.google.com/maps?q={s["lat"]},{s["lon"]}'
+        tidspunkt = html.escape((s.get('tidspunkt') or '')[:16])
+        rader.append(
+            f'<tr>'
+            f'<td style="color:#94a3b8">{idx}</td>'
+            f'<td><a href="{kart_url}" target="_blank">{navn}</a></td>'
+            f'<td class="pris">{s["pris"]:.2f}</td>'
+            f'<td>{s["avvik_m"]} m</td>'
+            f'<td style="color:#94a3b8">{tidspunkt}</td>'
+            f'</tr>'
+        )
+    tabell = (
+        '<table><tr><th>#</th><th>Stasjon</th><th>Pris</th><th>Fra rute</th><th>Sist oppdatert</th></tr>'
+        + ''.join(rader) + '</table>'
+        if treff else ''
+    )
+    ruteinfo = ''
+    if rute and fra and til:
+        ruteinfo = (
+            f'<div class="ruteinfo">Rute: <strong>{html.escape(fra["navn"])}</strong> til '
+            f'<strong>{html.escape(til["navn"])}</strong> · ca. {rute["km"]:.0f} km · '
+            f'{rute["min"]:.0f} min · {len(treff)} treff innenfor {maks_avvik_km:g} km</div>'
+        )
+
+    melding_html = f'<p class="melding">{html.escape(melding)}</p>' if melding else ''
+    kartdata = {
+        'rute': [[lat, lon] for lat, lon in rute['punkter']] if rute else [],
+        'treff': [
+            {
+                'navn': s['navn'],
+                'kjede': s.get('kjede') or '',
+                'lat': s['lat'],
+                'lon': s['lon'],
+                'pris': s['pris'],
+                'avvik_m': s['avvik_m'],
+            }
+            for s in treff
+        ],
+    }
+
+    return f'''<!DOCTYPE html><html lang="no"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Billigst på vei – Admin</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  *{{box-sizing:border-box;margin:0;padding:0}}
+  body{{font-family:system-ui,sans-serif;background:#0f172a;color:#e5e7eb;padding:2rem 1rem}}
+  .container{{max-width:1100px;margin:0 auto}}
+  nav{{margin-bottom:1.5rem;font-size:0.85rem}}
+  nav a,a{{color:#93c5fd}}
+  h1{{font-size:1.35rem;margin-bottom:0.5rem;color:#f1f5f9}}
+  .ingress{{font-size:0.9rem;color:#94a3b8;margin-bottom:1.25rem;line-height:1.5}}
+  .kort{{background:#111827;border:1px solid #1f2937;border-radius:12px;padding:1.25rem;margin-bottom:1rem}}
+  form{{display:grid;grid-template-columns:1fr 1fr 170px 130px auto;gap:0.75rem;align-items:end}}
+  label{{font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:0.35rem}}
+  input,select{{width:100%;background:#1f2937;border:1px solid #374151;border-radius:8px;color:#e5e7eb;padding:0.7rem 0.8rem;font-size:0.95rem}}
+  button{{background:#2563eb;border:0;border-radius:8px;color:white;padding:0.75rem 1.1rem;font-weight:700;cursor:pointer}}
+  .melding{{color:#f59e0b;margin-top:1rem}}
+  .ruteinfo{{color:#cbd5e1;margin-bottom:1rem;font-size:0.9rem}}
+  .grid{{display:grid;grid-template-columns:minmax(0,1fr) 420px;gap:1rem;align-items:start}}
+  table{{width:100%;border-collapse:collapse;font-size:0.88rem}}
+  td,th{{padding:9px 10px;border-bottom:1px solid #1f2937;text-align:left}}
+  th{{color:#94a3b8;font-weight:600}}
+  .pris{{font-weight:800;color:#22c55e}}
+  #map{{height:520px;border-radius:12px;border:1px solid #1f2937;background:#020617}}
+  @media(max-width:850px){{form{{grid-template-columns:1fr}}.grid{{grid-template-columns:1fr}}#map{{height:360px}}}}
+</style></head><body><div class="container">
+<nav><a href="/admin">&#8592; Admin</a></nav>
+<h1>Billigste stasjon på veien</h1>
+<p class="ingress">Admin-prototype. Bruker Photon for stedssøk, OSRM for rute og egne prisdata for å finne stasjoner nær ruta. Ingen AI involvert.</p>
+<div class="kort">
+  <form method="post">
+    <div><label>Fra</label><input name="fra" value="{html.escape(fra_txt)}" placeholder="f.eks. Bergen" required></div>
+    <div><label>Til</label><input name="til" value="{html.escape(til_txt)}" placeholder="f.eks. Oslo" required></div>
+    <div><label>Drivstoff</label><select name="drivstoff">
+      <option value="bensin" {valgt('bensin')}>95 oktan</option>
+      <option value="bensin98" {valgt('bensin98')}>98 oktan</option>
+      <option value="diesel" {valgt('diesel')}>Diesel</option>
+      <option value="diesel_avgiftsfri" {valgt('diesel_avgiftsfri')}>Avg.fri diesel</option>
+    </select></div>
+    <div><label>Maks fra rute (km)</label><input type="number" min="0.5" max="15" step="0.5" name="maks_avvik_km" value="{maks_avvik_km:g}"></div>
+    <button>Søk</button>
+  </form>
+  {melding_html}
+</div>
+{ruteinfo}
+<div class="grid">
+  <div class="kort">{tabell or '<p style="color:#94a3b8">Søk etter en rute for å se forslag.</p>'}</div>
+  <div id="map"></div>
+</div>
+</div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const data = {json.dumps(kartdata, ensure_ascii=False)};
+const map = L.map('map').setView([63.4, 10.4], 5);
+L.tileLayer('https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png', {{ attribution: '© OpenStreetMap' }}).addTo(map);
+const bounds = [];
+if (data.rute.length) {{
+  L.polyline(data.rute, {{color:'#60a5fa', weight:5, opacity:0.85}}).addTo(map);
+  bounds.push(...data.rute);
+}}
+data.treff.forEach((s, i) => {{
+  const m = L.circleMarker([s.lat, s.lon], {{radius: i < 3 ? 9 : 7, color:'#022c22', fillColor: i < 3 ? '#22c55e' : '#f59e0b', fillOpacity:0.9}})
+    .bindPopup(`<strong>${{i+1}}. ${{s.navn}}</strong>${{s.kjede ? ' (' + s.kjede + ')' : ''}}<br>Pris: ${{s.pris.toFixed(2)}}<br>Fra rute: ${{s.avvik_m}} m`)
+    .addTo(map);
+  bounds.push([s.lat, s.lon]);
+}});
+if (bounds.length) map.fitBounds(bounds, {{padding:[30,30]}});
 </script></body></html>'''
 
 

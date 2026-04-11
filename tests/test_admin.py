@@ -31,6 +31,12 @@ class TestAdminDashboard:
         assert 'Prislogg' in html
         assert 'Kart' in html
 
+    def test_rutepris_er_adminside(self, admin_client):
+        resp = admin_client.get('/admin/rutepris')
+        html = resp.data.decode()
+        assert resp.status_code == 200
+        assert 'Billigste stasjon' in html
+
 
 class TestAdminBrukere:
     def test_viser_brukere(self, admin_client):
