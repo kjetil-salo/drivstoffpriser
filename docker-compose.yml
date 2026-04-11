@@ -15,7 +15,7 @@ services:
       REGISTRER_KODE: "${REGISTRER_KODE:-}"
       PARTNER_API_KEY: "${PARTNER_API_KEY:-}"
       ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
-      OCR_MODELL: "${OCR_MODELL:-gemini}"
+      OCR_MODELL: "${OCR_MODELL:-haiku}"
       GEMINI_API_KEY: "${GEMINI_API_KEY:-}"
       GEMINI_MODELL: "${GEMINI_MODELL:-gemini-flash-latest}"
       GEMINI_MODELLER: "${GEMINI_MODELLER:-gemini-flash-latest,gemini-2.5-flash}"
