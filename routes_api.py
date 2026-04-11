@@ -1042,6 +1042,8 @@ AVVIS bildet og returner alle null-verdier hvis:
 - Prisene ikke er lesbare (for langt unna, uskarp, refleks)
 - Du er usikker på enkeltsiffer og kan ikke korrigere med prislogikken nedenfor
 
+Viktig: Ikke returner alle null bare fordi bildet er vanskelig. Hvis du ser minst én plausibel prisrad med tall i området 15.00–35.00, returner den eller de sikre prisene og sett resten til null.
+
 Returner KUN gyldig JSON uten annen tekst:
 {"bensin": null, "diesel": null, "bensin98": null, "diesel_avgiftsfri": null, "kjede": null, "confidence": "low", "uncertain_fields": []}
 
@@ -1169,15 +1171,31 @@ Returner KUN gyldig JSON uten annen tekst:
 """
 
 
-def _lag_ocr_prompt(forventet_kjede=None):
+_OCR_PROMPT_HAIKU_EKSTRA = """
+Ekstra instruks for Haiku:
+- Tenk rad-for-rad, ikke bilde-for-bilde. Finn først rektangelet med prisdisplayet, deretter hver horisontale prisrad.
+- Tell synlige prisrader: vanligvis 2, av og til 3. Ikke let etter mange andre tall.
+- Hvis to rader er synlige og etikettene er uklare eller delvis beskåret, er beste antakelse 95 oktan + diesel. Bruk etiketter hvis de er synlige, ellers bruk øverste synlige pris som bensin og nederste synlige pris som diesel.
+- Hvis tre rader er synlige og etikettene er uklare, er beste antakelse 95 oktan, 98 oktan og diesel. Bruk etiketter hvis de er synlige; 98 har ingen fast plass.
+- Røde LED-tall er punktmatrise/segmenter. Ikke les "20.79" som "2019" eller "20.19" hvis det tredje sifferet har tydelig 7-form.
+- Alle priser skal normaliseres til XX.XX. Eksempel: 1599 -> 15.99, 1949 -> 19.49, 2079 -> 20.79.
+- Det er bedre å returnere to sikre priser med confidence "medium" enn å returnere alle null.
+- Returner likevel null for felt som ikke har en synlig eller plausibel rad.
+"""
+
+
+def _lag_ocr_prompt(forventet_kjede=None, haiku=False):
+    prompt = _OCR_PROMPT_BASE
+    if haiku:
+        prompt += _OCR_PROMPT_HAIKU_EKSTRA
     if forventet_kjede:
         return (
-            _OCR_PROMPT_BASE +
+            prompt +
             f'\nMykt hint: bildet er sannsynligvis fra kjeden "{forventet_kjede}". '
             'Bruk dette bare som støtte hvis logo/visuell profil stemmer. '
             'Hvis bildet tydelig viser en annen kjede, stol på bildet, ikke hintet.'
         )
-    return _OCR_PROMPT_BASE
+    return prompt
 
 
 def _parse_ocr_pris(verdi):
@@ -1256,7 +1274,7 @@ def _normaliser_ocr_resultat(data):
     return resultat
 
 
-def _ocr_via_haiku(bilde_b64, content_type, forventet_kjede=None):
+def _haiku_json_request(bilde_b64, content_type, prompt):
     api_key = os.environ.get('ANTHROPIC_API_KEY', '')
     if not api_key:
         raise ValueError('ANTHROPIC_API_KEY ikke satt')
@@ -1269,10 +1287,12 @@ def _ocr_via_haiku(bilde_b64, content_type, forventet_kjede=None):
         },
         json={
             'model': 'claude-haiku-4-5-20251001',
-            'max_tokens': 256,
+            'max_tokens': 512,
+            'temperature': 0,
             'messages': [{
                 'role': 'user',
                 'content': [
+                    {'type': 'text', 'text': prompt},
                     {
                         'type': 'image',
                         'source': {
@@ -1280,8 +1300,7 @@ def _ocr_via_haiku(bilde_b64, content_type, forventet_kjede=None):
                             'media_type': content_type,
                             'data': bilde_b64,
                         }
-                    },
-                    {'type': 'text', 'text': _lag_ocr_prompt(forventet_kjede)}
+                    }
                 ]
             }]
         },
@@ -1292,6 +1311,25 @@ def _ocr_via_haiku(bilde_b64, content_type, forventet_kjede=None):
     if tekst.startswith('```'):
         tekst = tekst.split('\n', 1)[1].rsplit('```', 1)[0].strip()
     return _normaliser_ocr_resultat(json.loads(tekst))
+
+
+def _ocr_via_haiku(bilde_b64, content_type, forventet_kjede=None):
+    primar = _haiku_json_request(
+        bilde_b64,
+        content_type,
+        _lag_ocr_prompt(forventet_kjede, haiku=True),
+    )
+    if _har_ocr_priser(primar):
+        return primar
+
+    fallback_prompt = _OCR_PROMPT_FALLBACK + _OCR_PROMPT_HAIKU_EKSTRA
+    if forventet_kjede:
+        fallback_prompt += (
+            f'\nMykt hint: skiltet er sannsynligvis fra kjeden "{forventet_kjede}". '
+            'Bruk bare dette hvis logo eller design stemmer.'
+        )
+    fallback = _haiku_json_request(bilde_b64, content_type, fallback_prompt)
+    return fallback if _har_ocr_priser(fallback) else primar
 
 
 def _gemini_json_request(bilde_b64, content_type, prompt):
