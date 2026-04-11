@@ -7,6 +7,7 @@ const stasjonMarkorer = new Map(); // id → marker
 const stasjonData = new Map();     // id → stasjon
 let stasjonOnKlikk = null;
 let sisteKartvisning = null;
+let ruteLag = null;
 
 export function initMap(containerId, startPos) {
     const senter = startPos ? [startPos.lat, startPos.lon] : [59.91, 10.75];
@@ -39,6 +40,56 @@ export function getKartSenter() {
     if (!map) return null;
     const c = map.getCenter();
     return { lat: c.lat, lon: c.lng };
+}
+
+export function visRutePris(data, onStasjonKlikk) {
+    if (!map) return;
+    fjernRutePris();
+
+    const gruppe = L.layerGroup().addTo(map);
+    const bounds = [];
+    const punkter = data?.rute?.punkter || [];
+    if (punkter.length) {
+        L.polyline(punkter, {
+            color: '#38bdf8',
+            weight: 5,
+            opacity: 0.85,
+            lineCap: 'round',
+            lineJoin: 'round',
+        }).addTo(gruppe);
+        bounds.push(...punkter);
+    }
+
+    (data?.treff || []).forEach((s, i) => {
+        const erToppTre = i < 3;
+        const marker = L.circleMarker([s.lat, s.lon], {
+            radius: erToppTre ? 10 : 7,
+            color: erToppTre ? '#052e16' : '#451a03',
+            fillColor: erToppTre ? '#22c55e' : '#f59e0b',
+            fillOpacity: 0.95,
+            weight: 2,
+        }).addTo(gruppe);
+        marker.bindTooltip(`${i + 1}. ${s.pris.toFixed(2)}`, {
+            permanent: erToppTre,
+            direction: 'top',
+            offset: [0, -10],
+            className: 'rutepris-tooltip',
+        });
+        marker.on('click', () => onStasjonKlikk(s));
+        bounds.push([s.lat, s.lon]);
+    });
+
+    ruteLag = gruppe;
+    if (bounds.length) {
+        map.fitBounds(bounds, { padding: [34, 34], maxZoom: 13 });
+    }
+}
+
+export function fjernRutePris() {
+    if (ruteLag) {
+        ruteLag.remove();
+        ruteLag = null;
+    }
 }
 
 export function initKartBevegelse(onBevegelse) {

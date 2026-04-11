@@ -1,6 +1,6 @@
 import { hentStasjoner } from './api.js';
 import { hentPosisjon, startFollowWatch } from './location.js';
-import { initMap, sentrerKart, panTilPosisjon, visUserPosisjon, oppdaterUserMarker, registrerBrukerDrag, visStasjoner, oppdaterStasjonPriser, initKartBevegelse, refreshKartInnstillinger, getKartSenter } from './map.js';
+import { initMap, sentrerKart, panTilPosisjon, visUserPosisjon, oppdaterUserMarker, registrerBrukerDrag, visStasjoner, oppdaterStasjonPriser, initKartBevegelse, refreshKartInnstillinger, getKartSenter, visRutePris } from './map.js';
 import { visListe, oppdaterKort } from './list.js';
 import { initSheet, visStasjonSheet, oppdaterSheetStasjon, lukkSheet, refreshSheetInnstillinger } from './station-sheet.js';
 import { initHurtigpris, åpneHurtigKamera } from './hurtigpris.js';
@@ -8,6 +8,7 @@ import { initSearch } from './search.js';
 import { initInnstillinger, getInnstillinger } from './settings.js';
 import { initAddStation, openAddStation } from './add-station.js';
 import { lastStatistikk } from './stats.js';
+import { initRuteplanlegger } from './route-planner.js';
 
 // ── Lagret posisjon ───────────────────────────────
 const LAGRET_POS_KEY = 'siste_pos';
@@ -223,6 +224,12 @@ cameraBtn.addEventListener('click', () => {
 // ── Init kart med siste kjente posisjon ───────────
 const lagretPos = hentLagretPos();
 initMap('map', lagretPos);
+
+initRuteplanlegger({
+    getStartPos: () => userPos || hentLagretPos() || getKartSenter(),
+    onResultat: (data) => visRutePris(data, visStasjonSheet),
+    onStasjonKlikk: visStasjonSheet,
+});
 
 // ── Velkomst-overlay ──────────────────────────────
 if (!lagretPos) {

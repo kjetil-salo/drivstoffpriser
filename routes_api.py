@@ -1,6 +1,7 @@
 """API-ruter: stasjoner, priser, stedssøk, statistikk."""
 
 import logging
+import math
 import os
 import sqlite3
 import tempfile
@@ -214,6 +215,186 @@ def stedssok():
     except Exception as e:
         logger.warning(f'Stedssøk feilet: {e}')
         return jsonify([])
+
+
+def _punkt_til_segment_m(lat, lon, a, b):
+    lat0 = math.radians((lat + a[0] + b[0]) / 3)
+    meter_per_lat = 111_320
+    meter_per_lon = 111_320 * max(math.cos(lat0), 0.01)
+    px, py = lon * meter_per_lon, lat * meter_per_lat
+    ax, ay = a[1] * meter_per_lon, a[0] * meter_per_lat
+    bx, by = b[1] * meter_per_lon, b[0] * meter_per_lat
+    dx, dy = bx - ax, by - ay
+    if dx == 0 and dy == 0:
+        return math.hypot(px - ax, py - ay)
+    t = max(0, min(1, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy)))
+    nx, ny = ax + t * dx, ay + t * dy
+    return math.hypot(px - nx, py - ny)
+
+
+def _geokod_rutepunkt(q: str):
+    q = (q or '').strip()
+    if q.startswith('pos:'):
+        deler = q[4:].split(',')
+        if len(deler) == 2:
+            try:
+                lat, lon = float(deler[0]), float(deler[1])
+                if er_i_norge(lat, lon):
+                    return {'navn': 'Min posisjon', 'lat': lat, 'lon': lon}
+            except ValueError:
+                pass
+        return None
+
+    if len(q) < 2:
+        return None
+
+    resp = httpx.get(
+        'https://photon.komoot.io/api/',
+        params={'q': q, 'limit': 1, 'bbox': '4.0,57.0,31.5,71.5'},
+        headers={'User-Agent': 'drivstoffpriser/1.0 rutepris'},
+        timeout=8,
+    )
+    resp.raise_for_status()
+    for f in resp.json().get('features', []):
+        props = f.get('properties', {})
+        if props.get('countrycode', '').upper() != 'NO':
+            continue
+        coords = f.get('geometry', {}).get('coordinates', [])
+        if len(coords) >= 2:
+            lat, lon = float(coords[1]), float(coords[0])
+            if not er_i_norge(lat, lon):
+                continue
+            deler = [props.get(k) for k in ('name', 'county', 'state') if props.get(k)]
+            return {'navn': ', '.join(dict.fromkeys(deler)) or q, 'lat': lat, 'lon': lon}
+    return None
+
+
+def _hent_osrm_rute(fra, til):
+    resp = httpx.get(
+        f'https://router.project-osrm.org/route/v1/driving/{fra["lon"]},{fra["lat"]};{til["lon"]},{til["lat"]}',
+        params={'overview': 'full', 'geometries': 'geojson', 'alternatives': 'false', 'steps': 'false'},
+        headers={'User-Agent': 'drivstoffpriser/1.0 rutepris'},
+        timeout=15,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    routes = data.get('routes') or []
+    if not routes:
+        return None
+    coords = routes[0].get('geometry', {}).get('coordinates', [])
+    punkter = [(float(lat), float(lon)) for lon, lat in coords]
+    return {'punkter': punkter, 'km': routes[0].get('distance', 0) / 1000, 'min': routes[0].get('duration', 0) / 60}
+
+
+def _rute_stasjoner_i_boks(punkter, margin):
+    min_lat = min(p[0] for p in punkter) - margin
+    max_lat = max(p[0] for p in punkter) + margin
+    min_lon = min(p[1] for p in punkter) - margin
+    max_lon = max(p[1] for p in punkter) + margin
+    with get_conn() as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            '''SELECT s.id, s.navn, s.kjede, s.lat, s.lon, s.lagt_til_av,
+                      s.har_bensin, s.har_bensin98, s.har_diesel, s.har_diesel_avgiftsfri,
+                      (SELECT NULLIF(bensin, 0) FROM priser WHERE stasjon_id=s.id ORDER BY id DESC LIMIT 1) AS bensin,
+                      (SELECT tidspunkt FROM priser WHERE stasjon_id=s.id AND bensin IS NOT NULL AND bensin > 0 ORDER BY id DESC LIMIT 1) AS bensin_tidspunkt,
+                      (SELECT NULLIF(diesel, 0) FROM priser WHERE stasjon_id=s.id ORDER BY id DESC LIMIT 1) AS diesel,
+                      (SELECT tidspunkt FROM priser WHERE stasjon_id=s.id AND diesel IS NOT NULL AND diesel > 0 ORDER BY id DESC LIMIT 1) AS diesel_tidspunkt,
+                      (SELECT NULLIF(bensin98, 0) FROM priser WHERE stasjon_id=s.id ORDER BY id DESC LIMIT 1) AS bensin98,
+                      (SELECT tidspunkt FROM priser WHERE stasjon_id=s.id AND bensin98 IS NOT NULL AND bensin98 > 0 ORDER BY id DESC LIMIT 1) AS bensin98_tidspunkt,
+                      (SELECT NULLIF(diesel_avgiftsfri, 0) FROM priser WHERE stasjon_id=s.id ORDER BY id DESC LIMIT 1) AS diesel_avgiftsfri,
+                      (SELECT tidspunkt FROM priser WHERE stasjon_id=s.id AND diesel_avgiftsfri IS NOT NULL AND diesel_avgiftsfri > 0 ORDER BY id DESC LIMIT 1) AS diesel_avgiftsfri_tidspunkt
+               FROM stasjoner s
+               WHERE s.godkjent != 0
+                 AND (s.land IS NULL OR s.land = 'NO')
+                 AND s.lat BETWEEN ? AND ? AND s.lon BETWEEN ? AND ?''',
+            (min_lat, max_lat, min_lon, max_lon),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def _finn_billige_langs_rute(rute, drivstoff: str, maks_avvik_km: float, limit: int = 25):
+    felt_til_tilbud = {
+        'bensin': 'har_bensin',
+        'bensin98': 'har_bensin98',
+        'diesel': 'har_diesel',
+        'diesel_avgiftsfri': 'har_diesel_avgiftsfri',
+    }
+    punkter = rute['punkter']
+    if len(punkter) < 2:
+        return []
+
+    margin = maks_avvik_km / 111
+    kandidater = []
+    for s in _rute_stasjoner_i_boks(punkter, margin):
+        if not s.get(felt_til_tilbud[drivstoff]):
+            continue
+        pris = s.get(drivstoff)
+        if pris is None or pris <= 0:
+            continue
+        avstand = min(_punkt_til_segment_m(s['lat'], s['lon'], punkter[i], punkter[i + 1]) for i in range(len(punkter) - 1))
+        if avstand <= maks_avvik_km * 1000:
+            s.update({
+                'pris': pris,
+                'avvik_m': round(avstand),
+                'brukeropprettet': s.get('lagt_til_av') is not None,
+                'har_bensin': bool(s.get('har_bensin')),
+                'har_bensin98': bool(s.get('har_bensin98')),
+                'har_diesel': bool(s.get('har_diesel')),
+                'har_diesel_avgiftsfri': bool(s.get('har_diesel_avgiftsfri')),
+            })
+            kandidater.append(s)
+    kandidater.sort(key=lambda s: (s['pris'], s['avvik_m']))
+    return kandidater[:limit]
+
+
+@api_bp.route('/api/rutepris', methods=['POST'])
+def rutepris():
+    data = request.get_json(silent=True) or {}
+    fra_txt = (data.get('fra') or '').strip()
+    til_txt = (data.get('til') or '').strip()
+    drivstoff = data.get('drivstoff') or 'diesel'
+    if drivstoff not in {'bensin', 'bensin98', 'diesel', 'diesel_avgiftsfri'}:
+        return jsonify({'error': 'Ugyldig drivstofftype'}), 400
+
+    try:
+        maks_avvik_km = float(data.get('maks_avvik_km', 3))
+    except (TypeError, ValueError):
+        maks_avvik_km = 3
+    maks_avvik_km = max(0.5, min(maks_avvik_km, 15))
+
+    if not fra_txt or not til_txt:
+        return jsonify({'error': 'Fra og til er påkrevd'}), 400
+
+    try:
+        fra = _geokod_rutepunkt(fra_txt)
+        til = _geokod_rutepunkt(til_txt)
+        if not fra or not til:
+            return jsonify({'error': 'Fant ikke fra- eller tilsted i Norge'}), 400
+
+        rute = _hent_osrm_rute(fra, til)
+        if not rute:
+            return jsonify({'error': 'Fant ingen kjørerute'}), 400
+
+        treff = _finn_billige_langs_rute(rute, drivstoff, maks_avvik_km)
+        return jsonify({
+            'fra': fra,
+            'til': til,
+            'rute': {
+                'punkter': rute['punkter'],
+                'km': rute['km'],
+                'min': rute['min'],
+            },
+            'treff': treff,
+            'drivstoff': drivstoff,
+            'maks_avvik_km': maks_avvik_km,
+        })
+    except httpx.HTTPError as e:
+        logger.warning(f'Rutepris ekstern tjeneste feilet: {e}')
+        return jsonify({'error': 'Rutetjenesten svarte ikke. Prøv igjen om litt.'}), 502
+    except Exception as e:
+        logger.exception(f'Rutepris feilet: {e}')
+        return jsonify({'error': 'Kunne ikke beregne rute nå'}), 500
 
 
 @api_bp.route('/api/logview', methods=['POST'])

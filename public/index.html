@@ -96,6 +96,7 @@
   <main id="view-kart" class="view" role="tabpanel" aria-labelledby="tab-kart">
     <div id="map"></div>
     <button id="loc-btn" aria-label="Hent posisjon"><span aria-hidden="true">📍</span></button>
+    <button id="route-btn" aria-label="Finn billigste på vei"><span aria-hidden="true">🛣️</span></button>
     <button id="add-station-btn" hidden aria-label="Legg til stasjon">+</button>
     <button id="camera-btn" hidden aria-label="Ta bilde av pristavle">📷</button>
   </main>
@@ -235,6 +236,57 @@ Vil du hjelpe til? Opprett en gratis bruker og oppdater priser på stasjoner næ
       <div class="lok-steg"><span class="lok-steg-nr">3</span><span>Velg <strong>Tillat</strong> og kom tilbake hit</span></div>
     </div>
     <button id="lok-feil-lukk">Lukk</button>
+  </div>
+
+  <!-- Rutepris -->
+  <div id="rutepris-backdrop"></div>
+  <div id="rutepris-sheet" role="dialog" aria-modal="true" aria-labelledby="rutepris-tittel">
+    <div class="sheet-handle"></div>
+    <div id="rutepris-content">
+      <div class="rutepris-header">
+        <div>
+          <h3 id="rutepris-tittel">Billigst på vei</h3>
+          <p>Finn billige stasjoner nær ruta di.</p>
+        </div>
+        <button id="rutepris-lukk" type="button" aria-label="Lukk">×</button>
+      </div>
+      <div class="rutepris-grid">
+        <div class="rutepris-felt">
+          <label for="rutepris-fra">Fra</label>
+          <div class="rutepris-input-rad">
+            <input id="rutepris-fra" type="text" placeholder="Startsted" autocomplete="off">
+            <button id="rutepris-her" type="button">Her</button>
+          </div>
+          <div id="rutepris-fra-resultater" class="rutepris-autocomplete" hidden></div>
+        </div>
+        <div class="rutepris-felt">
+          <label for="rutepris-til">Til</label>
+          <input id="rutepris-til" type="text" placeholder="Hvor skal du?" autocomplete="off">
+          <div id="rutepris-til-resultater" class="rutepris-autocomplete" hidden></div>
+        </div>
+        <div class="rutepris-felt">
+          <label for="rutepris-drivstoff">Drivstoff</label>
+          <select id="rutepris-drivstoff">
+            <option value="diesel">Diesel</option>
+            <option value="bensin">95 oktan</option>
+            <option value="bensin98">98 oktan</option>
+            <option value="diesel_avgiftsfri">Avg.fri diesel</option>
+          </select>
+        </div>
+        <div class="rutepris-felt">
+          <label for="rutepris-avvik">Maks fra rute</label>
+          <select id="rutepris-avvik">
+            <option value="2">2 km</option>
+            <option value="3" selected>3 km</option>
+            <option value="5">5 km</option>
+            <option value="10">10 km</option>
+          </select>
+        </div>
+      </div>
+      <button id="rutepris-sok" type="button">Finn stasjoner</button>
+      <div id="rutepris-status" role="status" aria-live="polite"></div>
+      <div id="rutepris-resultater"></div>
+    </div>
   </div>
 
   <!-- Legg til stasjon -->

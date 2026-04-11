@@ -18,6 +18,22 @@ export async function hentTotaltMedPris() {
     return (await resp.json()).totalt;
 }
 
+export async function finnBilligstLangsRute({ fra, til, drivstoff, maksAvvikKm }) {
+    const resp = await fetch('/api/rutepris', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            fra,
+            til,
+            drivstoff,
+            maks_avvik_km: maksAvvikKm,
+        }),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(data.error || 'Kunne ikke beregne rute');
+    return data;
+}
+
 export async function opprettStasjon(navn, kjede, lat, lon) {
     const resp = await fetch('/api/stasjon', {
         method: 'POST',
