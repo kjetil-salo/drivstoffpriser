@@ -438,7 +438,7 @@ async function lagrePris() {
         visPrisStatus('', null);
         visVisModus();
     } catch (e) {
-        visPrisStatus('Feil ved lagring. Prøv igjen.', true);
+        visPrisStatus(e.message || 'Feil ved lagring. Prøv igjen.', true);
         editLagreBtn.disabled = false;
     }
 }

@@ -96,6 +96,9 @@ export async function oppdaterPris(stasjonId, bensin, diesel, bensin98, diesel_a
         body: JSON.stringify({ stasjon_id: stasjonId, bensin, diesel, bensin98, diesel_avgiftsfri }),
     });
     if (resp.status === 401) return { status: 401 };
-    if (!resp.ok) throw new Error('Feil ved lagring av pris');
+    if (!resp.ok) {
+        const data = await resp.json().catch(() => ({}));
+        throw new Error(data.error || 'Feil ved lagring av pris');
+    }
     return resp.json();
 }

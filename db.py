@@ -286,6 +286,14 @@ def lagre_stasjon(navn, kjede, lat, lon, osm_id, land=None):
 
 
 _pris_lock = threading.Lock()
+PRIS_MIN = 12.0
+PRIS_MAX = 37.0
+
+
+def _gyldig_pris_eller_null(pris):
+    if pris is None:
+        return None
+    return pris if PRIS_MIN <= pris <= PRIS_MAX else None
 
 
 def lagre_pris(stasjon_id, bensin, diesel, bensin98=None, bruker_id=None, diesel_avgiftsfri=None, min_intervall=300):
@@ -303,6 +311,11 @@ def lagre_pris(stasjon_id, bensin, diesel, bensin98=None, bruker_id=None, diesel
                 diesel = diesel if diesel is not None else forrige[1]
                 bensin98 = bensin98 if bensin98 is not None else forrige[2]
                 diesel_avgiftsfri = diesel_avgiftsfri if diesel_avgiftsfri is not None else forrige[3]
+
+            bensin = _gyldig_pris_eller_null(bensin)
+            diesel = _gyldig_pris_eller_null(diesel)
+            bensin98 = _gyldig_pris_eller_null(bensin98)
+            diesel_avgiftsfri = _gyldig_pris_eller_null(diesel_avgiftsfri)
 
             if bruker_id is not None:
                 sist = conn.execute(

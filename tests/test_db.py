@@ -97,6 +97,22 @@ class TestPriser:
         assert result[0]['diesel_avgiftsfri'] == 14.50
         assert result[0]['diesel_avgiftsfri_tidspunkt'] is not None
 
+    def test_umulig_gammel_pris_arves_ikke_videre(self):
+        db_mod.lagre_stasjon('Test', 'Test', 60.39, 5.33, 'node/1')
+        stasjoner = db_mod.get_stasjoner_med_priser(60.39, 5.33)
+        sid = stasjoner[0]['id']
+        with db_mod.get_conn() as conn:
+            conn.execute(
+                'INSERT INTO priser (stasjon_id, bensin, diesel, bensin98) VALUES (?, ?, ?, ?)',
+                (sid, 18.79, 23.79, 3.0),
+            )
+
+        db_mod.lagre_pris(sid, 18.99, 23.99)
+        result = db_mod.get_stasjoner_med_priser(60.39, 5.33)
+        assert result[0]['bensin'] == 18.99
+        assert result[0]['diesel'] == 23.99
+        assert result[0]['bensin98'] is None
+
     def test_diesel_avgiftsfri_null_som_standard(self):
         db_mod.lagre_stasjon('Test', 'Test', 60.39, 5.33, 'node/1')
         result = db_mod.get_stasjoner_med_priser(60.39, 5.33)

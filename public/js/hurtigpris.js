@@ -245,8 +245,8 @@ async function lagre() {
         visStatus('Lagret!', 'ok');
         lagreBtn.textContent = 'Lagret!';
         setTimeout(lukk, 1000);
-    } catch {
-        visStatus('Feil ved lagring. Prøv igjen.', 'feil');
+    } catch (e) {
+        visStatus(e.message || 'Feil ved lagring. Prøv igjen.', 'feil');
         lagreBtn.disabled = false;
         lagreBtn.textContent = 'Lagre pris';
     }

@@ -34,6 +34,8 @@ logger = logging.getLogger('drivstoff')
 api_bp = Blueprint('api', __name__)
 
 _PRIS_MIN_INTERVALL = 300  # sekunder (5 min)
+_PRIS_MIN = 12.0
+_PRIS_MAX = 37.0
 
 NORGE_BBOX = {'lat_min': 57.0, 'lat_max': 71.5, 'lon_min': 4.0, 'lon_max': 31.5}
 
@@ -500,6 +502,15 @@ def oppdater_pris():
     diesel = til_float(diesel_raw)
     bensin98 = til_float(bensin98_raw)
     diesel_avgiftsfri = til_float(diesel_avgiftsfri_raw)
+
+    for navn, pris in (
+        ('95 oktan', bensin),
+        ('diesel', diesel),
+        ('98 oktan', bensin98),
+        ('avgiftsfri diesel', diesel_avgiftsfri),
+    ):
+        if pris is not None and not (_PRIS_MIN <= pris <= _PRIS_MAX):
+            return jsonify({'error': f'{navn} må være mellom {_PRIS_MIN:g} og {_PRIS_MAX:g} kr'}), 400
 
     bruker_id = session.get('bruker_id')
 

@@ -90,6 +90,22 @@ class TestPrisAPI:
         # 0 skal tolkes som "ikke oppgitt"
         assert result[0]['bensin'] is None
 
+    def test_avviser_umulig_lav_pris(self, innlogget_client):
+        db_mod.lagre_stasjon('S', 'T', 60.39, 5.33, 'node/1')
+        stasjoner = db_mod.get_stasjoner_med_priser(60.39, 5.33)
+        resp = innlogget_client.post('/api/pris', json={
+            'stasjon_id': stasjoner[0]['id'], 'bensin98': 3.0,
+        })
+        assert resp.status_code == 400
+
+    def test_avviser_umulig_hoy_pris(self, innlogget_client):
+        db_mod.lagre_stasjon('S', 'T', 60.39, 5.33, 'node/1')
+        stasjoner = db_mod.get_stasjoner_med_priser(60.39, 5.33)
+        resp = innlogget_client.post('/api/pris', json={
+            'stasjon_id': stasjoner[0]['id'], 'diesel': 40.0,
+        })
+        assert resp.status_code == 400
+
     def test_lagre_diesel_avgiftsfri(self, innlogget_client):
         db_mod.lagre_stasjon('S', 'T', 60.39, 5.33, 'node/1')
         stasjoner = db_mod.get_stasjoner_med_priser(60.39, 5.33)
