@@ -272,6 +272,11 @@ Vil du hjelpe til? Opprett en gratis bruker og oppdater priser på stasjoner næ
           <div id="rutepris-til-resultater" class="rutepris-autocomplete" hidden></div>
         </div>
         <div class="rutepris-felt">
+          <label for="rutepris-via">Via</label>
+          <input id="rutepris-via" type="text" placeholder="Valgfritt stoppested" autocomplete="off">
+          <div id="rutepris-via-resultater" class="rutepris-autocomplete" hidden></div>
+        </div>
+        <div class="rutepris-felt">
           <label for="rutepris-drivstoff">Drivstoff</label>
           <select id="rutepris-drivstoff">
             <option value="diesel">Diesel</option>
@@ -283,10 +288,10 @@ Vil du hjelpe til? Opprett en gratis bruker og oppdater priser på stasjoner næ
         <div class="rutepris-felt">
           <label for="rutepris-avvik">Maks fra rute</label>
           <select id="rutepris-avvik">
-            <option value="0.5">500 m</option>
+            <option value="0.5" selected>500 m</option>
             <option value="1">1 km</option>
             <option value="2">2 km</option>
-            <option value="3" selected>3 km</option>
+            <option value="3">3 km</option>
             <option value="5">5 km</option>
             <option value="10">10 km</option>
           </select>

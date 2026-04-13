@@ -1,4 +1,14 @@
-let lastet = false;
+const OPPDATER_INTERVAL_MS = 60_000;
+const MIN_MANUELL_INTERVAL_MS = 15_000;
+
+let sistLastet = 0;
+let laster = false;
+let autoOppdateringStartet = false;
+
+function statistikkErSynlig() {
+    const view = document.getElementById('view-statistikk');
+    return !!view && view.style.display !== 'none' && !document.hidden;
+}
 
 function formaterTid(tidspunkt) {
     if (!tidspunkt) return '';
@@ -144,12 +154,31 @@ function injiserBidragPromo() {
     });
 }
 
-export async function lastStatistikk() {
-    if (lastet) return;
+function startAutoOppdatering() {
+    if (autoOppdateringStartet) return;
+    autoOppdateringStartet = true;
+
+    setInterval(() => {
+        if (statistikkErSynlig()) lastStatistikk({ force: true });
+    }, OPPDATER_INTERVAL_MS);
+
+    document.addEventListener('visibilitychange', () => {
+        if (statistikkErSynlig()) lastStatistikk({ force: true });
+    });
+}
+
+export async function lastStatistikk({ force = false } = {}) {
+    startAutoOppdatering();
+
+    const naa = Date.now();
+    if (laster) return;
+    if (!force && sistLastet && naa - sistLastet < MIN_MANUELL_INTERVAL_MS) return;
+
+    laster = true;
     try {
         const [respStat, respTopp] = await Promise.all([
-            fetch('/api/statistikk'),
-            fetch('/api/toppliste'),
+            fetch('/api/statistikk', { cache: 'no-store' }),
+            fetch('/api/toppliste', { cache: 'no-store' }),
         ]);
         if (!respStat.ok) return;
         const data = await respStat.json();
@@ -169,12 +198,14 @@ export async function lastStatistikk() {
         const toppliste = respTopp.ok ? await respTopp.json() : [];
         visToppliste(toppliste);
 
-        lastet = true;
+        sistLastet = Date.now();
     } catch (e) {
         console.warn('Statistikk-feil:', e);
+    } finally {
+        laster = false;
     }
 }
 
 export function resetStatistikk() {
-    lastet = false;
+    sistLastet = 0;
 }

@@ -271,9 +271,14 @@ def _geokod_rutepunkt(q: str):
     return None
 
 
-def _hent_osrm_rute(fra, til):
+def _hent_osrm_rute(fra, til, via=None):
+    punkter = [fra]
+    if via:
+        punkter.append(via)
+    punkter.append(til)
+    koordinater = ';'.join(f'{p["lon"]},{p["lat"]}' for p in punkter)
     resp = httpx.get(
-        f'https://router.project-osrm.org/route/v1/driving/{fra["lon"]},{fra["lat"]};{til["lon"]},{til["lat"]}',
+        f'https://router.project-osrm.org/route/v1/driving/{koordinater}',
         params={'overview': 'full', 'geometries': 'geojson', 'alternatives': 'false', 'steps': 'false'},
         headers={'User-Agent': 'drivstoffpriser/1.0 rutepris'},
         timeout=15,
@@ -358,14 +363,15 @@ def rutepris():
     data = request.get_json(silent=True) or {}
     fra_txt = (data.get('fra') or '').strip()
     til_txt = (data.get('til') or '').strip()
+    via_txt = (data.get('via') or '').strip()
     drivstoff = data.get('drivstoff') or 'diesel'
     if drivstoff not in {'bensin', 'bensin98', 'diesel', 'diesel_avgiftsfri'}:
         return jsonify({'error': 'Ugyldig drivstofftype'}), 400
 
     try:
-        maks_avvik_km = float(data.get('maks_avvik_km', 3))
+        maks_avvik_km = float(data.get('maks_avvik_km', 0.5))
     except (TypeError, ValueError):
-        maks_avvik_km = 3
+        maks_avvik_km = 0.5
     maks_avvik_km = max(0.5, min(maks_avvik_km, 15))
 
     if not fra_txt or not til_txt:
@@ -376,8 +382,11 @@ def rutepris():
         til = _geokod_rutepunkt(til_txt)
         if not fra or not til:
             return jsonify({'error': 'Fant ikke fra- eller tilsted i Norge'}), 400
+        via = _geokod_rutepunkt(via_txt) if via_txt else None
+        if via_txt and not via:
+            return jsonify({'error': 'Fant ikke via-sted i Norge'}), 400
 
-        rute = _hent_osrm_rute(fra, til)
+        rute = _hent_osrm_rute(fra, til, via)
         if not rute:
             return jsonify({'error': 'Fant ingen kjørerute'}), 400
 
@@ -385,6 +394,7 @@ def rutepris():
         return jsonify({
             'fra': fra,
             'til': til,
+            'via': via,
             'rute': {
                 'punkter': rute['punkter'],
                 'km': rute['km'],
@@ -1049,59 +1059,56 @@ _OCR_MIN_PRIS = 15.0
 _OCR_MAX_PRIS = 35.0
 
 
-_OCR_PROMPT_BASE = """Du er en prisavleser for norske bensinstasjoner. Din ENESTE oppgave er å lese drivstoffpriser fra pristavler/prisdisplay.
+_OCR_PROMPT_BASE = """Du er en OCR-leser for norske drivstoffskilt. Din ENESTE oppgave er å lese drivstoffpriser fra selve pristavlen/prisdisplayet.
 
 AVVIS bildet og returner alle null-verdier hvis:
-- Bildet ikke viser en pristavle eller prisdisplay fra en bensinstasjon
-- Prisene ikke er lesbare (for langt unna, uskarp, refleks)
-- Du er usikker på enkeltsiffer og kan ikke korrigere med prislogikken nedenfor
+- Bildet ikke viser en drivstoff-pristavle/prisdisplay
+- Prisene er for små, uskarpe, skjult av refleks eller ikke lesbare
+- Du ikke klarer å koble en tydelig pris til en tydelig eller plausibel drivstofftype
 
-Viktig: Ikke returner alle null bare fordi bildet er vanskelig. Hvis du ser minst én plausibel prisrad med tall i området 15.00–35.00, returner den eller de sikre prisene og sett resten til null.
+Viktig: Ikke returner alle null bare fordi bildet er vanskelig. Hvis du ser minst én plausibel prisrad med tall i området 15.00–35.00, returner sikre priser og sett resten til null.
 
 Returner KUN gyldig JSON uten annen tekst:
 {"bensin": null, "diesel": null, "bensin98": null, "diesel_avgiftsfri": null, "kjede": null, "confidence": "low", "uncertain_fields": []}
 
-Det finnes kun fire drivstofftyper. Hver kjede har egne produktnavn, men de betyr alltid det samme:
-- "bensin" = vanlig bensin. På tavlen: "95", "Blyfri", "B", "miles 95", "Futura 95", eller bare den øverste prisen uten etikett.
+Det finnes kun fire drivstofftyper:
+- "bensin" = vanlig 95 oktan bensin. På tavlen: "95", "Blyfri", "B", "miles 95", "Futura 95", eller vanlig 95-rad.
 - "bensin98" = høyoktan bensin. På tavlen: "98", "V-Power", "miles 98", "Futura 98", "Extra".
 - "diesel" = vanlig diesel. På tavlen: "D", "Diesel", "HVO", "HVO100", "Blank diesel", "Biodiesel", "Miljødiesel", "miles D", "Diesel Gold", "B-diesel", "XTL".
-- "diesel_avgiftsfri" = avgiftsfri/farget diesel. På tavlen: "FD", "Farget", "Avgiftsfri", "Anleggsdiesel".
-
-Bruk sunn fornuft: uansett hva produktet heter, avgjør om det er bensin 95, bensin 98, diesel eller avgiftsfri diesel.
-Noen tavler viser bare 2–3 typer. Dette er normalt. Sett null for typer som ikke finnes på tavlen.
-I de aller fleste tilfeller er bare 2 prisrader synlige. Hvis bare 2 rader er synlige, er det som hovedregel bensin 95 og diesel, med mindre etikettene tydelig viser noe annet.
-Hvis 3 prisrader er synlige, er det som hovedregel bensin 95, bensin 98 og diesel. Det finnes ingen fast plassering for 98 på skiltet. Stol alltid mest på etiketten på hver rad, ikke på vertikal rekkefølge.
+- "diesel_avgiftsfri" = avgiftsfri/farget diesel. På tavlen: "FD", "Farget", "Avgiftsfri", "Avg.fri", "Anleggsdiesel".
 
 Arbeidsmåte:
-1. Finn først selve prisradene visuelt. Se etter en rad som inneholder både drivstoffetikett og en pris.
-2. Les etiketten på raden først, og les deretter prisen på samme rad.
-3. Match radene til feltene i JSON:
-   - "95" eller "miles 95" -> bensin
-   - "98", "V-Power", "miles 98" -> bensin98
-   - "D", "Diesel", "miles D" -> diesel
-   - "FD", "Avgiftsfri", "Farget" -> diesel_avgiftsfri
-4. Hvis bare 1–2 prisrader er synlige, er dette normalt. Returner disse og sett resten til null.
-5. Prioriter tydelig etikett + tydelig pris på samme rad over generelle antakelser.
-6. Ikke flytt en pris fra én rad til en annen bare fordi prisnivået virker mer sannsynlig. Hvis raden tydelig viser "D", skal den raden mappes til diesel. Hvis raden tydelig viser "95", skal den raden mappes til bensin.
-7. Hvis en tavle har to synlige rader, og den øverste raden er merket "D" mens nederste er merket "95", skal øverste pris være diesel og nederste pris være bensin.
-8. Hvis en tavle har to synlige rader og etikettene er delvis uklare, anta bensin 95 og diesel før du vurderer bensin98 eller avgiftsfri diesel.
-9. Hvis en tavle har tre synlige rader, anta som hovedregel at de tre typene er bensin 95, bensin 98 og diesel.
-10. Ved tre synlige rader: ikke anta at 98 ligger på en bestemt rad. Bruk etiketten på hver rad for å avgjøre hvilken pris som er 95, 98 og diesel.
+1. Finn først prisdisplayet/pristavlen. Ignorer bilvask, tilbud, kaffe, åpningstider og andre tall.
+2. Tell synlige prisrader. Norske skilt har vanligvis 2 rader, av og til 3, sjelden 4.
+3. Les hver rad horisontalt: drivstoffetikett på raden + pris på samme rad.
+4. Match hver rad til riktig JSON-felt.
+5. Returner sikre priser. Sett null for manglende eller usikre felt.
+
+Radlogikk:
+- Hvis bare 2 rader er synlige, er det normalt 95 + diesel.
+- Hvis 2 rader er synlige og etikettene er uklare, anta 95 + diesel bare hvis prisene er tydelige.
+- Ikke fyll "bensin98" hvis du ikke ser 98/V-Power/miles 98/Futura 98/tilsvarende etikett.
+- Ikke fyll "diesel_avgiftsfri" hvis du ikke ser FD/Farget/Avgiftsfri/Avg.fri/Anleggsdiesel/tilsvarende etikett.
+- Hvis 3 rader er synlige, er det vanligvis 95 + 98 + diesel.
+- 98 har ingen fast plassering. Bruk etiketten på raden, ikke radnummer.
+- Hvis etiketten er tydelig, stol på etiketten selv om prisnivået virker overraskende.
+- Ikke flytt en pris fra én rad til en annen bare fordi prisnivået passer bedre.
+- Hvis øverste rad er "D" og nederste rad er "95", skal øverste pris være diesel og nederste pris være bensin.
 
 Prislogikk (bruk dette aktivt til å korrigere lesefeil):
-- Priser er ALLTID mellom 15.00 og 35.00 kr/liter.
-- bensin98 er ALLTID dyrere enn bensin (95) — typisk 1–4 kr mer. Eks: bensin=18.79 → bensin98 må være > 18.79. Hvis du har lest bensin98 < bensin, er noe feil — se gjennom sifrene på nytt.
-- Diesel er vanligvis billigere enn eller omtrent lik bensin 95.
-- Avgiftsfri diesel er ALLTID billigst av alle — typisk 5–10 kr under vanlig diesel. Hvis du har lest avgiftsfri diesel som dyrere enn diesel, er noe feil — sett null for den.
+- Priser skal være mellom 15.00 og 35.00 kr/liter.
+- bensin98 er normalt dyrere enn bensin 95, ofte 1–4 kr mer. Hvis 98 < 95, sjekk sifrene igjen. Hvis fortsatt usikkert, sett 98 til null.
+- Diesel er ofte nær eller lavere enn 95, men kan variere.
+- Avgiftsfri/farget diesel er normalt klart billigere enn vanlig diesel. Hvis den ser dyrere ut enn vanlig diesel, sjekk etikett og siffer ekstra nøye. Hvis raden tydelig er FD/Avgiftsfri, returner verdien, men sett "diesel_avgiftsfri" i uncertain_fields hvis du er usikker.
 
 Format:
 - Desimaltall med punktum (f.eks. 21.35)
-- Priser er ALLTID på formen XX.XX — nøyaktig to siffer før og to siffer etter desimaltegnet.
+- Priser skal normaliseres til XX.XX — to siffer før og to siffer etter desimaltegnet.
 - Eksempler på korreksjon: "2608" → 26.08, "6.08" → sannsynligvis 26.08, "260.8" → 26.08. Verdier som ikke lar seg korrigere til XX.XX i området 15–35 — sett null.
 - Sett null for typer du ikke finner
 
 Kjede:
-- "kjede" = kjedelogo eller -navn synlig i bildet (f.eks. "Circle K", "Shell", "Esso"). Ellers null.
+- "kjede" = kjedelogo eller -navn synlig i bildet (f.eks. "Circle K", "Shell", "Esso", "Uno-X", "YX", "St1", "Best", "Tanken", "Haltbakk Express"). Ellers null.
 
 Nøyaktighet — LED-display:
 - Røde/oransje LED-display: sifrene 1 og 7 forveksles svært lett. Sjekk: har sifferet et topphorisontalt segment? Da er det trolig 7, ikke 1. Eks: "18.19" der 95-oktan er i nærheten av 21.29 (98-oktan), er feil — den laveste prisen for 95 kan gjerne være 18.79 (7 lest som 1).
@@ -1112,11 +1119,10 @@ Nøyaktighet — LED-display:
 - Returner null kun hvis prisen ikke lar seg tolke til et plausibelt XX.XX-tall i området 15–35 selv etter korreksjonsforsøk.
 
 Ekstra regler for robusthet:
-- Ignorer all tekst som ikke er drivstofftype eller pris, som bilvask, tilbud, kaffe, åpningstider og lignende.
 - Hvis du ikke sikkert klarer å koble en pris til riktig drivstofftype, bruk null for den typen.
 - Hvis du finner 2–4 plausible priser, men er usikker på én av dem, returner de sikre prisene og bruk null for den usikre.
-- Sett "confidence" til low, medium eller high.
-- Sett "uncertain_fields" til en liste med feltnavn du er usikker på, ellers [].
+- "confidence": high = tydelige etiketter og priser, medium = 1–2 sikre priser med noe usikkerhet, low = vanskelig bilde/få sikre felt.
+- "uncertain_fields" = liste med feltnavn du er usikker på, ellers [].
 
 Eksempler:
 Eksempel 1:
@@ -1166,8 +1172,9 @@ Svar:
 _OCR_PROMPT_FALLBACK = """Du leser et enkelt norsk drivstoffskilt med vanligvis 2 eller 3 prisrader.
 
 Oppgaven er mye enklere enn vanlig:
-- Finn bare synlige prisrader.
-- Les etiketten til venstre og prisen på samme rad.
+- Finn prisdisplayet.
+- Tell synlige prisrader.
+- Les hver rad horisontalt: etikett + pris på samme rad.
 - Returner kun prisene du er rimelig sikker på.
 
 Viktige regler:
@@ -1179,6 +1186,7 @@ Viktige regler:
 - Hvis en rad tydelig er merket "D" eller "Diesel", skal den mappes til diesel.
 - Ikke gjett avgiftsfri diesel hvis den ikke er tydelig synlig.
 - Røde LED-tall kan forveksle 1 og 7. Vurder alltid om 20.19 egentlig er 20.79 hvis segmentene ligner.
+- 8 og 9, 4 og 9, 6 og 8 kan ligne. Sjekk segmentene før du bestemmer siffer.
 - Prisene skal være mellom 15.00 og 35.00.
 - Hvis du kun klarer å lese 95 og diesel, er det et gyldig svar.
 
@@ -1193,6 +1201,7 @@ Ekstra instruks for Haiku:
 - Tell synlige prisrader: vanligvis 2, av og til 3. Ikke let etter mange andre tall.
 - Hvis to rader er synlige og etikettene er uklare eller delvis beskåret, er beste antakelse 95 oktan + diesel. Bruk etiketter hvis de er synlige, ellers bruk øverste synlige pris som bensin og nederste synlige pris som diesel.
 - Hvis tre rader er synlige og etikettene er uklare, er beste antakelse 95 oktan, 98 oktan og diesel. Bruk etiketter hvis de er synlige; 98 har ingen fast plass.
+- Ikke fyll 98 eller avgiftsfri diesel bare fordi du forventer flere produkter. Fyll dem bare når raden/etiketten er synlig eller svært tydelig.
 - Røde LED-tall er punktmatrise/segmenter. Ikke les "20.79" som "2019" eller "20.19" hvis det tredje sifferet har tydelig 7-form.
 - Sjekk 8 og 9 ekstra nøye: 8 har nedre venstre del/segment, 9 mangler vanligvis nedre venstre del/segment.
 - Sjekk 4 og 9 ekstra nøye: 9 har topp og bunn, 4 mangler vanligvis topp og bunn.
@@ -1310,7 +1319,6 @@ def _haiku_json_request(bilde_b64, content_type, prompt):
             'messages': [{
                 'role': 'user',
                 'content': [
-                    {'type': 'text', 'text': prompt},
                     {
                         'type': 'image',
                         'source': {
@@ -1318,7 +1326,8 @@ def _haiku_json_request(bilde_b64, content_type, prompt):
                             'media_type': content_type,
                             'data': bilde_b64,
                         }
-                    }
+                    },
+                    {'type': 'text', 'text': prompt},
                 ]
             }]
         },

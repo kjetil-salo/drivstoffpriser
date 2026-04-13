@@ -192,6 +192,105 @@ class TestStedssok:
         assert resp.get_json() == []
 
 
+# ── /api/rutepris ──────────────────────────────────
+
+class TestRuteprisAPI:
+    def test_osrm_rute_bruker_via_punkt(self, monkeypatch):
+        import routes_api
+
+        kall = {}
+
+        class Resp:
+            def raise_for_status(self):
+                pass
+
+            def json(self):
+                return {
+                    'routes': [{
+                        'geometry': {'coordinates': [[5.0, 60.0], [5.4, 60.2], [5.8, 60.4]]},
+                        'distance': 12000,
+                        'duration': 900,
+                    }]
+                }
+
+        def fake_get(url, **kwargs):
+            kall['url'] = url
+            kall['params'] = kwargs['params']
+            return Resp()
+
+        monkeypatch.setattr(routes_api.httpx, 'get', fake_get)
+
+        rute = routes_api._hent_osrm_rute(
+            {'lat': 60.0, 'lon': 5.0},
+            {'lat': 60.4, 'lon': 5.8},
+            {'lat': 60.2, 'lon': 5.4},
+        )
+
+        assert '/5.0,60.0;5.4,60.2;5.8,60.4' in kall['url']
+        assert kall['params']['alternatives'] == 'false'
+        assert rute['km'] == 12
+        assert rute['min'] == 15
+
+    def test_rutepris_tar_imot_via_posisjon(self, client, monkeypatch):
+        import routes_api
+
+        class Resp:
+            def raise_for_status(self):
+                pass
+
+            def json(self):
+                return {
+                    'routes': [{
+                        'geometry': {'coordinates': [[5.0, 60.0], [5.4, 60.2], [5.8, 60.4]]},
+                        'distance': 12000,
+                        'duration': 900,
+                    }]
+                }
+
+        monkeypatch.setattr(routes_api.httpx, 'get', lambda *args, **kwargs: Resp())
+
+        resp = client.post('/api/rutepris', json={
+            'fra': 'pos:60.0,5.0',
+            'via': 'pos:60.2,5.4',
+            'til': 'pos:60.4,5.8',
+            'drivstoff': 'diesel',
+            'maks_avvik_km': 3,
+        })
+
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data['via']['lat'] == 60.2
+        assert data['via']['lon'] == 5.4
+        assert data['rute']['km'] == 12
+
+    def test_rutepris_default_maks_avvik_er_500_meter(self, client, monkeypatch):
+        import routes_api
+
+        class Resp:
+            def raise_for_status(self):
+                pass
+
+            def json(self):
+                return {
+                    'routes': [{
+                        'geometry': {'coordinates': [[5.0, 60.0], [5.8, 60.4]]},
+                        'distance': 12000,
+                        'duration': 900,
+                    }]
+                }
+
+        monkeypatch.setattr(routes_api.httpx, 'get', lambda *args, **kwargs: Resp())
+
+        resp = client.post('/api/rutepris', json={
+            'fra': 'pos:60.0,5.0',
+            'til': 'pos:60.4,5.8',
+            'drivstoff': 'diesel',
+        })
+
+        assert resp.status_code == 200
+        assert resp.get_json()['maks_avvik_km'] == 0.5
+
+
 # ── /bidrag ────────────────────────────────────────
 
 class TestBidragSide:

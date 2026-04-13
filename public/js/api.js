@@ -18,13 +18,14 @@ export async function hentTotaltMedPris() {
     return (await resp.json()).totalt;
 }
 
-export async function finnBilligstLangsRute({ fra, til, drivstoff, maksAvvikKm }) {
+export async function finnBilligstLangsRute({ fra, til, via, drivstoff, maksAvvikKm }) {
     const resp = await fetch('/api/rutepris', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             fra,
             til,
+            via,
             drivstoff,
             maks_avvik_km: maksAvvikKm,
         }),

@@ -9,6 +9,8 @@ const DRIVSTOFF_NAVN = {
 };
 
 let fraPos = null;
+let viaPos = null;
+let tilPos = null;
 let onResultat = null;
 let onStasjonKlikk = null;
 let onFjernRute = null;
@@ -23,6 +25,8 @@ const el = {
     fraResultater: document.getElementById('rutepris-fra-resultater'),
     til: document.getElementById('rutepris-til'),
     tilResultater: document.getElementById('rutepris-til-resultater'),
+    via: document.getElementById('rutepris-via'),
+    viaResultater: document.getElementById('rutepris-via-resultater'),
     her: document.getElementById('rutepris-her'),
     drivstoff: document.getElementById('rutepris-drivstoff'),
     avvik: document.getElementById('rutepris-avvik'),
@@ -55,10 +59,15 @@ export function initRuteplanlegger(options) {
     });
 
     initAutocomplete(el.fra, el.fraResultater, (sted) => {
-        fraPos = null;
+        fraPos = sted;
         el.fra.value = sted.navn;
     });
+    initAutocomplete(el.via, el.viaResultater, (sted) => {
+        viaPos = sted;
+        el.via.value = sted.navn;
+    });
     initAutocomplete(el.til, el.tilResultater, (sted) => {
+        tilPos = sted;
         el.til.value = sted.navn;
     });
 }
@@ -93,8 +102,9 @@ function brukMinPosisjon() {
 }
 
 async function sokRute() {
-    const fra = fraPos ? `pos:${fraPos.lat},${fraPos.lon}` : el.fra.value.trim();
-    const til = el.til.value.trim();
+    const fra = rutepunktFraInput(el.fra, fraPos);
+    const via = rutepunktFraInput(el.via, viaPos);
+    const til = rutepunktFraInput(el.til, tilPos);
     if (!fra || !til) {
         settStatus('Skriv inn både fra og til.', true);
         return;
@@ -108,6 +118,7 @@ async function sokRute() {
         const data = await finnBilligstLangsRute({
             fra,
             til,
+            via,
             drivstoff: el.drivstoff.value,
             maksAvvikKm: el.avvik.value,
         });
@@ -225,6 +236,8 @@ function initAutocomplete(input, resultEl, onVelg) {
 
     input.addEventListener('input', () => {
         if (input === el.fra) fraPos = null;
+        if (input === el.via) viaPos = null;
+        if (input === el.til) tilPos = null;
         clearTimeout(timer);
         const q = input.value.trim();
         if (q.length < 2 || q === 'Min posisjon') {
@@ -255,6 +268,13 @@ function initAutocomplete(input, resultEl, onVelg) {
     document.addEventListener('click', (e) => {
         if (!resultEl.contains(e.target) && e.target !== input) lukkListe();
     });
+}
+
+function rutepunktFraInput(input, pos) {
+    const tekst = input.value.trim();
+    if (!tekst) return '';
+    if (pos && (!pos.navn || tekst === pos.navn)) return `pos:${pos.lat},${pos.lon}`;
+    return tekst;
 }
 
 function escapeHtml(tekst) {

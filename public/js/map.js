@@ -50,6 +50,13 @@ export function visRutePris(data, onStasjonKlikk) {
     ruteAktiv = true;
     stasjonMarkorer.forEach(m => m.remove());
 
+    if (!map.getPane('ruteBilligstPane')) {
+        map.createPane('ruteBilligstPane').style.zIndex = 410;
+    }
+    if (!map.getPane('ruteBilligstTooltipPane')) {
+        map.createPane('ruteBilligstTooltipPane').style.zIndex = 660;
+    }
+
     const gruppe = L.layerGroup().addTo(map);
     const bounds = [];
     const punkter = data?.rute?.punkter || [];
@@ -62,9 +69,12 @@ export function visRutePris(data, onStasjonKlikk) {
             lineJoin: 'round',
         }).addTo(gruppe);
         bounds.push(...punkter);
+        L.marker(punkter[0], { icon: ruteStartIkon(), zIndexOffset: 200 }).addTo(gruppe);
+        L.marker(punkter[punkter.length - 1], { icon: ruteStoppIkon(), zIndexOffset: 200 }).addTo(gruppe);
     }
 
     (data?.treff || []).forEach((s, i) => {
+        const erBilligst = i === 0;
         const erToppTre = i < 3;
         const marker = L.circleMarker([s.lat, s.lon], {
             radius: erToppTre ? 10 : 7,
@@ -72,12 +82,14 @@ export function visRutePris(data, onStasjonKlikk) {
             fillColor: erToppTre ? '#22c55e' : '#f59e0b',
             fillOpacity: 0.95,
             weight: 2,
+            pane: erBilligst ? 'ruteBilligstPane' : 'overlayPane',
         }).addTo(gruppe);
         marker.bindTooltip(`${i + 1}. ${s.pris.toFixed(2)}`, {
             permanent: erToppTre,
             direction: 'top',
             offset: [0, -10],
             className: 'rutepris-tooltip',
+            ...(erBilligst ? { pane: 'ruteBilligstTooltipPane' } : {}),
         });
         marker.on('click', () => onStasjonKlikk(s));
         bounds.push([s.lat, s.lon]);
@@ -370,6 +382,24 @@ function kompaktIkon(s, erBilligst) {
         iconSize: erBilligst ? [54, 72] : [44, 60],
         iconAnchor: erBilligst ? [27, 46] : [22, 38],
         popupAnchor: erBilligst ? [0, -46] : [0, -38],
+    });
+}
+
+function ruteStartIkon() {
+    return L.divIcon({
+        className: '',
+        html: `<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#22c55e" stroke="#fff" stroke-width="2.5"/><polygon points="9.5,7 19,12 9.5,17" fill="#fff"/></svg>`,
+        iconSize: [26, 26],
+        iconAnchor: [13, 13],
+    });
+}
+
+function ruteStoppIkon() {
+    return L.divIcon({
+        className: '',
+        html: `<svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#ef4444" stroke="#fff" stroke-width="2.5"/><rect x="7.5" y="7.5" width="9" height="9" rx="1.5" fill="#fff"/></svg>`,
+        iconSize: [26, 26],
+        iconAnchor: [13, 13],
     });
 }
 
