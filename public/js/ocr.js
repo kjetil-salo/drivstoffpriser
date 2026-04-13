@@ -286,6 +286,9 @@ function dedup(priser) {
 async function gjenkjennMedBackend(bildeBlob, kontekst = null) {
     const formData = new FormData();
     formData.append('bilde', bildeBlob, 'pristavle.jpg');
+    if (kontekst?.stasjon_id) {
+        formData.append('stasjon_id', String(kontekst.stasjon_id));
+    }
     if (kontekst?.forventet_kjede) {
         formData.append('forventet_kjede', kontekst.forventet_kjede);
     }

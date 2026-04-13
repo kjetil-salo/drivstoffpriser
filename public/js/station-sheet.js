@@ -84,7 +84,10 @@ export function initSheet(onOppdatert) {
                 ocrStatus.removeAttribute('hidden');
             }
         },
-        () => ({ forventet_kjede: aktivStasjon?.kjede || '' })
+        () => ({
+            stasjon_id: aktivStasjon?.id || '',
+            forventet_kjede: aktivStasjon?.kjede || '',
+        })
     );
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && forslagModalEl.classList.contains('open')) lukkForslagModal();

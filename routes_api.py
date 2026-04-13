@@ -1065,6 +1065,13 @@ _OCR_MIN_PRIS = 15.0
 _OCR_MAX_PRIS = 35.0
 _OCR_CROP_MAX_SIDE = 1800
 _OCR_CROP_MIN_PIXLER = 20
+_OCR_DRIVSTOFF_FELT = ('bensin', 'diesel', 'bensin98', 'diesel_avgiftsfri')
+_OCR_DRIVSTOFF_LABELS = {
+    'bensin': '95 oktan bensin',
+    'diesel': 'diesel',
+    'bensin98': '98 oktan bensin',
+    'diesel_avgiftsfri': 'avgiftsfri/farget diesel',
+}
 
 
 def _bbox_fra_maske(img, treff_fn):
@@ -1185,6 +1192,76 @@ def _forbered_haiku_bilde(bilde_data, content_type):
         logger.warning(f'OCR bilde-preprosessering feilet, bruker original: {e}')
         meta['reason'] = 'preprocess_failed'
         return base64.b64encode(bilde_data).decode('utf-8'), content_type, meta
+
+
+def _hent_ocr_stasjon_kontekst(stasjon_id):
+    try:
+        stasjon_id = int(stasjon_id)
+    except (TypeError, ValueError):
+        return None
+    if stasjon_id <= 0:
+        return None
+    with get_conn() as conn:
+        row = conn.execute(
+            '''SELECT id, navn, kjede, har_bensin, har_bensin98, har_diesel, har_diesel_avgiftsfri
+               FROM stasjoner WHERE id = ?''',
+            (stasjon_id,)
+        ).fetchone()
+    if not row:
+        return None
+    tillatte = {
+        'bensin': bool(row['har_bensin']),
+        'bensin98': bool(row['har_bensin98']),
+        'diesel': bool(row['har_diesel']),
+        'diesel_avgiftsfri': bool(row['har_diesel_avgiftsfri']),
+    }
+    return {
+        'id': row['id'],
+        'navn': row['navn'],
+        'kjede': row['kjede'],
+        'tillatte': tillatte,
+    }
+
+
+def _ocr_tillatte_felt(stasjon_kontekst):
+    if not stasjon_kontekst:
+        return None
+    tillatte = stasjon_kontekst.get('tillatte') or {}
+    return {felt for felt in _OCR_DRIVSTOFF_FELT if tillatte.get(felt)}
+
+
+def _filtrer_ocr_drivstoff(resultat, stasjon_kontekst):
+    tillatte = _ocr_tillatte_felt(stasjon_kontekst)
+    if not tillatte:
+        return resultat
+    fjernet = []
+    for felt in _OCR_DRIVSTOFF_FELT:
+        if felt not in tillatte and resultat.get(felt) is not None:
+            resultat[felt] = None
+            fjernet.append(felt)
+    resultat['_tillatte_drivstoff'] = sorted(tillatte)
+    if fjernet:
+        resultat['_fjernet_ikke_solgt'] = fjernet
+    return resultat
+
+
+def _ocr_stasjon_prompt_tillegg(stasjon_kontekst):
+    tillatte = _ocr_tillatte_felt(stasjon_kontekst)
+    if not tillatte:
+        return ''
+    solgt = ', '.join(_OCR_DRIVSTOFF_LABELS[felt] for felt in _OCR_DRIVSTOFF_FELT if felt in tillatte)
+    ikke_solgt = ', '.join(_OCR_DRIVSTOFF_LABELS[felt] for felt in _OCR_DRIVSTOFF_FELT if felt not in tillatte)
+    tekst = (
+        '\nStasjonskontekst:\n'
+        f'- Valgt stasjon i appen: {stasjon_kontekst.get("navn") or "ukjent"}'
+        f' ({stasjon_kontekst.get("kjede") or "ukjent kjede"}).\n'
+        f'- Denne stasjonen er registrert med disse drivstofftypene: {solgt}.\n'
+        '- Returner null for alle drivstofftyper som ikke står i listen over registrerte drivstofftyper, '
+        'selv om du synes du ser et tall på bildet.\n'
+    )
+    if ikke_solgt:
+        tekst += f'- Ikke bruk disse feltene: {ikke_solgt}.\n'
+    return tekst
 
 
 _OCR_PROMPT_BASE = """Du er en OCR-leser for norske drivstoffskilt. Din ENESTE oppgave er å lese drivstoffpriser fra selve pristavlen/prisdisplayet.
@@ -1357,10 +1434,11 @@ Ekstra instruks for Haiku:
 """
 
 
-def _lag_ocr_prompt(forventet_kjede=None, haiku=False):
+def _lag_ocr_prompt(forventet_kjede=None, haiku=False, stasjon_kontekst=None):
     prompt = _OCR_PROMPT_BASE
     if haiku:
         prompt += _OCR_PROMPT_HAIKU_EKSTRA
+    prompt += _ocr_stasjon_prompt_tillegg(stasjon_kontekst)
     if forventet_kjede:
         return (
             prompt +
@@ -1505,13 +1583,13 @@ def _haiku_json_request(bilde_b64, content_type, prompt):
     return _normaliser_ocr_resultat(json.loads(tekst))
 
 
-def _ocr_via_haiku(bilde_b64, content_type, forventet_kjede=None, bilde_meta=None):
+def _ocr_via_haiku(bilde_b64, content_type, forventet_kjede=None, bilde_meta=None, stasjon_kontekst=None):
     kall = 1
-    primar = _haiku_json_request(
+    primar = _filtrer_ocr_drivstoff(_haiku_json_request(
         bilde_b64,
         content_type,
-        _lag_ocr_prompt(forventet_kjede, haiku=True),
-    )
+        _lag_ocr_prompt(forventet_kjede, haiku=True, stasjon_kontekst=stasjon_kontekst),
+    ), stasjon_kontekst)
     if _har_ocr_priser(primar):
         primar['_haiku_calls'] = kall
         if bilde_meta:
@@ -1524,8 +1602,12 @@ def _ocr_via_haiku(bilde_b64, content_type, forventet_kjede=None, bilde_meta=Non
             f'\nMykt hint: skiltet er sannsynligvis fra kjeden "{forventet_kjede}". '
             'Bruk bare dette hvis logo eller design stemmer.'
         )
+    fallback_prompt += _ocr_stasjon_prompt_tillegg(stasjon_kontekst)
     kall += 1
-    fallback = _haiku_json_request(bilde_b64, content_type, fallback_prompt)
+    fallback = _filtrer_ocr_drivstoff(
+        _haiku_json_request(bilde_b64, content_type, fallback_prompt),
+        stasjon_kontekst,
+    )
     resultat = fallback if _har_ocr_priser(fallback) else primar
     resultat['_haiku_calls'] = kall
     if bilde_meta:
@@ -1590,9 +1672,12 @@ def _gemini_json_request(bilde_b64, content_type, prompt):
     raise ValueError('Ingen Gemini-modeller konfigurert')
 
 
-def _ocr_via_gemini(bilde_b64, content_type, forventet_kjede=None):
-    primar = _normaliser_ocr_resultat(
-        _gemini_json_request(bilde_b64, content_type, _lag_ocr_prompt(forventet_kjede))
+def _ocr_via_gemini(bilde_b64, content_type, forventet_kjede=None, stasjon_kontekst=None):
+    primar = _filtrer_ocr_drivstoff(
+        _normaliser_ocr_resultat(
+            _gemini_json_request(bilde_b64, content_type, _lag_ocr_prompt(forventet_kjede, stasjon_kontekst=stasjon_kontekst))
+        ),
+        stasjon_kontekst,
     )
     if _har_ocr_priser(primar):
         return primar
@@ -1603,8 +1688,12 @@ def _ocr_via_gemini(bilde_b64, content_type, forventet_kjede=None):
             f'\nMykt hint: skiltet er sannsynligvis fra kjeden "{forventet_kjede}". '
             'Bruk bare dette hvis logo eller design stemmer.'
         )
-    fallback = _normaliser_ocr_resultat(
-        _gemini_json_request(bilde_b64, content_type, fallback_prompt)
+    fallback_prompt += _ocr_stasjon_prompt_tillegg(stasjon_kontekst)
+    fallback = _filtrer_ocr_drivstoff(
+        _normaliser_ocr_resultat(
+            _gemini_json_request(bilde_b64, content_type, fallback_prompt)
+        ),
+        stasjon_kontekst,
     )
     return fallback if _har_ocr_priser(fallback) else primar
 
@@ -1642,27 +1731,30 @@ def gjenkjenn_priser():
 
     bilde_b64 = base64.b64encode(bilde_data).decode('utf-8')
     ocr_modell = os.environ.get('OCR_MODELL', 'haiku').lower()
+    stasjon_kontekst = _hent_ocr_stasjon_kontekst(request.form.get('stasjon_id'))
     forventet_kjede = (request.form.get('forventet_kjede') or '').strip()[:60] or None
+    if stasjon_kontekst and stasjon_kontekst.get('kjede') and not forventet_kjede:
+        forventet_kjede = stasjon_kontekst.get('kjede')
 
     try:
         haiku_b64 = haiku_content_type = haiku_bilde_meta = None
         if ocr_modell == 'gemini':
             try:
-                priser = _ocr_via_gemini(bilde_b64, content_type, forventet_kjede=forventet_kjede)
+                priser = _ocr_via_gemini(bilde_b64, content_type, forventet_kjede=forventet_kjede, stasjon_kontekst=stasjon_kontekst)
                 brukt_modell = priser.get('_modell') or 'gemini'
                 if not _har_ocr_priser(priser):
                     logger.warning(f'Gemini OCR fant ingen priser for bruker={bruker_id}; prøver Haiku fallback')
                     haiku_b64, haiku_content_type, haiku_bilde_meta = _forbered_haiku_bilde(bilde_data, content_type)
-                    priser = _ocr_via_haiku(haiku_b64, haiku_content_type, forventet_kjede=forventet_kjede, bilde_meta=haiku_bilde_meta)
+                    priser = _ocr_via_haiku(haiku_b64, haiku_content_type, forventet_kjede=forventet_kjede, bilde_meta=haiku_bilde_meta, stasjon_kontekst=stasjon_kontekst)
                     brukt_modell = 'haiku-fallback'
             except (ValueError, httpx.HTTPError, KeyError, json.JSONDecodeError, IndexError, RuntimeError) as e:
                 logger.warning(f'Gemini OCR feilet for bruker={bruker_id}; prøver Haiku fallback: {e}')
                 haiku_b64, haiku_content_type, haiku_bilde_meta = _forbered_haiku_bilde(bilde_data, content_type)
-                priser = _ocr_via_haiku(haiku_b64, haiku_content_type, forventet_kjede=forventet_kjede, bilde_meta=haiku_bilde_meta)
+                priser = _ocr_via_haiku(haiku_b64, haiku_content_type, forventet_kjede=forventet_kjede, bilde_meta=haiku_bilde_meta, stasjon_kontekst=stasjon_kontekst)
                 brukt_modell = 'haiku-fallback'
         else:
             haiku_b64, haiku_content_type, haiku_bilde_meta = _forbered_haiku_bilde(bilde_data, content_type)
-            priser = _ocr_via_haiku(haiku_b64, haiku_content_type, forventet_kjede=forventet_kjede, bilde_meta=haiku_bilde_meta)
+            priser = _ocr_via_haiku(haiku_b64, haiku_content_type, forventet_kjede=forventet_kjede, bilde_meta=haiku_bilde_meta, stasjon_kontekst=stasjon_kontekst)
             brukt_modell = 'haiku'
         logger.info(
             f'OCR-gjenkjenning: bruker={bruker_id} modell={brukt_modell} '

@@ -114,7 +114,10 @@ async function onBilde(e) {
             (tekst) => {
                 visStatus(tekst, 'loading');
             },
-            { forventet_kjede: valgtStasjon?.kjede || '' }
+            {
+                stasjon_id: valgtStasjon?.id || '',
+                forventet_kjede: valgtStasjon?.kjede || '',
+            }
         );
 
         if (resultat.priser) {
