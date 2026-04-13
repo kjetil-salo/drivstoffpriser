@@ -15,8 +15,14 @@ import httpx
 from flask import Blueprint, request, jsonify, make_response, session
 
 import base64
+import io
 import json
 import re
+
+try:
+    from PIL import Image, ImageEnhance, ImageFilter
+except ImportError:  # pragma: no cover - produksjon har Pillow, fallback bruker originalbildet
+    Image = ImageEnhance = ImageFilter = None
 
 from db import (get_stasjoner_med_priser, lagre_pris, logg_visning,
                 antall_stasjoner_med_pris, finn_bruker_id, DB_PATH,
@@ -1057,6 +1063,128 @@ _ocr_bruk = {}  # {bruker_id: (dato, antall)}
 
 _OCR_MIN_PRIS = 15.0
 _OCR_MAX_PRIS = 35.0
+_OCR_CROP_MAX_SIDE = 1800
+_OCR_CROP_MIN_PIXLER = 20
+
+
+def _bbox_fra_maske(img, treff_fn):
+    """Finn enkel bbox for relevante fargepiksler i et nedskalert RGB-bilde."""
+    w, h = img.size
+    pix = img.load()
+    min_x, min_y, max_x, max_y, antall = w, h, -1, -1, 0
+    steg = 2 if max(w, h) > 1200 else 1
+    for y in range(0, h, steg):
+        for x in range(0, w, steg):
+            if treff_fn(pix[x, y]):
+                antall += 1
+                if x < min_x:
+                    min_x = x
+                if y < min_y:
+                    min_y = y
+                if x > max_x:
+                    max_x = x
+                if y > max_y:
+                    max_y = y
+    if antall < _OCR_CROP_MIN_PIXLER:
+        return None
+    return (min_x, min_y, max_x + 1, max_y + 1, antall)
+
+
+def _utvid_bbox(box, img_size, faktor_x=3.8, faktor_y=4.2, min_bredde=360, min_hoyde=300):
+    x1, y1, x2, y2, _ = box
+    w, h = img_size
+    bw = max(x2 - x1, min_bredde)
+    bh = max(y2 - y1, min_hoyde)
+    cx = (x1 + x2) / 2
+    cy = (y1 + y2) / 2
+    ny_w = min(w, bw * faktor_x)
+    ny_h = min(h, bh * faktor_y)
+    nx1 = max(0, int(cx - ny_w / 2))
+    ny1 = max(0, int(cy - ny_h / 2))
+    nx2 = min(w, int(cx + ny_w / 2))
+    ny2 = min(h, int(cy + ny_h / 2))
+    if nx2 - nx1 < min_bredde:
+        mangler = min_bredde - (nx2 - nx1)
+        nx1 = max(0, nx1 - mangler // 2)
+        nx2 = min(w, nx1 + min_bredde)
+    if ny2 - ny1 < min_hoyde:
+        mangler = min_hoyde - (ny2 - ny1)
+        ny1 = max(0, ny1 - mangler // 2)
+        ny2 = min(h, ny1 + min_hoyde)
+    return (nx1, ny1, nx2, ny2)
+
+
+def _forbered_haiku_bilde(bilde_data, content_type):
+    """Lag en billig server-side crop/zoom for kamera-OCR før Haiku-kall.
+
+    Målet er ikke perfekt objektgjenkjenning, bare å gi små LED-tall flere
+    piksler i bildet. Faller tilbake til originalen ved feil.
+    """
+    meta = {'preprocess': 'original', 'content_type': content_type, 'haiku_image': 'original'}
+    if Image is None:
+        meta['reason'] = 'pillow_missing'
+        return base64.b64encode(bilde_data).decode('utf-8'), content_type, meta
+
+    try:
+        img = Image.open(io.BytesIO(bilde_data))
+        img = img.convert('RGB')
+        original_w, original_h = img.size
+        img.thumbnail((_OCR_CROP_MAX_SIDE, _OCR_CROP_MAX_SIDE), Image.Resampling.LANCZOS)
+        w, h = img.size
+
+        def er_rod_led(rgb):
+            r, g, b = rgb
+            return r >= 115 and g <= 95 and b <= 95 and r >= g * 1.25 and r >= b * 1.25
+
+        def er_gult_skilt(rgb):
+            r, g, b = rgb
+            return r >= 135 and g >= 95 and b <= 95 and abs(r - g) <= 95 and r >= b * 1.7 and g >= b * 1.4
+
+        rod_box = _bbox_fra_maske(img, er_rod_led)
+        gul_box = _bbox_fra_maske(img, er_gult_skilt)
+
+        valgt_box = None
+        strategi = 'resized_original'
+        if rod_box:
+            valgt_box = _utvid_bbox(rod_box, img.size, faktor_x=5.8, faktor_y=6.2, min_bredde=420, min_hoyde=340)
+            strategi = 'red_led_crop'
+        elif gul_box:
+            valgt_box = _utvid_bbox(gul_box, img.size, faktor_x=2.8, faktor_y=3.2, min_bredde=440, min_hoyde=360)
+            strategi = 'yellow_sign_crop'
+
+        if valgt_box:
+            crop = img.crop(valgt_box)
+        else:
+            # Avstandsbilder har ofte skilt i øvre/midtre del. Dette er en trygg
+            # fallback som fortsatt bevarer nok kontekst.
+            valgt_box = (int(w * 0.15), int(h * 0.10), int(w * 0.85), int(h * 0.72))
+            crop = img.crop(valgt_box)
+
+        cw, ch = crop.size
+        scale = min(3.0, max(1.0, 1700 / max(cw, ch)))
+        if scale > 1.05:
+            crop = crop.resize((int(cw * scale), int(ch * scale)), Image.Resampling.LANCZOS)
+
+        crop = ImageEnhance.Contrast(crop).enhance(1.25)
+        crop = ImageEnhance.Sharpness(crop).enhance(1.45)
+        crop = crop.filter(ImageFilter.UnsharpMask(radius=1.2, percent=120, threshold=3))
+
+        out = io.BytesIO()
+        crop.save(out, format='JPEG', quality=90, optimize=True)
+        meta.update({
+            'preprocess': strategi,
+            'haiku_image': 'server_crop',
+            'original_size': [original_w, original_h],
+            'processed_size': list(crop.size),
+            'crop_box': list(valgt_box),
+            'red_pixels': rod_box[4] if rod_box else 0,
+            'yellow_pixels': gul_box[4] if gul_box else 0,
+        })
+        return base64.b64encode(out.getvalue()).decode('utf-8'), 'image/jpeg', meta
+    except Exception as e:
+        logger.warning(f'OCR bilde-preprosessering feilet, bruker original: {e}')
+        meta['reason'] = 'preprocess_failed'
+        return base64.b64encode(bilde_data).decode('utf-8'), content_type, meta
 
 
 _OCR_PROMPT_BASE = """Du er en OCR-leser for norske drivstoffskilt. Din ENESTE oppgave er å lese drivstoffpriser fra selve pristavlen/prisdisplayet.
@@ -1319,6 +1447,25 @@ def _normaliser_ocr_resultat(data):
     return resultat
 
 
+def _ocr_match_oppsummering(ai_resultat, lagret_priser):
+    if not isinstance(ai_resultat, dict) or not isinstance(lagret_priser, dict):
+        return None
+    felt = ('bensin', 'diesel', 'bensin98', 'diesel_avgiftsfri')
+    relevante = []
+    riktige = 0
+    for navn in felt:
+        ai = _parse_ocr_pris(ai_resultat.get(navn))
+        lagret = _parse_ocr_pris(lagret_priser.get(navn))
+        if ai is None and lagret is None:
+            continue
+        relevante.append(navn)
+        if ai is not None and lagret is not None and abs(ai - lagret) < 0.01:
+            riktige += 1
+    if not relevante:
+        return None
+    return {'riktige': riktige, 'totalt': len(relevante), 'ok': riktige == len(relevante)}
+
+
 def _haiku_json_request(bilde_b64, content_type, prompt):
     api_key = os.environ.get('ANTHROPIC_API_KEY', '')
     if not api_key:
@@ -1358,13 +1505,17 @@ def _haiku_json_request(bilde_b64, content_type, prompt):
     return _normaliser_ocr_resultat(json.loads(tekst))
 
 
-def _ocr_via_haiku(bilde_b64, content_type, forventet_kjede=None):
+def _ocr_via_haiku(bilde_b64, content_type, forventet_kjede=None, bilde_meta=None):
+    kall = 1
     primar = _haiku_json_request(
         bilde_b64,
         content_type,
         _lag_ocr_prompt(forventet_kjede, haiku=True),
     )
     if _har_ocr_priser(primar):
+        primar['_haiku_calls'] = kall
+        if bilde_meta:
+            primar['_ocr_bilde'] = bilde_meta
         return primar
 
     fallback_prompt = _OCR_PROMPT_FALLBACK + _OCR_PROMPT_HAIKU_EKSTRA
@@ -1373,8 +1524,13 @@ def _ocr_via_haiku(bilde_b64, content_type, forventet_kjede=None):
             f'\nMykt hint: skiltet er sannsynligvis fra kjeden "{forventet_kjede}". '
             'Bruk bare dette hvis logo eller design stemmer.'
         )
+    kall += 1
     fallback = _haiku_json_request(bilde_b64, content_type, fallback_prompt)
-    return fallback if _har_ocr_priser(fallback) else primar
+    resultat = fallback if _har_ocr_priser(fallback) else primar
+    resultat['_haiku_calls'] = kall
+    if bilde_meta:
+        resultat['_ocr_bilde'] = bilde_meta
+    return resultat
 
 
 def _gemini_json_request(bilde_b64, content_type, prompt):
@@ -1489,22 +1645,29 @@ def gjenkjenn_priser():
     forventet_kjede = (request.form.get('forventet_kjede') or '').strip()[:60] or None
 
     try:
+        haiku_b64 = haiku_content_type = haiku_bilde_meta = None
         if ocr_modell == 'gemini':
             try:
                 priser = _ocr_via_gemini(bilde_b64, content_type, forventet_kjede=forventet_kjede)
                 brukt_modell = priser.get('_modell') or 'gemini'
                 if not _har_ocr_priser(priser):
                     logger.warning(f'Gemini OCR fant ingen priser for bruker={bruker_id}; prøver Haiku fallback')
-                    priser = _ocr_via_haiku(bilde_b64, content_type, forventet_kjede=forventet_kjede)
+                    haiku_b64, haiku_content_type, haiku_bilde_meta = _forbered_haiku_bilde(bilde_data, content_type)
+                    priser = _ocr_via_haiku(haiku_b64, haiku_content_type, forventet_kjede=forventet_kjede, bilde_meta=haiku_bilde_meta)
                     brukt_modell = 'haiku-fallback'
             except (ValueError, httpx.HTTPError, KeyError, json.JSONDecodeError, IndexError, RuntimeError) as e:
                 logger.warning(f'Gemini OCR feilet for bruker={bruker_id}; prøver Haiku fallback: {e}')
-                priser = _ocr_via_haiku(bilde_b64, content_type, forventet_kjede=forventet_kjede)
+                haiku_b64, haiku_content_type, haiku_bilde_meta = _forbered_haiku_bilde(bilde_data, content_type)
+                priser = _ocr_via_haiku(haiku_b64, haiku_content_type, forventet_kjede=forventet_kjede, bilde_meta=haiku_bilde_meta)
                 brukt_modell = 'haiku-fallback'
         else:
-            priser = _ocr_via_haiku(bilde_b64, content_type, forventet_kjede=forventet_kjede)
+            haiku_b64, haiku_content_type, haiku_bilde_meta = _forbered_haiku_bilde(bilde_data, content_type)
+            priser = _ocr_via_haiku(haiku_b64, haiku_content_type, forventet_kjede=forventet_kjede, bilde_meta=haiku_bilde_meta)
             brukt_modell = 'haiku'
-        logger.info(f'OCR-gjenkjenning: bruker={bruker_id} modell={brukt_modell} resultat={priser}')
+        logger.info(
+            f'OCR-gjenkjenning: bruker={bruker_id} modell={brukt_modell} '
+            f'haiku_calls={priser.get("_haiku_calls")} bilde={priser.get("_ocr_bilde")} resultat={priser}'
+        )
         priser['_modell'] = brukt_modell
         return jsonify(priser)
     except ValueError as e:
@@ -1524,6 +1687,9 @@ def ocr_statistikk():
     """Logg OCR-statistikk: tesseract vs claude, hva brukeren faktisk lagret."""
     data = request.get_json(silent=True) or {}
     bruker_id = session.get('bruker_id')
+    claude_resultat = data.get('claude_resultat')
+    lagret = data.get('lagret')
+    match = _ocr_match_oppsummering(claude_resultat, lagret)
 
     with get_conn() as conn:
         conn.execute('''INSERT INTO ocr_statistikk
@@ -1539,9 +1705,17 @@ def ocr_statistikk():
              (data.get('tesseract_raatekst') or '')[:2000],
              1 if data.get('claude_ok') else 0,
              data.get('claude_ms'),
-             json.dumps(data.get('claude_resultat')) if data.get('claude_resultat') else None,
-             json.dumps(data.get('lagret')) if data.get('lagret') else None,
+             json.dumps(claude_resultat) if claude_resultat else None,
+             json.dumps(lagret) if lagret else None,
              data.get('tesseract_feil'),
              data.get('claude_feil')))
+
+    bilde_meta = claude_resultat.get('_ocr_bilde') if isinstance(claude_resultat, dict) else None
+    logger.info(
+        f'OCR-statistikk: bruker={bruker_id} kilde={data.get("kilde")} '
+        f'claude_ok={bool(data.get("claude_ok"))} claude_ms={data.get("claude_ms")} '
+        f'haiku_calls={claude_resultat.get("_haiku_calls") if isinstance(claude_resultat, dict) else None} '
+        f'bilde={bilde_meta} match={match}'
+    )
 
     return jsonify({'ok': True})
