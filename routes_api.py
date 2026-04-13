@@ -6,7 +6,7 @@ import os
 import sqlite3
 import tempfile
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from functools import wraps
 
 import time
@@ -331,6 +331,9 @@ def _finn_billige_langs_rute(rute, drivstoff: str, maks_avvik_km: float, limit: 
             continue
         pris = s.get(drivstoff)
         if pris is None or pris <= 0:
+            continue
+        tidspunkt = s.get(f'{drivstoff}_tidspunkt')
+        if not tidspunkt or tidspunkt < (datetime.now(timezone.utc) - timedelta(days=7)).strftime('%Y-%m-%d %H:%M:%S'):
             continue
         avstand = min(_punkt_til_segment_m(s['lat'], s['lon'], punkter[i], punkter[i + 1]) for i in range(len(punkter) - 1))
         if avstand <= maks_avvik_km * 1000:

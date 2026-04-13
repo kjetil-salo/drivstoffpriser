@@ -96,7 +96,14 @@
   <main id="view-kart" class="view" role="tabpanel" aria-labelledby="tab-kart">
     <div id="map"></div>
     <button id="loc-btn" aria-label="Hent posisjon"><span aria-hidden="true">📍</span></button>
-    <button id="route-btn" aria-label="Finn billigste på vei"><span aria-hidden="true">🛣️</span></button>
+    <button id="route-btn" aria-label="Finn billigste på vei">
+      <svg class="route-ikon" viewBox="0 0 44 44" aria-hidden="true" focusable="false">
+        <path class="route-ikon-skygge" d="M12 33 H 22 C 25.5 33, 27 31.5, 27 28 V 17" />
+        <path class="route-ikon-pil" d="M12 33 H 22 C 25.5 33, 27 31.5, 27 28 V 15" />
+        <path class="route-ikon-spiss" d="M18 19 L27 10 L36 19" />
+        <circle class="route-ikon-start" cx="12" cy="33" r="3.8" />
+      </svg>
+    </button>
     <button id="add-station-btn" hidden aria-label="Legg til stasjon">+</button>
     <button id="camera-btn" hidden aria-label="Ta bilde av pristavle">📷</button>
   </main>

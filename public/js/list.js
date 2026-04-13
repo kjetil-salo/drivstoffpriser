@@ -4,6 +4,7 @@ import { getKjedeFarge, getKjedeInitials, getKjedeLogo } from './kjede.js';
 let aktivSort = 'avstand';
 let sisteStasjoner = [];
 let sisteOnKlikk = null;
+const MAKS_TOPPLISTE_ALDER_TIMER = 24 * 7;
 
 export function visListe(stasjoner, onKlikk) {
     sisteStasjoner = stasjoner;
@@ -44,9 +45,12 @@ export function visListe(stasjoner, onKlikk) {
         });
     });
 
-    const billigste = finnBilligste(stasjoner, inn);
-    const billigsteId = finnBilligsteId(stasjoner, inn, aktivSort);
-    const sortert = sorter(stasjoner, aktivSort, billigsteId);
+    const listeStasjoner = aktivSort === 'avstand'
+        ? stasjoner
+        : stasjoner.filter(s => aktuellPris(s, aktivSort) != null);
+    const billigste = finnBilligste(listeStasjoner, inn);
+    const billigsteId = finnBilligsteId(listeStasjoner, inn, aktivSort);
+    const sortert = sorter(listeStasjoner, aktivSort, billigsteId);
     container.innerHTML = sortert.map(s => kortHtml(s, billigste, s.id === billigsteId)).join('');
 
     container.querySelectorAll('.stasjon-kort').forEach(kort => {
@@ -90,7 +94,8 @@ function finnBilligste(stasjoner, inn) {
         if (!inn[type]) continue;
         let min = Infinity, minId = null;
         for (const s of stasjoner) {
-            if (s[type] != null && s[type] < min) { min = s[type]; minId = s.id; }
+            const pris = aktuellPris(s, type);
+            if (pris != null && pris < min) { min = pris; minId = s.id; }
         }
         if (minId !== null) billigste[type] = minId;
     }
@@ -101,12 +106,12 @@ function finnBilligsteId(stasjoner, inn, felt) {
     let minPris = Infinity, minId = null;
     for (const s of stasjoner) {
         const priser = felt && felt !== 'avstand'
-            ? (inn[felt] && s[felt] != null ? [s[felt]] : [])
+            ? (inn[felt] ? [aktuellPris(s, felt)].filter(v => v != null) : [])
             : [
-                inn.bensin              ? s.bensin              : null,
-                inn.bensin98            ? s.bensin98            : null,
-                inn.diesel              ? s.diesel              : null,
-                inn.diesel_avgiftsfri   ? s.diesel_avgiftsfri   : null,
+                inn.bensin              ? aktuellPris(s, 'bensin')              : null,
+                inn.bensin98            ? aktuellPris(s, 'bensin98')            : null,
+                inn.diesel              ? aktuellPris(s, 'diesel')              : null,
+                inn.diesel_avgiftsfri   ? aktuellPris(s, 'diesel_avgiftsfri')   : null,
               ].filter(v => v != null);
         if (!priser.length) continue;
         const min = Math.min(...priser);
@@ -123,10 +128,18 @@ function sorter(stasjoner, felt, billigsteId) {
             if (b.id === billigsteId) return 1;
         }
         if (felt === 'avstand') return (a.avstand_m ?? Infinity) - (b.avstand_m ?? Infinity);
-        const av = a[felt] ?? Infinity;
-        const bv = b[felt] ?? Infinity;
+        const av = aktuellPris(a, felt) ?? Infinity;
+        const bv = aktuellPris(b, felt) ?? Infinity;
         return av - bv;
     });
+}
+
+function aktuellPris(s, type) {
+    if (!s || s[type] == null) return null;
+    const ts = s[`${type}_tidspunkt`];
+    if (!ts) return null;
+    const alderTimer = (Date.now() - new Date(ts.replace(' ', 'T') + 'Z').getTime()) / 3600000;
+    return alderTimer <= MAKS_TOPPLISTE_ALDER_TIMER ? s[type] : null;
 }
 
 function formatPris(v) {

@@ -111,6 +111,32 @@ html, body {
   min-height: unset;
 }
 #route-btn:hover { background: rgba(30, 41, 59, 0.95); }
+#route-btn .route-ikon {
+  width: 31px;
+  height: 31px;
+  display: block;
+}
+#route-btn .route-ikon-skygge {
+  fill: none;
+  stroke: rgba(15, 23, 42, 0.55);
+  stroke-width: 7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transform: translate(1.6px, 1.8px);
+}
+#route-btn .route-ikon-pil,
+#route-btn .route-ikon-spiss {
+  fill: none;
+  stroke: #93c5fd;
+  stroke-width: 5.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+#route-btn .route-ikon-start {
+  fill: #22c55e;
+  stroke: #dbeafe;
+  stroke-width: 1.8;
+}
 
 #auth-lenke {
   font-size: var(--font-xs);

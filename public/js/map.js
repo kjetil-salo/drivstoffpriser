@@ -9,6 +9,7 @@ let stasjonOnKlikk = null;
 let sisteKartvisning = null;
 let ruteLag = null;
 let ruteAktiv = false;
+const MAKS_BILLIGST_ALDER_TIMER = 24 * 7;
 
 export function initMap(containerId, startPos) {
     const senter = startPos ? [startPos.lat, startPos.lon] : [59.91, 10.75];
@@ -172,16 +173,24 @@ function finnBilligsteId(stasjoner) {
     let minPris = Infinity, minId = null;
     for (const s of stasjoner) {
         const priser = [
-            inn.bensin              ? s.bensin              : null,
-            inn.bensin98            ? s.bensin98            : null,
-            inn.diesel              ? s.diesel              : null,
-            inn.diesel_avgiftsfri   ? s.diesel_avgiftsfri   : null,
+            inn.bensin              ? aktuellPris(s, 'bensin')              : null,
+            inn.bensin98            ? aktuellPris(s, 'bensin98')            : null,
+            inn.diesel              ? aktuellPris(s, 'diesel')              : null,
+            inn.diesel_avgiftsfri   ? aktuellPris(s, 'diesel_avgiftsfri')   : null,
         ].filter(v => v != null);
         if (!priser.length) continue;
         const min = Math.min(...priser);
         if (min < minPris) { minPris = min; minId = s.id; }
     }
     return minId;
+}
+
+function aktuellPris(s, type) {
+    if (!s || s[type] == null) return null;
+    const ts = s[`${type}_tidspunkt`];
+    if (!ts) return null;
+    const alderTimer = prisAlderTimer(ts);
+    return alderTimer !== null && alderTimer <= MAKS_BILLIGST_ALDER_TIMER ? s[type] : null;
 }
 
 export function refreshKartInnstillinger() {
