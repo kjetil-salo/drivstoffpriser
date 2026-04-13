@@ -12,6 +12,8 @@ const ocrStatus = document.getElementById('sheet-ocr-status');
 
 let tesseractWorker = null;
 let tesseractLoading = false;
+const OCR_MAX_BREDDE = 2048;
+const OCR_JPEG_KVALITET = 0.9;
 
 // Statistikk for siste OCR-analyse (sendes til backend ved lagring)
 let sisteOcrStat = null;
@@ -31,7 +33,7 @@ export function initOcr(onPriserGjenkjent, getKontekst = null) {
 
         try {
             // Skaler ned bildet for ytelse
-            const nedskalert = await skalerBilde(fil, 1280);
+            const nedskalert = await skalerBilde(fil, OCR_MAX_BREDDE);
 
             visOcrStatus('Analyserer med AI ...', false);
             let priser = null;
@@ -90,7 +92,7 @@ export async function gjenkjennPriserFraBilde(bildeFile, onStatus, kontekst = nu
     const stat = { tidspunkt: new Date().toISOString() };
 
     if (onStatus) onStatus('Forbereder bilde …');
-    const nedskalert = await skalerBilde(bildeFile, 1280);
+    const nedskalert = await skalerBilde(bildeFile, OCR_MAX_BREDDE);
 
     if (onStatus) onStatus('Analyserer med AI …');
     let priser = null;
@@ -177,7 +179,7 @@ function skalerBilde(fil, maxBredde) {
             canvas.toBlob((blob) => {
                 if (blob) resolve(blob);
                 else reject(new Error('Canvas toBlob feilet'));
-            }, 'image/jpeg', 0.8);
+            }, 'image/jpeg', OCR_JPEG_KVALITET);
         };
         img.onerror = () => reject(new Error('Kunne ikke laste bilde'));
         img.src = URL.createObjectURL(fil);

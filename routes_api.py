@@ -1087,6 +1087,7 @@ Arbeidsmåte:
 Radlogikk:
 - Hvis bare 2 rader er synlige, er det normalt 95 + diesel.
 - Hvis 2 rader er synlige og etikettene er uklare, anta 95 + diesel bare hvis prisene er tydelige.
+- Hvis bare én av to rader har tydelig etikett, bruk den etiketten og la den andre raden være den andre vanlige typen. Eksempel: nederste rad er tydelig "95" -> nederste pris er bensin, øverste pris er diesel.
 - Ikke fyll "bensin98" hvis du ikke ser 98/V-Power/miles 98/Futura 98/tilsvarende etikett.
 - Ikke fyll "diesel_avgiftsfri" hvis du ikke ser FD/Farget/Avgiftsfri/Avg.fri/Anleggsdiesel/tilsvarende etikett.
 - Hvis 3 rader er synlige, er det vanligvis 95 + 98 + diesel.
@@ -1111,10 +1112,12 @@ Kjede:
 - "kjede" = kjedelogo eller -navn synlig i bildet (f.eks. "Circle K", "Shell", "Esso", "Uno-X", "YX", "St1", "Best", "Tanken", "Haltbakk Express"). Ellers null.
 
 Nøyaktighet — LED-display:
+- På bilder tatt langt unna er desimalpunkt/komma ofte svakt eller usynlig. Les fire røde LED-siffer som XX.XX, ikke som heltall. Eksempel: 2686 -> 26.86 og 2156 -> 21.56.
+- Uno-X-skilt kan ha to røde prisrader uten store produktnavn. Ofte er en liten "95" synlig ved nederste rad. Da er nederste rad bensin 95, og øverste rad er diesel selv om den er dyrere enn bensin.
 - Røde/oransje LED-display: sifrene 1 og 7 forveksles svært lett. Sjekk: har sifferet et topphorisontalt segment? Da er det trolig 7, ikke 1. Eks: "18.19" der 95-oktan er i nærheten av 21.29 (98-oktan), er feil — den laveste prisen for 95 kan gjerne være 18.79 (7 lest som 1).
 - 8 og 9 forveksles svært ofte på LED-skilt. Sjekk spesielt nedre venstre segment: hvis nedre venstre segment er tent, er sifferet trolig 8; hvis nedre venstre segment mangler mens øvre/midtre/nedre og høyre side er tent, er det trolig 9. Ikke velg 8 eller 9 uten å kontrollere dette segmentet.
 - 4 og 9 kan også ligne på LED-skilt. Sjekk topp- og bunnsegmentene: 9 har vanligvis både toppsegment og bunnsegment tent, mens 4 vanligvis mangler toppsegment og bunnsegment og består mest av midtsegment + øvre venstre + høyre side. Ikke les 19.49 som 19.99 eller omvendt uten å sjekke disse segmentene.
-- 6 og 8, 3 og 8, 9 og 5 forveksles også på LED. Bruk alltid prislogikken over til å velge riktig siffer.
+- 6 og 8, 3 og 8, 9 og 5 forveksles også på LED. Sjekk spesielt siste siffer: 6 har nederste venstre segment tent, 5 mangler normalt nederste høyre segment. Ikke les 26.86 som 26.85 hvis siste siffer har lukket 6-form.
 - I tall som ligner "20.19" på røde LED-skilt, vurder alltid om tredje siffer egentlig er 7 og tallet derfor er "20.79". Dette er en vanlig feil.
 - Returner null kun hvis prisen ikke lar seg tolke til et plausibelt XX.XX-tall i området 15–35 selv etter korreksjonsforsøk.
 
@@ -1166,6 +1169,15 @@ Eksempel 6:
 - Bruk etiketten på hver rad, ikke fast radplass
 Svar:
 {"bensin": 21.49, "diesel": 20.89, "bensin98": 23.29, "diesel_avgiftsfri": null, "kjede": null, "confidence": "medium", "uncertain_fields": []}
+
+Eksempel 7:
+- Gult Uno-X-skilt fotografert på avstand
+- To røde LED-rader
+- Øverste prisrad ser ut som fire siffer "2686" eller "26 86"
+- Nederste prisrad har liten etikett "95" til venstre og ser ut som "2156" eller "21 56"
+- Desimalpunktet er svakt/usynlig
+Svar:
+{"bensin": 21.56, "diesel": 26.86, "bensin98": null, "diesel_avgiftsfri": null, "kjede": "Uno-X", "confidence": "high", "uncertain_fields": []}
 """
 
 
@@ -1182,9 +1194,12 @@ Viktige regler:
 - Hvis du ser 3 rader, er det vanligvis bensin 95, bensin 98 og diesel.
 - Det finnes ingen fast vertikal plassering for 98.
 - Hvis en rad tydelig er merket "95", skal den mappes til bensin.
+- Hvis nederste rad er merket "95", skal nederste pris være bensin, og en umerket øverste rad på et vanlig 2-raders skilt skal vanligvis være diesel.
 - Hvis en rad tydelig er merket "98", skal den mappes til bensin98.
 - Hvis en rad tydelig er merket "D" eller "Diesel", skal den mappes til diesel.
 - Ikke gjett avgiftsfri diesel hvis den ikke er tydelig synlig.
+- Langt unna kan desimalpunktet være usynlig: 2686 betyr 26.86, 2156 betyr 21.56.
+- Gult Uno-X-skilt med to røde rader, øverst 2686 og nederst 95/2156, skal returneres som diesel=26.86 og bensin=21.56.
 - Røde LED-tall kan forveksle 1 og 7. Vurder alltid om 20.19 egentlig er 20.79 hvis segmentene ligner.
 - 8 og 9, 4 og 9, 6 og 8 kan ligne. Sjekk segmentene før du bestemmer siffer.
 - Prisene skal være mellom 15.00 og 35.00.
@@ -1199,13 +1214,16 @@ _OCR_PROMPT_HAIKU_EKSTRA = """
 Ekstra instruks for Haiku:
 - Tenk rad-for-rad, ikke bilde-for-bilde. Finn først rektangelet med prisdisplayet, deretter hver horisontale prisrad.
 - Tell synlige prisrader: vanligvis 2, av og til 3. Ikke let etter mange andre tall.
-- Hvis to rader er synlige og etikettene er uklare eller delvis beskåret, er beste antakelse 95 oktan + diesel. Bruk etiketter hvis de er synlige, ellers bruk øverste synlige pris som bensin og nederste synlige pris som diesel.
+- Hvis to rader er synlige og bare én rad har lesbar etikett, bruk den etiketten først. Hvis nederste rad viser "95", er nederste pris bensin 95 og den andre synlige prisen er vanlig diesel.
+- Hvis to rader er synlige og ingen etiketter er lesbare, returner de to prisene bare hvis de passer klart som 95 + diesel; ikke stol blindt på vertikal rekkefølge.
 - Hvis tre rader er synlige og etikettene er uklare, er beste antakelse 95 oktan, 98 oktan og diesel. Bruk etiketter hvis de er synlige; 98 har ingen fast plass.
 - Ikke fyll 98 eller avgiftsfri diesel bare fordi du forventer flere produkter. Fyll dem bare når raden/etiketten er synlig eller svært tydelig.
+- For gule Uno-X-skilt tatt langt unna: finn de røde LED-tallene i midten av skiltet. Hvis øverste rad leses som 2686 og nederste rad har 95 + 2156, skal JSON være bensin=21.56, diesel=26.86, kjede="Uno-X".
 - Røde LED-tall er punktmatrise/segmenter. Ikke les "20.79" som "2019" eller "20.19" hvis det tredje sifferet har tydelig 7-form.
 - Sjekk 8 og 9 ekstra nøye: 8 har nedre venstre del/segment, 9 mangler vanligvis nedre venstre del/segment.
 - Sjekk 4 og 9 ekstra nøye: 9 har topp og bunn, 4 mangler vanligvis topp og bunn.
-- Alle priser skal normaliseres til XX.XX. Eksempel: 1599 -> 15.99, 1949 -> 19.49, 2079 -> 20.79.
+- Sjekk 5 og 6 ekstra nøye i siste siffer: 6 har en lukket/nedre venstre form; 5 har ikke samme nedre venstre segment.
+- Alle priser skal normaliseres til XX.XX. Eksempel: 1599 -> 15.99, 1949 -> 19.49, 2079 -> 20.79, 2686 -> 26.86, 2156 -> 21.56.
 - Det er bedre å returnere to sikre priser med confidence "medium" enn å returnere alle null.
 - Returner likevel null for felt som ikke har en synlig eller plausibel rad.
 """
