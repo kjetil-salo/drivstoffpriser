@@ -8,7 +8,7 @@ const KJEDE_DOMENER = [
     { match: ['esso'],                          logo: 'esso',                 farge: '#2563eb' },
     { match: ['shell'],                         logo: 'shell',                farge: '#ca8a04' },
     { match: ['preem'],                         logo: 'preem',                farge: '#059669' },
-    { match: ['st1', 'st 1'],                   logo: 'st1',                  farge: '#e4003a' },
+    { match: ['st1', 'st 1'],                   logo: 'st1',                  farge: '#f5c400' },
     { match: ['best'],                          logo: 'best',                 farge: '#0284c7' },
     { match: ['oljeleverandøren', 'oljeleverandoren'], logo: 'oljeleverandoren', farge: '#0d9488' },
     { match: ['tanken'],                        logo: 'tanken',               farge: '#e11d48' },
