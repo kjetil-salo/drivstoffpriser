@@ -1255,7 +1255,7 @@ def priser_historikk():
         rader = conn.execute(
             "SELECT strftime('%Y-%m-%d', tidspunkt) as dato, COUNT(*) as antall "
             "FROM priser "
-            "WHERE tidspunkt >= date('now', '-9 days') "
+            "WHERE tidspunkt >= date('now', '-19 days') "
             "GROUP BY dato ORDER BY dato"
         ).fetchall()
     return jsonify([{'dato': r[0], 'antall': r[1]} for r in rader])
@@ -1376,7 +1376,7 @@ def oversikt():
     <canvas id="prisgraf48" style="width:100%;max-height:220px"></canvas>
   </div>
   <div class="seksjon">
-    <h2>Prisregistreringer per dag – siste 10 dager <span id="historikk-oppdatert" style="font-size:0.75rem;color:#64748b;margin-left:0.5rem"></span></h2>
+    <h2>Prisregistreringer per dag – siste 20 dager <span id="historikk-oppdatert" style="font-size:0.75rem;color:#64748b;margin-left:0.5rem"></span></h2>
     <canvas id="historikkgraf" style="width:100%;max-height:220px"></canvas>
   </div>
   <div class="seksjon">
@@ -1494,7 +1494,7 @@ new Chart(document.getElementById('prisgraf48'), {{
   }}
 }});
 
-// Prisregistreringer per dag – siste 10 dager (live)
+// Prisregistreringer per dag – siste 20 dager (live)
 const historikkChart = new Chart(document.getElementById('historikkgraf'), {{
   type: 'bar',
   data: {{ labels: [], datasets: [{{ label: 'Registreringer', data: [],
@@ -1530,7 +1530,7 @@ async function oppdaterHistorikk() {{
       return;
     }}
     const raw = await resp.json();
-    const data = fyllInnDager(raw, 10);
+    const data = fyllInnDager(raw, 20);
     historikkChart.data.labels = data.map(d => d.dato.slice(5).replace('-', '.'));
     historikkChart.data.datasets[0].data = data.map(d => d.antall);
     historikkChart.data.datasets[0].backgroundColor = data.map(d => {{
