@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v77';
+const CACHE_VERSION = 'v78';
 const STATIC_CACHE = `drivstoff-static-${CACHE_VERSION}`;
 const DATA_CACHE = `drivstoff-data-${CACHE_VERSION}`;
 
@@ -47,7 +47,7 @@ self.addEventListener('install', (e) => {
   );
 });
 
-// ── Activate: rydd opp gamle cacher ──────────────
+// ── Activate: rydd opp gamle cacher og reload åpne klienter ──────────────
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys().then(keys =>
@@ -57,6 +57,8 @@ self.addEventListener('activate', (e) => {
           .map(k => caches.delete(k))
       )
     ).then(() => self.clients.claim())
+      .then(() => self.clients.matchAll({ type: 'window' }))
+      .then(clients => clients.forEach(client => client.navigate(client.url)))
   );
 });
 
