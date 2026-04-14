@@ -219,8 +219,7 @@ function kortHtml(s, billigste = {}, erHovedBilligst = false) {
         ${bannerHtml}
         ${badgeHtml}
         <div class="sk-info">
-            <div class="sk-navn">${s.navn}</div>
-            ${s.kjede ? `<div class="sk-kjede">${s.kjede}</div>` : ''}
+            <div class="sk-navn">${s.navn}${s.kjede ? ` <span class="sk-kjede-inline">(${s.kjede})</span>` : ''}</div>
             <div class="sk-priser">
                 ${rader.map(r => `<div class="sk-pris-rad${r.type === aktivSort ? ' sort-aktiv' : ''}">
                     <span class="sk-pris-label">${r.label}</span>

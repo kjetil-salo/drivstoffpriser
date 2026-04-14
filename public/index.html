@@ -459,21 +459,23 @@ Vil du hjelpe til? Opprett en gratis bruker og oppdater priser på stasjoner næ
           </div>
           <div id="sheet-ocr-status" role="status" aria-live="polite" hidden></div>
         </div>
-        <div id="sheet-gruppe-bensin" class="pris-input-gruppe">
-          <label for="sheet-bensin-input">95 oktan (kr/liter)</label>
-          <input id="sheet-bensin-input" type="text" inputmode="decimal" placeholder="f.eks. 21,35" autocomplete="off">
-        </div>
-        <div id="sheet-gruppe-bensin98" class="pris-input-gruppe">
-          <label for="sheet-bensin98-input">98 oktan (kr/liter)</label>
-          <input id="sheet-bensin98-input" type="text" inputmode="decimal" placeholder="f.eks. 22,50" autocomplete="off">
-        </div>
-        <div id="sheet-gruppe-diesel" class="pris-input-gruppe">
-          <label for="sheet-diesel-input">Diesel (kr/liter)</label>
-          <input id="sheet-diesel-input" type="text" inputmode="decimal" placeholder="f.eks. 20,50" autocomplete="off">
-        </div>
-        <div id="sheet-gruppe-diesel-avgiftsfri" class="pris-input-gruppe">
-          <label for="sheet-diesel-avgiftsfri-input">Avgiftsfri diesel (kr/liter)</label>
-          <input id="sheet-diesel-avgiftsfri-input" type="text" inputmode="decimal" placeholder="f.eks. 14,50" autocomplete="off">
+        <div class="pris-grid">
+          <div id="sheet-gruppe-bensin" class="pris-grid-celle">
+            <label for="sheet-bensin-input">95 oktan</label>
+            <input id="sheet-bensin-input" type="text" inputmode="decimal" placeholder="–" autocomplete="off">
+          </div>
+          <div id="sheet-gruppe-bensin98" class="pris-grid-celle">
+            <label for="sheet-bensin98-input">98 oktan</label>
+            <input id="sheet-bensin98-input" type="text" inputmode="decimal" placeholder="–" autocomplete="off">
+          </div>
+          <div id="sheet-gruppe-diesel" class="pris-grid-celle">
+            <label for="sheet-diesel-input">Diesel</label>
+            <input id="sheet-diesel-input" type="text" inputmode="decimal" placeholder="–" autocomplete="off">
+          </div>
+          <div id="sheet-gruppe-diesel-avgiftsfri" class="pris-grid-celle">
+            <label for="sheet-diesel-avgiftsfri-input">Avg.fri diesel</label>
+            <input id="sheet-diesel-avgiftsfri-input" type="text" inputmode="decimal" placeholder="–" autocomplete="off">
+          </div>
         </div>
         <div id="sheet-edit-status" role="status" aria-live="polite"></div>
         <div class="modal-btns">

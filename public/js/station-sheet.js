@@ -111,6 +111,18 @@ export function initSheet(onOppdatert) {
     bensin98Input.addEventListener('focus', selectAll);
     dieselInput.addEventListener('focus', selectAll);
     dieselAvgiftsfriInput.addEventListener('focus', selectAll);
+
+    // Scroll aktivt felt inn i synlig område når tastatur åpner
+    if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', () => {
+            const aktiv = document.activeElement;
+            if (aktiv && !editEl.hasAttribute('hidden') &&
+                (aktiv === bensinInput || aktiv === bensin98Input ||
+                 aktiv === dieselInput || aktiv === dieselAvgiftsfriInput)) {
+                aktiv.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            }
+        });
+    }
 }
 
 export function visStasjonSheet(stasjon) {
