@@ -1,4 +1,4 @@
-import { oppdaterPris, bekreftEnPris, settKjede, endreNavn, foreslåEndring } from './api.js';
+import { oppdaterPris, bekreftEnPris, settKjede, endreNavn, settDrivstofftyper, foreslåEndring } from './api.js';
 import { getInnstillinger } from './settings.js';
 import { getKjedeFarge, getKjedeInitials, getKjedeLogo } from './kjede.js';
 import { initOcr, visOcrForRolle, skjulOcrPreview, loggOcrVedLagring } from './ocr.js';
@@ -35,13 +35,20 @@ const forslagLagreEl = document.getElementById('forslag-lagre-btn');
 const forslagAvbrytEl = document.getElementById('forslag-avbryt-btn');
 
 // Admin-elementer
-const adminKjedeEl = document.getElementById('sheet-admin-kjede');
+const adminBtnEl = document.getElementById('sheet-admin-btn');
+const adminPanelEl = document.getElementById('sheet-admin-panel');
 const kjedeSelectEl = document.getElementById('sheet-kjede-select');
 const kjedeStatusEl = document.getElementById('sheet-kjede-status');
 const kjedelagreBtnEl = document.getElementById('sheet-kjede-lagre-btn');
 const navnInputEl = document.getElementById('sheet-navn-input');
 const navnStatusEl = document.getElementById('sheet-navn-status');
 const navnlagreBtnEl = document.getElementById('sheet-navn-lagre-btn');
+const harBensinEl = document.getElementById('sheet-har-bensin');
+const harBensin98El = document.getElementById('sheet-har-bensin98');
+const harDieselEl = document.getElementById('sheet-har-diesel');
+const harDieselAvgiftsfriEl = document.getElementById('sheet-har-diesel-avgiftsfri');
+const drivstoffStatusEl = document.getElementById('sheet-drivstoff-status');
+const drivstofflagreBtnEl = document.getElementById('sheet-drivstoff-lagre-btn');
 
 // Edit-elementer
 const bensinInput = document.getElementById('sheet-bensin-input');
@@ -91,8 +98,10 @@ export function initSheet(onOppdatert) {
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && forslagModalEl.classList.contains('open')) lukkForslagModal();
     });
+    adminBtnEl.addEventListener('click', toggleAdminPanel);
     kjedelagreBtnEl.addEventListener('click', lagreKjede);
     navnlagreBtnEl.addEventListener('click', lagreNavn);
+    drivstofflagreBtnEl.addEventListener('click', lagreDrivstofftyper);
 
     const enterLagre = (e) => { if (e.key === 'Enter') lagrePris(); };
     bensinInput.addEventListener('keydown', enterLagre);
@@ -111,14 +120,17 @@ export function initSheet(onOppdatert) {
     dieselInput.addEventListener('focus', selectAll);
     dieselAvgiftsfriInput.addEventListener('focus', selectAll);
 
-    // Scroll aktivt felt inn i synlig område når tastatur åpner
+    // Flytt sheet opp over tastaturet på iOS
     if (window.visualViewport) {
         window.visualViewport.addEventListener('resize', () => {
             const aktiv = document.activeElement;
             if (aktiv && !editEl.hasAttribute('hidden') &&
                 (aktiv === bensinInput || aktiv === bensin98Input ||
                  aktiv === dieselInput || aktiv === dieselAvgiftsfriInput)) {
-                aktiv.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                const tastaturHøyde = window.innerHeight - window.visualViewport.height - window.visualViewport.offsetTop;
+                sheet.style.bottom = Math.max(0, tastaturHøyde) + 'px';
+            } else {
+                sheet.style.bottom = '';
             }
         });
     }
@@ -134,7 +146,9 @@ export function visStasjonSheet(stasjon) {
     forslagBtnEl.style.display = innlogget ? '' : 'none';
 
     if (window.__erAdmin) {
-        adminKjedeEl.removeAttribute('hidden');
+        adminBtnEl.removeAttribute('hidden');
+        adminPanelEl.setAttribute('hidden', '');
+        adminBtnEl.setAttribute('aria-expanded', 'false');
         kjedeSelectEl.value = stasjon.kjede || '';
         kjedeStatusEl.style.display = 'none';
         kjedelagreBtnEl.disabled = false;
@@ -143,8 +157,16 @@ export function visStasjonSheet(stasjon) {
         navnStatusEl.style.display = 'none';
         navnlagreBtnEl.disabled = false;
         navnlagreBtnEl.textContent = 'Lagre navn';
+        harBensinEl.checked = stasjon.har_bensin !== false;
+        harBensin98El.checked = stasjon.har_bensin98 !== false;
+        harDieselEl.checked = stasjon.har_diesel !== false;
+        harDieselAvgiftsfriEl.checked = stasjon.har_diesel_avgiftsfri !== false;
+        drivstoffStatusEl.style.display = 'none';
+        drivstofflagreBtnEl.disabled = false;
+        drivstofflagreBtnEl.textContent = 'Lagre drivstofftyper';
     } else {
-        adminKjedeEl.setAttribute('hidden', '');
+        adminBtnEl.setAttribute('hidden', '');
+        adminPanelEl.setAttribute('hidden', '');
     }
 
     sheet.classList.add('open');
@@ -166,7 +188,10 @@ export function refreshSheetInnstillinger() {
 export function lukkSheet() {
     sheet.classList.remove('open');
     sheet.classList.remove('edit-modus');
+    sheet.style.bottom = '';
     backdrop.classList.remove('open');
+    adminPanelEl.setAttribute('hidden', '');
+    adminBtnEl.setAttribute('aria-expanded', 'false');
     _bekreftedeTyper.clear();
     if (tidligereFokus) { tidligereFokus.focus(); tidligereFokus = null; }
 }
@@ -232,6 +257,7 @@ function fyllVisning(s) {
 
 function visVisModus() {
     sheet.classList.remove('edit-modus');
+    sheet.style.bottom = '';
     viewEl.removeAttribute('hidden');
     editEl.setAttribute('hidden', '');
     visPrisStatus('', null);
@@ -408,6 +434,47 @@ async function lagreNavn() {
     }
     navnlagreBtnEl.disabled = false;
     navnlagreBtnEl.textContent = 'Lagre navn';
+}
+
+function toggleAdminPanel() {
+    const skjult = adminPanelEl.hasAttribute('hidden');
+    if (skjult) {
+        adminPanelEl.removeAttribute('hidden');
+        adminBtnEl.setAttribute('aria-expanded', 'true');
+    } else {
+        adminPanelEl.setAttribute('hidden', '');
+        adminBtnEl.setAttribute('aria-expanded', 'false');
+    }
+}
+
+async function lagreDrivstofftyper() {
+    drivstofflagreBtnEl.disabled = true;
+    drivstofflagreBtnEl.textContent = 'Lagrer …';
+    drivstoffStatusEl.style.display = 'none';
+    const typer = {
+        har_bensin: harBensinEl.checked,
+        har_bensin98: harBensin98El.checked,
+        har_diesel: harDieselEl.checked,
+        har_diesel_avgiftsfri: harDieselAvgiftsfriEl.checked,
+    };
+    try {
+        await settDrivstofftyper(aktivStasjon.id, typer);
+        const oppdatert = { ...aktivStasjon, ...typer };
+        aktivStasjon = oppdatert;
+        fyllVisning(oppdatert);
+        if (onPrisOppdatert) onPrisOppdatert(oppdatert);
+        drivstoffStatusEl.textContent = 'Drivstofftyper lagret!';
+        drivstoffStatusEl.style.display = 'block';
+        drivstoffStatusEl.style.background = 'rgba(34,197,94,0.2)';
+        drivstoffStatusEl.style.color = '#22c55e';
+    } catch {
+        drivstoffStatusEl.textContent = 'Feil ved lagring. Prøv igjen.';
+        drivstoffStatusEl.style.display = 'block';
+        drivstoffStatusEl.style.background = 'rgba(239,68,68,0.2)';
+        drivstoffStatusEl.style.color = '#ef4444';
+    }
+    drivstofflagreBtnEl.disabled = false;
+    drivstofflagreBtnEl.textContent = 'Lagre drivstofftyper';
 }
 
 async function lagrePris() {

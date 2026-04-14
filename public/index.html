@@ -369,6 +369,7 @@ Vil du hjelpe til? Opprett en gratis bruker og oppdater priser på stasjoner næ
             <div id="sheet-kjede" class="sheet-kjede"></div>
           </div>
           <div id="sheet-avstand" class="sheet-avstand"></div>
+          <button id="sheet-admin-btn" class="btn-admin-meny" hidden aria-label="Admin-meny" aria-expanded="false">&#8942;</button>
         </div>
 
         <div id="sheet-priser" class="sheet-priser"></div>
@@ -391,11 +392,11 @@ Vil du hjelpe til? Opprett en gratis bruker og oppdater priser på stasjoner næ
         </div>
         <button id="sheet-forslag-btn" class="btn-nedlagt" style="display:none">Foreslå endring</button>
 
-        <!-- Admin: tilknytt kjede -->
-        <div id="sheet-admin-kjede" hidden>
+        <!-- Admin-panel (skjult bak ⋮-knapp) -->
+        <div id="sheet-admin-panel" hidden>
           <div class="sheet-divider" style="margin:1rem 0"></div>
           <div class="pris-input-gruppe">
-            <label for="sheet-kjede-select">Kjede (admin)</label>
+            <label for="sheet-kjede-select">Kjede</label>
             <select id="sheet-kjede-select">
               <option value="">— Ingen kjede —</option>
               <option value="Best">Best</option>
@@ -421,11 +422,22 @@ Vil du hjelpe til? Opprett en gratis bruker og oppdater priser på stasjoner næ
           <div id="sheet-kjede-status" role="status" aria-live="polite" style="display:none"></div>
           <button id="sheet-kjede-lagre-btn" class="btn-lagre" style="width:100%">Lagre kjede</button>
           <div style="margin-top:0.75rem" class="pris-input-gruppe">
-            <label for="sheet-navn-input">Navn (admin)</label>
+            <label for="sheet-navn-input">Navn</label>
             <input id="sheet-navn-input" type="text" autocomplete="off" style="width:100%">
           </div>
           <div id="sheet-navn-status" role="status" aria-live="polite" style="display:none"></div>
           <button id="sheet-navn-lagre-btn" class="btn-lagre" style="width:100%;margin-top:0.5rem">Lagre navn</button>
+          <div style="margin-top:0.75rem">
+            <label class="pris-input-gruppe-label">Drivstofftyper</label>
+            <div class="admin-drivstoff-checkboxer">
+              <label><input type="checkbox" id="sheet-har-bensin"> 95 oktan</label>
+              <label><input type="checkbox" id="sheet-har-bensin98"> 98 oktan</label>
+              <label><input type="checkbox" id="sheet-har-diesel"> Diesel</label>
+              <label><input type="checkbox" id="sheet-har-diesel-avgiftsfri"> Avg.fri diesel</label>
+            </div>
+          </div>
+          <div id="sheet-drivstoff-status" role="status" aria-live="polite" style="display:none"></div>
+          <button id="sheet-drivstoff-lagre-btn" class="btn-lagre" style="width:100%;margin-top:0.5rem">Lagre drivstofftyper</button>
         </div>
       </div>
 

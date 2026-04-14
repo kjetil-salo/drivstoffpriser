@@ -92,7 +92,8 @@ test('lagre ny pris oppdaterer visning', async ({ page }) => {
 test('backdrop lukker sheet', async ({ page }) => {
     await page.locator('.leaflet-marker-icon').first().click();
     await expect(page.locator('#stasjon-sheet')).toHaveClass(/open/);
-    await page.locator('#sheet-backdrop').click();
+    // Klikk øverst i viewport (over sheet-bunnen) for å unngå at sheet dekker sentrum av backdrop
+    await page.locator('#sheet-backdrop').click({ position: { x: 100, y: 40 } });
     await expect(page.locator('#stasjon-sheet')).not.toHaveClass(/open/);
 });
 

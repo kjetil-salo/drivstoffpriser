@@ -1243,6 +1243,44 @@ html, body {
 .sheet-kjede { font-size: var(--font-xs); color: var(--color-muted); margin-top: 2px; }
 .sheet-avstand { font-size: var(--font-sm); color: var(--color-muted); flex-shrink: 0; padding-top: 2px; }
 
+.btn-admin-meny {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--color-muted);
+  font-size: 1.25rem;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  touch-action: manipulation;
+  align-self: flex-start;
+}
+.btn-admin-meny:hover, .btn-admin-meny:focus-visible {
+  background: var(--bg-secondary);
+  color: var(--color-text);
+}
+
+.admin-drivstoff-checkboxer {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+.admin-drivstoff-checkboxer label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: var(--font-sm);
+  cursor: pointer;
+}
+.pris-input-gruppe-label {
+  font-size: var(--font-sm);
+  color: var(--color-muted);
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
 .sheet-priser {
   display: flex;
   flex-direction: column;

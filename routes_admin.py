@@ -1094,6 +1094,24 @@ def admin_endre_navn():
     return {'ok': True, 'navn': nytt_navn}
 
 
+@admin_bp.route('/admin/sett-drivstofftyper', methods=['POST'])
+@krever_innlogging
+@krever_moderator
+def admin_sett_drivstofftyper_json():
+    data = request.get_json()
+    stasjon_id = data.get('stasjon_id') if data else None
+    if not stasjon_id:
+        return {'error': 'Mangler stasjon_id'}, 400
+    sett_drivstofftyper(
+        int(stasjon_id),
+        bool(data.get('har_bensin', True)),
+        bool(data.get('har_bensin98', True)),
+        bool(data.get('har_diesel', True)),
+        bool(data.get('har_diesel_avgiftsfri', True)),
+    )
+    return {'ok': True}
+
+
 @admin_bp.route('/admin/avvis-rapport', methods=['POST'])
 @krever_innlogging
 @krever_moderator

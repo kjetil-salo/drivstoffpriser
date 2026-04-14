@@ -90,6 +90,17 @@ export async function endreNavn(stasjonId, navn) {
     return resp.json();
 }
 
+export async function settDrivstofftyper(stasjonId, typer) {
+    const resp = await fetch('/admin/sett-drivstofftyper', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stasjon_id: stasjonId, ...typer }),
+    });
+    if (resp.status === 403) return { status: 403 };
+    if (!resp.ok) throw new Error('Feil ved oppdatering av drivstofftyper');
+    return resp.json();
+}
+
 export async function oppdaterPris(stasjonId, bensin, diesel, bensin98, diesel_avgiftsfri) {
     const resp = await fetch('/api/pris', {
         method: 'POST',
