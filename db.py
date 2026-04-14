@@ -296,6 +296,43 @@ def _gyldig_pris_eller_null(pris):
     return pris if PRIS_MIN <= pris <= PRIS_MAX else None
 
 
+_GYLDIGE_PRISTYPER = {'bensin', 'diesel', 'bensin98', 'diesel_avgiftsfri'}
+
+
+def bekreft_pris(stasjon_id, type_navn, bruker_id, min_intervall=300):
+    """Bekrefter at én enkelt drivstofftype stemmer — oppdaterer kun tidspunktet for den typen.
+    Inserterer en rad der bare det aktuelle feltet er satt, resten NULL, slik at
+    per-felt tidspunkt-subqueriene i hent_stasjoner() plukker opp riktig tidspunkt."""
+    if type_navn not in _GYLDIGE_PRISTYPER:
+        return False
+    with _pris_lock:
+        with get_conn() as conn:
+            row = conn.execute(
+                f"SELECT {type_navn} FROM priser WHERE stasjon_id=? AND {type_navn} IS NOT NULL AND {type_navn} > 0 ORDER BY id DESC LIMIT 1",
+                (stasjon_id,)
+            ).fetchone()
+            if not row or row[0] is None:
+                return False
+            verdi = row[0]
+
+            if bruker_id is not None:
+                sist = conn.execute(
+                    "SELECT id, tidspunkt FROM priser WHERE bruker_id=? AND stasjon_id=? ORDER BY tidspunkt DESC LIMIT 1",
+                    (bruker_id, stasjon_id)
+                ).fetchone()
+                if sist:
+                    sekunder_siden = (datetime.now() - datetime.strptime(sist[1], '%Y-%m-%d %H:%M:%S')).total_seconds()
+                    if sekunder_siden < min_intervall:
+                        return False
+
+            vals = {t: verdi if t == type_navn else None for t in _GYLDIGE_PRISTYPER}
+            conn.execute(
+                'INSERT INTO priser (stasjon_id, bensin, diesel, bensin98, diesel_avgiftsfri, bruker_id) VALUES (?, ?, ?, ?, ?, ?)',
+                (stasjon_id, vals['bensin'], vals['diesel'], vals['bensin98'], vals['diesel_avgiftsfri'], bruker_id)
+            )
+    return True
+
+
 def lagre_pris(stasjon_id, bensin, diesel, bensin98=None, bruker_id=None, diesel_avgiftsfri=None, min_intervall=300):
     """Lagrer pris. Oppdaterer siste rad hvis bruker korrigerer innen intervallet, ellers insert.
     NULL-verdier bevares fra forrige pris slik at en delvis oppdatering ikke sletter eksisterende priser."""

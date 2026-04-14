@@ -1,4 +1,4 @@
-import { oppdaterPris, settKjede, endreNavn, foreslåEndring } from './api.js';
+import { oppdaterPris, bekreftEnPris, settKjede, endreNavn, foreslåEndring } from './api.js';
 import { getInnstillinger } from './settings.js';
 import { getKjedeFarge, getKjedeInitials, getKjedeLogo } from './kjede.js';
 import { initOcr, visOcrForRolle, skjulOcrPreview, loggOcrVedLagring } from './ocr.js';
@@ -20,7 +20,6 @@ const avstandEl = document.getElementById('sheet-avstand');
 const prisContainer = document.getElementById('sheet-priser');
 const tidEl = document.getElementById('sheet-tid');
 const endreBtnEl = document.getElementById('sheet-endre-btn');
-const bekreftBtnEl = document.getElementById('sheet-bekreft-btn');
 const navigerBtnEl = document.getElementById('sheet-naviger-btn');
 const kartBtnEl = document.getElementById('sheet-kart-btn');
 const forslagBtnEl = document.getElementById('sheet-forslag-btn');
@@ -61,7 +60,7 @@ export function initSheet(onOppdatert) {
         if (e.key === 'Escape' && sheet.classList.contains('open')) lukkSheet();
     });
     endreBtnEl.addEventListener('click', visEditModus);
-    bekreftBtnEl.addEventListener('click', bekreftPris);
+    prisContainer.addEventListener('click', håndterBekreftKlikk);
     editAvbrytBtn.addEventListener('click', visVisModus);
     editLagreBtn.addEventListener('click', lagrePris);
     forslagBtnEl.addEventListener('click', åpneForslagModal);
@@ -131,9 +130,7 @@ export function visStasjonSheet(stasjon) {
     fyllVisning(stasjon);
     visVisModus();
     const innlogget = window.__innlogget;
-    const harPriser = stasjon.bensin != null || stasjon.bensin98 != null || stasjon.diesel != null || stasjon.diesel_avgiftsfri != null;
     endreBtnEl.style.display = innlogget ? '' : 'none';
-    bekreftBtnEl.style.display = innlogget && harPriser ? '' : 'none';
     forslagBtnEl.style.display = innlogget ? '' : 'none';
 
     if (window.__erAdmin) {
@@ -170,6 +167,7 @@ export function lukkSheet() {
     sheet.classList.remove('open');
     sheet.classList.remove('edit-modus');
     backdrop.classList.remove('open');
+    _bekreftedeTyper.clear();
     if (tidligereFokus) { tidligereFokus.focus(); tidligereFokus = null; }
 }
 
@@ -199,19 +197,27 @@ function fyllVisning(s) {
     }
 
     const inn = getInnstillinger();
+    const innlogget = window.__innlogget;
     const typer = [
-        inn.bensin            && s.har_bensin !== false            ? { label: '95 oktan',       v: s.bensin,             ts: s.bensin_tidspunkt             } : null,
-        inn.bensin98          && s.har_bensin98 !== false          ? { label: '98 oktan',       v: s.bensin98,           ts: s.bensin98_tidspunkt           } : null,
-        inn.diesel            && s.har_diesel !== false            ? { label: 'Diesel',         v: s.diesel,             ts: s.diesel_tidspunkt             } : null,
-        inn.diesel_avgiftsfri && s.har_diesel_avgiftsfri !== false ? { label: 'Avg.fri diesel', v: s.diesel_avgiftsfri,  ts: s.diesel_avgiftsfri_tidspunkt  } : null,
+        inn.bensin            && s.har_bensin !== false            ? { label: '95 oktan',       nøkkel: 'bensin',             v: s.bensin,            ts: s.bensin_tidspunkt             } : null,
+        inn.bensin98          && s.har_bensin98 !== false          ? { label: '98 oktan',       nøkkel: 'bensin98',           v: s.bensin98,          ts: s.bensin98_tidspunkt           } : null,
+        inn.diesel            && s.har_diesel !== false            ? { label: 'Diesel',         nøkkel: 'diesel',             v: s.diesel,            ts: s.diesel_tidspunkt             } : null,
+        inn.diesel_avgiftsfri && s.har_diesel_avgiftsfri !== false ? { label: 'Avg.fri diesel', nøkkel: 'diesel_avgiftsfri',  v: s.diesel_avgiftsfri, ts: s.diesel_avgiftsfri_tidspunkt  } : null,
     ].filter(Boolean);
-    prisContainer.innerHTML = typer.map((t, i) => `
-        ${i > 0 ? '<div class="sheet-divider"></div>' : ''}
-        <div class="sheet-pris-blokk">
-            <div class="sheet-pris-label">${t.label}</div>
+    prisContainer.innerHTML = typer.map(t => {
+        const bekreftet = _bekreftedeTyper.has(t.nøkkel) ? ' bekreftet' : '';
+        return `
+        <div class="sheet-pris-rad">
+            <div class="sheet-pris-rad-label">
+                ${t.v != null ? `<span class="pris-alder-dot ${prisAlderKlasse(t.ts)}"></span>` : ''}
+                <span>${t.label}</span>
+            </div>
             <div class="sheet-pris-verdi ${t.v == null ? 'ingen' : ''}">${t.v != null ? formatPris(t.v) + ' kr' : '–'}</div>
-            ${t.v != null ? `<span class="pris-alder-dot ${prisAlderKlasse(t.ts)}"></span>` : ''}
-        </div>`).join('');
+            ${innlogget && t.v != null
+                ? `<button class="btn-bekreft-rad${bekreftet}" data-type="${t.nøkkel}" aria-label="Bekreft ${t.label}">✓</button>`
+                : (innlogget ? '<div class="btn-bekreft-rad-placeholder"></div>' : '')}
+        </div>`;
+    }).join('');
 
     const nyesteTidspunkt = [s.bensin_tidspunkt, s.diesel_tidspunkt, s.bensin98_tidspunkt, s.diesel_avgiftsfri_tidspunkt]
         .filter(Boolean)
@@ -263,40 +269,36 @@ function erTouchMobil() {
     return window.matchMedia?.('(pointer: coarse)').matches || window.innerWidth < 700;
 }
 
-async function bekreftPris() {
-    bekreftBtnEl.disabled = true;
-    bekreftBtnEl.textContent = 'Bekrefter …';
+const _bekreftedeTyper = new Set();
+
+async function håndterBekreftKlikk(e) {
+    const knapp = e.target.closest('.btn-bekreft-rad');
+    if (!knapp) return;
+    const type = knapp.dataset.type;
+    if (!type) return;
+
+    knapp.disabled = true;
+    knapp.textContent = '…';
+
     try {
-        const resultat = await oppdaterPris(
-            aktivStasjon.id,
-            aktivStasjon.bensin,
-            aktivStasjon.diesel,
-            aktivStasjon.bensin98,
-            aktivStasjon.diesel_avgiftsfri
-        );
+        const resultat = await bekreftEnPris(aktivStasjon.id, type);
         if (resultat?.status === 401) {
-            bekreftBtnEl.disabled = false;
-            bekreftBtnEl.textContent = 'Bekreft priser';
+            knapp.disabled = false;
+            knapp.textContent = '✓';
             return;
         }
         const _nd = new Date(), _p = n => String(n).padStart(2, '0');
         const naa = `${_nd.getFullYear()}-${_p(_nd.getMonth()+1)}-${_p(_nd.getDate())} ${_p(_nd.getHours())}:${_p(_nd.getMinutes())}:${_p(_nd.getSeconds())}`;
 
-        const oppdatert = {
-            ...aktivStasjon,
-            bensin_tidspunkt: aktivStasjon.bensin != null ? naa : aktivStasjon.bensin_tidspunkt,
-            diesel_tidspunkt: aktivStasjon.diesel != null ? naa : aktivStasjon.diesel_tidspunkt,
-            bensin98_tidspunkt: aktivStasjon.bensin98 != null ? naa : aktivStasjon.bensin98_tidspunkt,
-            diesel_avgiftsfri_tidspunkt: aktivStasjon.diesel_avgiftsfri != null ? naa : aktivStasjon.diesel_avgiftsfri_tidspunkt,
-        };
-        aktivStasjon = oppdatert;
-        fyllVisning(oppdatert);
-        if (onPrisOppdatert) onPrisOppdatert(oppdatert);
+        const tidspunktFelt = type + '_tidspunkt';
+        aktivStasjon = { ...aktivStasjon, [tidspunktFelt]: naa };
+        _bekreftedeTyper.add(type);
+        fyllVisning(aktivStasjon);
+        if (onPrisOppdatert) onPrisOppdatert(aktivStasjon);
     } catch {
-        // still, bare ignorer
+        knapp.disabled = false;
+        knapp.textContent = '✓';
     }
-    bekreftBtnEl.disabled = false;
-    bekreftBtnEl.textContent = 'Bekreft priser';
 }
 
 

@@ -103,3 +103,14 @@ export async function oppdaterPris(stasjonId, bensin, diesel, bensin98, diesel_a
     }
     return resp.json();
 }
+
+export async function bekreftEnPris(stasjonId, type) {
+    const resp = await fetch('/api/bekreft-pris', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stasjon_id: stasjonId, type }),
+    });
+    if (resp.status === 401) return { status: 401 };
+    if (!resp.ok) throw new Error('Feil ved bekreftelse');
+    return resp.json();
+}

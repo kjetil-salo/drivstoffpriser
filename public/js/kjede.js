@@ -10,7 +10,7 @@ const KJEDE_DOMENER = [
     { match: ['preem'],                         logo: 'preem',                farge: '#059669' },
     { match: ['st1', 'st 1'],                   logo: 'st1',                  farge: '#f5c400' },
     { match: ['best'],                          logo: 'best',                 farge: '#0284c7' },
-    { match: ['oljeleverandøren', 'oljeleverandoren'], logo: 'oljeleverandoren', farge: '#0d9488' },
+    { match: ['oljeleverandøren', 'oljeleverandoren'], logo: 'oljeleverandoren', farge: '#c87010' },
     { match: ['tanken'],                        logo: 'tanken',               farge: '#e11d48' },
     { match: ['driv'],                          logo: 'driv.svg',             farge: '#cf1130' },
     { match: ['haltbakk'],                      logo: 'haltbakk.webp',        farge: '#b91c1c' },

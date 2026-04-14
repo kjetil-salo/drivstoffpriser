@@ -196,7 +196,7 @@ function kortHtml(s, billigste = {}, erHovedBilligst = false) {
     const initials = getKjedeInitials(s.kjede || s.navn);
     const badgeHtml = `<div class="sk-badge" style="background:${farge};position:relative">` +
         `<span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#fff">${initials}</span>` +
-        (logoUrl ? `<img src="${logoUrl}" alt="${s.kjede || ''}" style="position:relative;width:28px;height:28px;object-fit:contain" onerror="this.style.display='none'">` : '') +
+        (logoUrl ? `<img src="${logoUrl}" alt="${s.kjede || ''}" style="position:relative;width:28px;height:28px;object-fit:contain;background:#fff;border-radius:6px;padding:2px" onerror="this.style.display='none'">` : '') +
         `</div>`;
     // Nyeste oppdatering blant synlige priser → for alderTekst
     const synligeTidspunkt = rader.filter(r => r.v && r.ts).map(r => r.ts);

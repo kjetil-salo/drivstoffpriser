@@ -24,7 +24,7 @@ try:
 except ImportError:  # pragma: no cover - produksjon har Pillow, fallback bruker originalbildet
     Image = ImageEnhance = ImageFilter = None
 
-from db import (get_stasjoner_med_priser, lagre_pris, logg_visning,
+from db import (get_stasjoner_med_priser, lagre_pris, bekreft_pris, logg_visning,
                 antall_stasjoner_med_pris, finn_bruker_id, DB_PATH,
                 opprett_stasjon, hent_billigste_priser_24t,
                 antall_prisoppdateringer_24t, meld_stasjon_nedlagt,
@@ -535,6 +535,23 @@ def oppdater_pris():
         logger.info(f'Pris lagret: stasjon={stasjon_id} bensin={bensin} diesel={diesel} bensin98={bensin98} diesel_avgiftsfri={diesel_avgiftsfri} bruker={bruker_id}')
     else:
         logger.info(f'Pris ignorert (rate limit): stasjon={stasjon_id} bruker={bruker_id}')
+    return jsonify({'ok': True})
+
+
+@api_bp.route('/api/bekreft-pris', methods=['POST'])
+@krever_innlogging
+def bekreft_en_pris():
+    data = request.get_json(silent=True) or {}
+    stasjon_id = data.get('stasjon_id')
+    type_navn = data.get('type')
+
+    if not stasjon_id or not type_navn:
+        return jsonify({'error': 'stasjon_id og type er påkrevd'}), 400
+
+    bruker_id = session.get('bruker_id')
+    lagret = bekreft_pris(stasjon_id, type_navn, bruker_id, min_intervall=_PRIS_MIN_INTERVALL)
+    if lagret:
+        logger.info(f'Pris bekreftet: stasjon={stasjon_id} type={type_navn} bruker={bruker_id}')
     return jsonify({'ok': True})
 
 
