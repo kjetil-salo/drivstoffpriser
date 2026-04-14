@@ -1227,15 +1227,15 @@ def _hent_ocr_stasjon_kontekst(stasjon_id):
     if not row:
         return None
     tillatte = {
-        'bensin': bool(row['har_bensin']),
-        'bensin98': bool(row['har_bensin98']),
-        'diesel': bool(row['har_diesel']),
-        'diesel_avgiftsfri': bool(row['har_diesel_avgiftsfri']),
+        'bensin': bool(row[3]),
+        'bensin98': bool(row[4]),
+        'diesel': bool(row[5]),
+        'diesel_avgiftsfri': bool(row[6]),
     }
     return {
-        'id': row['id'],
-        'navn': row['navn'],
-        'kjede': row['kjede'],
+        'id': row[0],
+        'navn': row[1],
+        'kjede': row[2],
         'tillatte': tillatte,
     }
 
