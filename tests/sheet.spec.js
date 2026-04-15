@@ -22,9 +22,9 @@ const MOCK_STASJONER = [
 test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
         localStorage.setItem('velkommen_vist', '1');
-        localStorage.setItem('siste_pos', JSON.stringify({ lat: 59.9139, lon: 10.7522 }));
+        localStorage.setItem('siste_pos', JSON.stringify({ lat: 59.9100, lon: 10.7480 }));
         const pos = {
-            coords: { latitude: 59.9139, longitude: 10.7522, accuracy: 15 },
+            coords: { latitude: 59.9100, longitude: 10.7480, accuracy: 15 },
             timestamp: Date.now(),
         };
         const mock = {

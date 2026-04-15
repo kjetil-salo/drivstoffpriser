@@ -240,10 +240,10 @@ class TestRuteprisAPI:
 
             def json(self):
                 return {
-                    'routes': [{
-                        'geometry': {'coordinates': [[5.0, 60.0], [5.4, 60.2], [5.8, 60.4]]},
+                    'paths': [{
+                        'points': {'coordinates': [[5.0, 60.0], [5.4, 60.2], [5.8, 60.4]]},
                         'distance': 12000,
-                        'duration': 900,
+                        'time': 900000,
                     }]
                 }
 
@@ -272,10 +272,10 @@ class TestRuteprisAPI:
 
             def json(self):
                 return {
-                    'routes': [{
-                        'geometry': {'coordinates': [[5.0, 60.0], [5.8, 60.4]]},
+                    'paths': [{
+                        'points': {'coordinates': [[5.0, 60.0], [5.8, 60.4]]},
                         'distance': 12000,
-                        'duration': 900,
+                        'time': 900000,
                     }]
                 }
 

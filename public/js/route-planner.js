@@ -234,6 +234,10 @@ function initAutocomplete(input, resultEl, onVelg) {
         }
     }
 
+    input.addEventListener('focus', () => {
+        if (input.value) input.select();
+    });
+
     input.addEventListener('input', () => {
         if (input === el.fra) fraPos = null;
         if (input === el.via) viaPos = null;

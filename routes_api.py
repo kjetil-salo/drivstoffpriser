@@ -299,6 +299,39 @@ def _hent_osrm_rute(fra, til, via=None):
     return {'punkter': punkter, 'km': routes[0].get('distance', 0) / 1000, 'min': routes[0].get('duration', 0) / 60}
 
 
+def _hent_graphhopper_rute(fra, til, via=None):
+    api_key = os.environ.get('GRAPHHOPPER_API_KEY', '')
+    params = [('vehicle', 'car'), ('locale', 'no'), ('key', api_key),
+              ('steps', 'false'), ('points_encoded', 'false')]
+    for p in ([fra] + ([via] if via else []) + [til]):
+        params.append(('point', f'{p["lat"]},{p["lon"]}'))
+    resp = httpx.get(
+        'https://graphhopper.com/api/1/route',
+        params=params,
+        headers={'User-Agent': 'drivstoffpriser/1.0 rutepris'},
+        timeout=15,
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    paths = data.get('paths') or []
+    if not paths:
+        return None
+    coords = paths[0].get('points', {}).get('coordinates', [])
+    punkter = [(float(lat), float(lon)) for lon, lat in coords]
+    return {'punkter': punkter, 'km': paths[0].get('distance', 0) / 1000, 'min': paths[0].get('time', 0) / 60000}
+
+
+def _hent_rute(fra, til, via=None):
+    motor = os.environ.get('RUTE_MOTOR', 'graphhopper').lower()
+    if motor == 'osrm':
+        return _hent_osrm_rute(fra, til, via)
+    try:
+        return _hent_graphhopper_rute(fra, til, via)
+    except Exception as e:
+        logger.warning(f'GraphHopper feilet, prøver OSRM som fallback: {e}')
+        return _hent_osrm_rute(fra, til, via)
+
+
 def _rute_stasjoner_i_boks(punkter, margin):
     min_lat = min(p[0] for p in punkter) - margin
     max_lat = max(p[0] for p in punkter) + margin
@@ -392,7 +425,7 @@ def rutepris():
         if via_txt and not via:
             return jsonify({'error': 'Fant ikke via-sted i Norge'}), 400
 
-        rute = _hent_osrm_rute(fra, til, via)
+        rute = _hent_rute(fra, til, via)
         if not rute:
             return jsonify({'error': 'Fant ingen kjørerute'}), 400
 
