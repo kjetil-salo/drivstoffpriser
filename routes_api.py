@@ -1594,6 +1594,15 @@ def _ocr_match_oppsummering(ai_resultat, lagret_priser):
     return {'riktige': riktige, 'totalt': len(relevante), 'ok': riktige == len(relevante)}
 
 
+def _ocr_tidspunkt_fra_data(data):
+    tidspunkt = data.get('tidspunkt')
+    if isinstance(tidspunkt, str):
+        tidspunkt = tidspunkt.strip()
+        if tidspunkt:
+            return tidspunkt[:40]
+    return datetime.now(timezone.utc).isoformat(timespec='seconds')
+
+
 def _haiku_json_request(bilde_b64, content_type, prompt):
     api_key = os.environ.get('ANTHROPIC_API_KEY', '')
     if not api_key:
@@ -1832,14 +1841,16 @@ def ocr_statistikk():
     claude_resultat = data.get('claude_resultat')
     lagret = data.get('lagret')
     match = _ocr_match_oppsummering(claude_resultat, lagret)
+    tidspunkt = _ocr_tidspunkt_fra_data(data)
 
     with get_conn() as conn:
         conn.execute('''INSERT INTO ocr_statistikk
-            (bruker_id, kilde, tesseract_ok, tesseract_ms, tesseract_resultat,
+            (bruker_id, tidspunkt, kilde, tesseract_ok, tesseract_ms, tesseract_resultat,
              tesseract_raatekst, claude_ok, claude_ms, claude_resultat,
              lagret_priser, tesseract_feil, claude_feil)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
             (bruker_id,
+             tidspunkt,
              data.get('kilde'),
              1 if data.get('tesseract_ok') else 0,
              data.get('tesseract_ms'),
@@ -1855,6 +1866,7 @@ def ocr_statistikk():
     bilde_meta = claude_resultat.get('_ocr_bilde') if isinstance(claude_resultat, dict) else None
     logger.info(
         f'OCR-statistikk: bruker={bruker_id} kilde={data.get("kilde")} '
+        f'tidspunkt={tidspunkt} '
         f'claude_ok={bool(data.get("claude_ok"))} claude_ms={data.get("claude_ms")} '
         f'haiku_calls={claude_resultat.get("_haiku_calls") if isinstance(claude_resultat, dict) else None} '
         f'bilde={bilde_meta} match={match}'
