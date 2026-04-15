@@ -4,7 +4,7 @@ import logging
 import os
 import re
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from flask import Blueprint, request, session, redirect, url_for
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -177,7 +177,7 @@ def tilbakestill():
         bruker = finn_bruker(epost)
         if bruker:
             token = secrets.token_urlsafe(32)
-            utloper = (datetime.utcnow() + timedelta(hours=1)).strftime('%Y-%m-%d %H:%M:%S')
+            utloper = (datetime.now(timezone.utc) + timedelta(hours=1)).strftime('%Y-%m-%d %H:%M:%S')
             opprett_tilbakestilling(token, epost, utloper)
             logg_rate_limit('tilbakestilling', ip)
             base_url = os.environ.get('BASE_URL', request.host_url.rstrip('/'))
