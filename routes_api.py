@@ -1445,6 +1445,7 @@ Radlogikk:
 - Hvis bare én av to rader har tydelig etikett, bruk den etiketten og la den andre raden være den andre vanlige typen. Eksempel: nederste rad er tydelig "95" -> nederste pris er bensin, øverste pris er diesel.
 - Ikke fyll "bensin98" hvis du ikke ser 98/V-Power/miles 98/Futura 98/tilsvarende etikett.
 - Ikke fyll "diesel_avgiftsfri" hvis du ikke ser FD/Farget/Avgiftsfri/Avg.fri/Anleggsdiesel/tilsvarende etikett.
+- Hvis både D/Diesel og HVO/HVO100 vises på samme skilt, skal D/Diesel-raden brukes som "diesel". HVO-raden skal ignoreres fordi appen ikke har eget HVO-felt.
 - Hvis 3 rader er synlige, er det vanligvis 95 + 98 + diesel.
 - 98 har ingen fast plassering. Bruk etiketten på raden, ikke radnummer.
 - Hvis etiketten er tydelig, stol på etiketten selv om prisnivået virker overraskende.
@@ -1544,6 +1545,7 @@ Viktige regler:
 - Hvis nederste rad er merket "95", skal nederste pris være bensin, og en umerket øverste rad på et vanlig 2-raders skilt skal vanligvis være diesel.
 - Hvis en rad tydelig er merket "98", skal den mappes til bensin98.
 - Hvis en rad tydelig er merket "D" eller "Diesel", skal den mappes til diesel.
+- Hvis både D/Diesel og HVO/HVO100 finnes på samme skilt, bruk D/Diesel som diesel og ignorer HVO.
 - Ikke gjett avgiftsfri diesel hvis den ikke er tydelig synlig.
 - Langt unna kan desimalpunktet være usynlig: fire røde siffer skal normalt leses som XX.XX.
 - Gult Uno-X-skilt med to røde rader har ofte diesel øverst og 95/bensin nederst, men les alltid sifrene i bildet og ikke bruk faste eksempelpriser.
