@@ -1148,8 +1148,101 @@ def _bbox_fra_maske(img, treff_fn):
     return (min_x, min_y, max_x + 1, max_y + 1, antall)
 
 
+def _led_klynge_bbox_fra_maske(img, treff_fn):
+    """Finn en strammere bbox rundt LED-lignende røde klynger.
+
+    Store røde logoflater kan ellers dra vanlig bbox altfor bredt. Her deles
+    masken i komponenter, og vi prioriterer små/medium komponenter som ligner
+    segmenterte tall.
+    """
+    w, h = img.size
+    pix = img.load()
+    steg = 2 if max(w, h) > 1200 else 1
+    punkter = set()
+    for y in range(0, h, steg):
+        for x in range(0, w, steg):
+            if treff_fn(pix[x, y]):
+                punkter.add((x, y))
+
+    komponenter = []
+    naboer = (
+        (-steg, -steg), (0, -steg), (steg, -steg),
+        (-steg, 0), (steg, 0),
+        (-steg, steg), (0, steg), (steg, steg),
+    )
+    while punkter:
+        start = punkter.pop()
+        stack = [start]
+        min_x = max_x = start[0]
+        min_y = max_y = start[1]
+        antall = 1
+        while stack:
+            x, y = stack.pop()
+            for dx, dy in naboer:
+                nabo = (x + dx, y + dy)
+                if nabo in punkter:
+                    punkter.remove(nabo)
+                    stack.append(nabo)
+                    antall += 1
+                    nx, ny = nabo
+                    min_x = min(min_x, nx)
+                    max_x = max(max_x, nx)
+                    min_y = min(min_y, ny)
+                    max_y = max(max_y, ny)
+        if antall >= 4:
+            komponenter.append((min_x, min_y, max_x + steg, max_y + steg, antall))
+
+    kandidater = []
+    for box in komponenter:
+        x1, y1, x2, y2, antall = box
+        bw = max(1, x2 - x1)
+        bh = max(1, y2 - y1)
+        tetthet = antall / max(1, (bw / steg) * (bh / steg))
+        if bw > 280 or bh > 260:
+            continue
+        if antall > 1800 and tetthet > 0.30:
+            continue
+        if 6 <= bw <= 240 and 10 <= bh <= 220 and tetthet <= 0.85:
+            kandidater.append(box)
+
+    if not kandidater:
+        return None
+
+    grupper = []
+    for box in sorted(kandidater, key=lambda b: b[4], reverse=True):
+        x1, y1, x2, y2, antall = box
+        cx = (x1 + x2) / 2
+        cy = (y1 + y2) / 2
+        lagt_til = False
+        for gruppe in grupper:
+            gx1, gy1, gx2, gy2, total, n = gruppe
+            gcx = (gx1 + gx2) / 2
+            gcy = (gy1 + gy2) / 2
+            if abs(cx - gcx) <= 360 and abs(cy - gcy) <= 260:
+                gruppe[0] = min(gx1, x1)
+                gruppe[1] = min(gy1, y1)
+                gruppe[2] = max(gx2, x2)
+                gruppe[3] = max(gy2, y2)
+                gruppe[4] = total + antall
+                gruppe[5] = n + 1
+                lagt_til = True
+                break
+        if not lagt_til:
+            grupper.append([x1, y1, x2, y2, antall, 1])
+
+    def score(gruppe):
+        x1, y1, x2, y2, total, n = gruppe
+        areal = max(1, (x2 - x1) * (y2 - y1))
+        return total * min(n, 10) / math.sqrt(areal)
+
+    beste = max(grupper, key=score)
+    if beste[5] < 2 or beste[4] < _OCR_CROP_MIN_PIXLER:
+        return None
+    return (beste[0], beste[1], beste[2], beste[3], beste[4], beste[5])
+
+
 def _utvid_bbox(box, img_size, faktor_x=3.8, faktor_y=4.2, min_bredde=360, min_hoyde=300):
-    x1, y1, x2, y2, _ = box
+    x1, y1, x2, y2 = box[:4]
     w, h = img_size
     bw = max(x2 - x1, min_bredde)
     bh = max(y2 - y1, min_hoyde)
@@ -1199,11 +1292,16 @@ def _forbered_haiku_bilde(bilde_data, content_type):
             return r >= 135 and g >= 95 and b <= 95 and abs(r - g) <= 95 and r >= b * 1.7 and g >= b * 1.4
 
         rod_box = _bbox_fra_maske(img, er_rod_led)
+        led_box = _led_klynge_bbox_fra_maske(img, er_rod_led)
         gul_box = _bbox_fra_maske(img, er_gult_skilt)
 
         valgt_box = None
         strategi = 'resized_original'
-        if rod_box:
+        led_komponenter = led_box[5] if led_box else 0
+        if led_box:
+            valgt_box = _utvid_bbox(led_box, img.size, faktor_x=2.2, faktor_y=2.8, min_bredde=420, min_hoyde=340)
+            strategi = 'red_led_tight_crop'
+        elif rod_box:
             valgt_box = _utvid_bbox(rod_box, img.size, faktor_x=5.8, faktor_y=6.2, min_bredde=420, min_hoyde=340)
             strategi = 'red_led_crop'
         elif gul_box:
@@ -1236,6 +1334,7 @@ def _forbered_haiku_bilde(bilde_data, content_type):
             'processed_size': list(crop.size),
             'crop_box': list(valgt_box),
             'red_pixels': rod_box[4] if rod_box else 0,
+            'red_led_components': led_komponenter,
             'yellow_pixels': gul_box[4] if gul_box else 0,
         })
         return base64.b64encode(out.getvalue()).decode('utf-8'), 'image/jpeg', meta
@@ -1368,7 +1467,7 @@ Kjede:
 - "kjede" = kjedelogo eller -navn synlig i bildet (f.eks. "Circle K", "Shell", "Esso", "Uno-X", "YX", "St1", "Best", "Tanken", "Haltbakk Express"). Ellers null.
 
 Nøyaktighet — LED-display:
-- På bilder tatt langt unna er desimalpunkt/komma ofte svakt eller usynlig. Les fire røde LED-siffer som XX.XX, ikke som heltall. Eksempel: 2686 -> 26.86 og 2156 -> 21.56.
+- På bilder tatt langt unna er desimalpunkt/komma ofte svakt eller usynlig. Les fire røde LED-siffer som XX.XX, ikke som heltall. Eksempel: 1949 -> 19.49 og 2079 -> 20.79.
 - Uno-X-skilt kan ha to røde prisrader uten store produktnavn. Ofte er en liten "95" synlig ved nederste rad. Da er nederste rad bensin 95, og øverste rad er diesel selv om den er dyrere enn bensin.
 - Røde/oransje LED-display: sifrene 1 og 7 forveksles svært lett. Sjekk: har sifferet et topphorisontalt segment? Da er det trolig 7, ikke 1. Eks: "18.19" der 95-oktan er i nærheten av 21.29 (98-oktan), er feil — den laveste prisen for 95 kan gjerne være 18.79 (7 lest som 1).
 - 8 og 9 forveksles svært ofte på LED-skilt. Sjekk spesielt nedre venstre segment: hvis nedre venstre segment er tent, er sifferet trolig 8; hvis nedre venstre segment mangler mens øvre/midtre/nedre og høyre side er tent, er det trolig 9. Ikke velg 8 eller 9 uten å kontrollere dette segmentet.
@@ -1426,14 +1525,6 @@ Eksempel 6:
 Svar:
 {"bensin": 21.49, "diesel": 20.89, "bensin98": 23.29, "diesel_avgiftsfri": null, "kjede": null, "confidence": "medium", "uncertain_fields": []}
 
-Eksempel 7:
-- Gult Uno-X-skilt fotografert på avstand
-- To røde LED-rader
-- Øverste prisrad ser ut som fire siffer "2686" eller "26 86"
-- Nederste prisrad har liten etikett "95" til venstre og ser ut som "2156" eller "21 56"
-- Desimalpunktet er svakt/usynlig
-Svar:
-{"bensin": 21.56, "diesel": 26.86, "bensin98": null, "diesel_avgiftsfri": null, "kjede": "Uno-X", "confidence": "high", "uncertain_fields": []}
 """
 
 
@@ -1454,8 +1545,8 @@ Viktige regler:
 - Hvis en rad tydelig er merket "98", skal den mappes til bensin98.
 - Hvis en rad tydelig er merket "D" eller "Diesel", skal den mappes til diesel.
 - Ikke gjett avgiftsfri diesel hvis den ikke er tydelig synlig.
-- Langt unna kan desimalpunktet være usynlig: 2686 betyr 26.86, 2156 betyr 21.56.
-- Gult Uno-X-skilt med to røde rader, øverst 2686 og nederst 95/2156, skal returneres som diesel=26.86 og bensin=21.56.
+- Langt unna kan desimalpunktet være usynlig: fire røde siffer skal normalt leses som XX.XX.
+- Gult Uno-X-skilt med to røde rader har ofte diesel øverst og 95/bensin nederst, men les alltid sifrene i bildet og ikke bruk faste eksempelpriser.
 - Røde LED-tall kan forveksle 1 og 7. Vurder alltid om 20.19 egentlig er 20.79 hvis segmentene ligner.
 - 8 og 9, 4 og 9, 6 og 8 kan ligne. Sjekk segmentene før du bestemmer siffer.
 - Prisene skal være mellom 15.00 og 35.00.
@@ -1474,12 +1565,12 @@ Ekstra instruks for Haiku:
 - Hvis to rader er synlige og ingen etiketter er lesbare, returner de to prisene bare hvis de passer klart som 95 + diesel; ikke stol blindt på vertikal rekkefølge.
 - Hvis tre rader er synlige og etikettene er uklare, er beste antakelse 95 oktan, 98 oktan og diesel. Bruk etiketter hvis de er synlige; 98 har ingen fast plass.
 - Ikke fyll 98 eller avgiftsfri diesel bare fordi du forventer flere produkter. Fyll dem bare når raden/etiketten er synlig eller svært tydelig.
-- For gule Uno-X-skilt tatt langt unna: finn de røde LED-tallene i midten av skiltet. Hvis øverste rad leses som 2686 og nederste rad har 95 + 2156, skal JSON være bensin=21.56, diesel=26.86, kjede="Uno-X".
+- For gule Uno-X-skilt tatt langt unna: finn de røde LED-tallene i midten av skiltet. Hvis nederste rad har liten "95", skal nederste pris være bensin 95 og øverste synlige pris vanligvis diesel. Ikke bruk faste eksempelpriser.
 - Røde LED-tall er punktmatrise/segmenter. Ikke les "20.79" som "2019" eller "20.19" hvis det tredje sifferet har tydelig 7-form.
 - Sjekk 8 og 9 ekstra nøye: 8 har nedre venstre del/segment, 9 mangler vanligvis nedre venstre del/segment.
 - Sjekk 4 og 9 ekstra nøye: 9 har topp og bunn, 4 mangler vanligvis topp og bunn.
 - Sjekk 5 og 6 ekstra nøye i siste siffer: 6 har en lukket/nedre venstre form; 5 har ikke samme nedre venstre segment.
-- Alle priser skal normaliseres til XX.XX. Eksempel: 1599 -> 15.99, 1949 -> 19.49, 2079 -> 20.79, 2686 -> 26.86, 2156 -> 21.56.
+- Alle priser skal normaliseres til XX.XX. Eksempel: 1599 -> 15.99, 1949 -> 19.49, 2079 -> 20.79.
 - Det er bedre å returnere to sikre priser med confidence "medium" enn å returnere alle null.
 - Returner likevel null for felt som ikke har en synlig eller plausibel rad.
 """
