@@ -154,9 +154,6 @@ function lagKort(s) {
       <div class="b-priser">${lagRader(s)}</div>
     `;
 
-    li.querySelectorAll('.b-rad-rediger').forEach(btn => {
-        btn.addEventListener('click', () => åpneEdit(li, s, btn.dataset.type));
-    });
     li.querySelectorAll('.b-rad-pris').forEach(el => {
         const type = el.closest('.b-rad').dataset.type;
         el.addEventListener('click', () => åpneInlineEdit(li, s, type, el));
@@ -183,7 +180,6 @@ function lagRader(s) {
           <span class="b-dot ${dot}"></span>
           <span class="b-rad-label">${label}</span>
           <span class="b-rad-pris">${pris}</span>
-          <button class="b-rad-rediger" data-type="${type}" aria-label="Endre ${label}">✎</button>
           ${harPrisRad
             ? `<button class="b-rad-bekreft" data-type="${type}" aria-label="Bekreft ${label}">✓</button>`
             : `<span class="b-rad-bekreft-placeholder"></span>`}
@@ -211,9 +207,6 @@ function åpneInlineEdit(kortEl, stasjon, type, prisSpan) {
     };
     redigerer = { kortEl, stasjon, type, input, prisSpan, inline: true, klikkUtenforHandler };
 
-    const bekreftBtn = kortEl.querySelector(`.b-rad-bekreft[data-type="${type}"]`);
-    if (bekreftBtn) { bekreftBtn.disabled = true; bekreftBtn.style.opacity = '0.3'; }
-
     setTimeout(() => document.addEventListener('pointerdown', klikkUtenforHandler, true), 0);
 
     input.focus();
@@ -230,96 +223,30 @@ function åpneInlineEdit(kortEl, stasjon, type, prisSpan) {
     });
 }
 
-// ── Drawer edit (✎-knapp) ─────────────────────────
-function åpneEdit(kortEl, stasjon, type) {
-    if (redigerer) lukkEdit(false);
-
-    const rad = kortEl.querySelector(`.b-rad[data-type="${type}"]`);
-    const gjeldende = stasjon[type];
-
-    const initVerdi = gjeldende != null ? formaterØre(String(Math.round(gjeldende * 100))) : '';
-    const editEl = document.createElement('div');
-    editEl.className = 'b-edit';
-    editEl.innerHTML = `
-      <span class="b-edit-label">${rad.querySelector('.b-rad-label').textContent}</span>
-      <input class="b-edit-input" type="text" inputmode="numeric"
-             value="${initVerdi}"
-             placeholder="0,00" aria-label="Ny pris">
-      <button class="b-edit-lagre" aria-label="Lagre">✓</button>
-      <button class="b-edit-avbryt" aria-label="Avbryt">✕</button>
-    `;
-
-    const input     = editEl.querySelector('.b-edit-input');
-    const lagreBtn  = editEl.querySelector('.b-edit-lagre');
-    const avbrytBtn = editEl.querySelector('.b-edit-avbryt');
-
-    rad.after(editEl);
-    rad.classList.add('b-rad-aktiv');
-
-    const klikkUtenforHandler = e => {
-        if (!kortEl.contains(e.target)) lukkEdit(false);
-    };
-    redigerer = { kortEl, stasjon, type, input, editEl, inline: false, klikkUtenforHandler };
-
-    const bekreftBtn = kortEl.querySelector(`.b-rad-bekreft[data-type="${type}"]`);
-    if (bekreftBtn) { bekreftBtn.disabled = true; bekreftBtn.style.opacity = '0.3'; }
-
-    setTimeout(() => document.addEventListener('pointerdown', klikkUtenforHandler, true), 0);
-
-    input.focus();
-    setTimeout(() => input.select(), 50);
-
-    input.addEventListener('input', () => {
-        const digits = input.value.replace(/\D/g, '').replace(/^0+/, '');
-        input.value = formaterØre(digits);
-        input.setSelectionRange(input.value.length, input.value.length);
-    });
-    input.addEventListener('keydown', e => {
-        if (e.key === 'Enter') { e.preventDefault(); lagrePris(); }
-        if (e.key === 'Escape') lukkEdit(false);
-    });
-    lagreBtn.addEventListener('click', lagrePris);
-    avbrytBtn.addEventListener('click', () => lukkEdit(false));
-}
 
 function lukkEdit(suksess = false) {
     if (!redigerer) return;
-    const { kortEl, type, editEl, input, prisSpan, inline, klikkUtenforHandler } = redigerer;
+    const { kortEl, type, input, prisSpan, klikkUtenforHandler } = redigerer;
     redigerer = null;
     if (klikkUtenforHandler) document.removeEventListener('pointerdown', klikkUtenforHandler, true);
-    const bekreftBtn = kortEl.querySelector(`.b-rad-bekreft[data-type="${type}"]`);
-    if (bekreftBtn) { bekreftBtn.disabled = false; bekreftBtn.style.opacity = ''; }
 
-    if (inline) {
-        input.replaceWith(prisSpan);
-        const rad = kortEl.querySelector(`.b-rad[data-type="${type}"]`);
-        if (rad && suksess) rad.classList.add('b-rad-suksess');
-    } else {
-        editEl.remove();
-        const rad = kortEl.querySelector(`.b-rad[data-type="${type}"]`);
-        if (rad) {
-            rad.classList.remove('b-rad-aktiv');
-            if (suksess) rad.classList.add('b-rad-suksess');
-        }
-    }
+    input.replaceWith(prisSpan);
+    const rad = kortEl.querySelector(`.b-rad[data-type="${type}"]`);
+    if (rad && suksess) rad.classList.add('b-rad-suksess');
 }
 
 async function lagrePris() {
     if (!redigerer) return;
-    const { kortEl, stasjon, type, input, editEl, prisSpan, inline } = redigerer;
-    const lagreBtnEl = inline ? null : editEl.querySelector('.b-edit-lagre');
+    const { kortEl, stasjon, type, input, prisSpan } = redigerer;
 
     const verdi = input.value.trim().replace(',', '.');
     const pris  = parseFloat(verdi);
     if (isNaN(pris) || pris < 14 || pris > 37) {
         input.classList.add('b-input-feil');
         setTimeout(() => input.classList.remove('b-input-feil'), 600);
-        if (inline) lukkEdit(false);
-        else input.focus();
+        lukkEdit(false);
         return;
     }
-
-    if (lagreBtnEl) { lagreBtnEl.disabled = true; lagreBtnEl.textContent = '…'; }
 
     try {
         const resp = await fetch('/api/pris', {
@@ -341,17 +268,10 @@ async function lagrePris() {
         stasjon[type] = pris;
         stasjon[`${type}_tidspunkt`] = naa;
 
-        if (inline) {
-            prisSpan.textContent = pris.toFixed(2);
-            const rad = kortEl.querySelector(`.b-rad[data-type="${type}"]`);
-            if (rad) rad.querySelector('.b-dot').className = 'b-dot b-dot-fersk';
-        } else {
-            const rad = kortEl.querySelector(`.b-rad[data-type="${type}"]`);
-            if (rad) {
-                rad.querySelector('.b-rad-pris').textContent = pris.toFixed(2);
-                rad.querySelector('.b-dot').className = 'b-dot b-dot-fersk';
-            }
-        }
+        prisSpan.textContent = pris.toFixed(2);
+        const rad = kortEl.querySelector(`.b-rad[data-type="${type}"]`);
+        if (rad) rad.querySelector('.b-dot').className = 'b-dot b-dot-fersk';
+
         lukkEdit(true);
 
         dagTeller++;
@@ -360,7 +280,6 @@ async function lagrePris() {
         oppdaterRang();
 
     } catch {
-        if (lagreBtnEl) { lagreBtnEl.disabled = false; lagreBtnEl.textContent = '✓'; }
         input.classList.add('b-input-feil');
         setTimeout(() => input.classList.remove('b-input-feil'), 600);
     }
@@ -368,6 +287,10 @@ async function lagrePris() {
 
 // ── Bekreft ───────────────────────────────────────
 async function bekreftType(kortEl, stasjon, type) {
+    if (redigerer && redigerer.kortEl === kortEl && redigerer.type === type) {
+        lagrePris();
+        return;
+    }
     const btn = kortEl.querySelector(`.b-rad-bekreft[data-type="${type}"]`);
     if (!btn) return;
     btn.disabled = true;

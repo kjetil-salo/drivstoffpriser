@@ -339,11 +339,10 @@ class TestBidragJS:
         for klasse in brukte:
             assert klasse in html, f"JS-selektor '.{klasse}' mangler i bidrag.html"
 
-    def test_bekreft_og_rediger_knapper_i_html(self, client):
-        """b-rad-bekreft og b-rad-rediger må finnes i HTML-malen i bidrag.js."""
+    def test_bekreft_knapp_i_html(self, client):
+        """b-rad-bekreft må finnes i HTML-malen i bidrag.js."""
         js = self._les_js(client)
         assert 'b-rad-bekreft' in js, 'b-rad-bekreft mangler i bidrag.js'
-        assert 'b-rad-rediger' in js, 'b-rad-rediger mangler i bidrag.js'
 
 
 # ── /admin/oversikt ────────────────────────────────

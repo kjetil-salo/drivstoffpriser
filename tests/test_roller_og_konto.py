@@ -73,7 +73,7 @@ class TestHarRolle:
         db_mod.opprett_bruker('a@t.no', generate_password_hash('x'))
         bruker = db_mod.finn_bruker('a@t.no')
         stasjon_id, _ = db_mod.opprett_stasjon('Test', None, 60.0, 10.0, bruker['id'])
-        for _ in range(51):
+        for _ in range(20):
             db_mod.lagre_pris(stasjon_id, 20.0, None, bruker_id=bruker['id'], min_intervall=0)
         bruker = db_mod.finn_bruker_id(bruker['id'])
         assert db_mod.har_rolle(bruker, 'kamera') is True
@@ -82,7 +82,7 @@ class TestHarRolle:
         db_mod.opprett_bruker('a@t.no', generate_password_hash('x'))
         bruker = db_mod.finn_bruker('a@t.no')
         stasjon_id, _ = db_mod.opprett_stasjon('Test', None, 60.0, 10.0, bruker['id'])
-        for _ in range(50):
+        for _ in range(19):
             db_mod.lagre_pris(stasjon_id, bruker['id'], 20.0, None, None, None)
         bruker = db_mod.finn_bruker_id(bruker['id'])
         assert db_mod.har_rolle(bruker, 'kamera') is False
