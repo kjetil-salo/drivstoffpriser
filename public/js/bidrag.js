@@ -205,9 +205,16 @@ function åpneInlineEdit(kortEl, stasjon, type, prisSpan) {
     input.setAttribute('aria-label', 'Ny pris');
 
     prisSpan.replaceWith(input);
-    redigerer = { kortEl, stasjon, type, input, prisSpan, inline: true };
 
-    document.querySelectorAll('.b-rad-bekreft').forEach(b => { b.disabled = true; b.style.opacity = '0.3'; });
+    const klikkUtenforHandler = e => {
+        if (!kortEl.contains(e.target)) lukkEdit(false);
+    };
+    redigerer = { kortEl, stasjon, type, input, prisSpan, inline: true, klikkUtenforHandler };
+
+    const bekreftBtn = kortEl.querySelector(`.b-rad-bekreft[data-type="${type}"]`);
+    if (bekreftBtn) { bekreftBtn.disabled = true; bekreftBtn.style.opacity = '0.3'; }
+
+    setTimeout(() => document.addEventListener('pointerdown', klikkUtenforHandler, true), 0);
 
     input.focus();
     setTimeout(() => input.select(), 30);
@@ -220,10 +227,6 @@ function åpneInlineEdit(kortEl, stasjon, type, prisSpan) {
     input.addEventListener('keydown', e => {
         if (e.key === 'Enter') { e.preventDefault(); lagrePris(); }
         if (e.key === 'Escape') lukkEdit(false);
-    });
-    // Lagre ved blur (kort forsinkelse lar click-events rekke å kjøre først)
-    input.addEventListener('blur', () => {
-        setTimeout(() => { if (redigerer?.input === input) lagrePris(); }, 150);
     });
 }
 
@@ -252,9 +255,16 @@ function åpneEdit(kortEl, stasjon, type) {
 
     rad.after(editEl);
     rad.classList.add('b-rad-aktiv');
-    redigerer = { kortEl, stasjon, type, input, editEl, inline: false };
 
-    document.querySelectorAll('.b-rad-bekreft').forEach(b => { b.disabled = true; b.style.opacity = '0.3'; });
+    const klikkUtenforHandler = e => {
+        if (!kortEl.contains(e.target)) lukkEdit(false);
+    };
+    redigerer = { kortEl, stasjon, type, input, editEl, inline: false, klikkUtenforHandler };
+
+    const bekreftBtn = kortEl.querySelector(`.b-rad-bekreft[data-type="${type}"]`);
+    if (bekreftBtn) { bekreftBtn.disabled = true; bekreftBtn.style.opacity = '0.3'; }
+
+    setTimeout(() => document.addEventListener('pointerdown', klikkUtenforHandler, true), 0);
 
     input.focus();
     setTimeout(() => input.select(), 50);
@@ -274,9 +284,11 @@ function åpneEdit(kortEl, stasjon, type) {
 
 function lukkEdit(suksess = false) {
     if (!redigerer) return;
-    const { kortEl, type, editEl, input, prisSpan, inline } = redigerer;
+    const { kortEl, type, editEl, input, prisSpan, inline, klikkUtenforHandler } = redigerer;
     redigerer = null;
-    document.querySelectorAll('.b-rad-bekreft').forEach(b => { b.disabled = false; b.style.opacity = ''; });
+    if (klikkUtenforHandler) document.removeEventListener('pointerdown', klikkUtenforHandler, true);
+    const bekreftBtn = kortEl.querySelector(`.b-rad-bekreft[data-type="${type}"]`);
+    if (bekreftBtn) { bekreftBtn.disabled = false; bekreftBtn.style.opacity = ''; }
 
     if (inline) {
         input.replaceWith(prisSpan);
