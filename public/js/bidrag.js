@@ -299,7 +299,7 @@ async function lagrePris() {
 
     const verdi = input.value.trim().replace(',', '.');
     const pris  = parseFloat(verdi);
-    if (isNaN(pris) || pris < 12 || pris > 37) {
+    if (isNaN(pris) || pris < 14 || pris > 37) {
         input.classList.add('b-input-feil');
         setTimeout(() => input.classList.remove('b-input-feil'), 600);
         if (inline) lukkEdit(false);

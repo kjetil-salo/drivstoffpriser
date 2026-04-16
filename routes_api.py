@@ -40,7 +40,7 @@ logger = logging.getLogger('drivstoff')
 api_bp = Blueprint('api', __name__)
 
 _PRIS_MIN_INTERVALL = 300  # sekunder (5 min)
-_PRIS_MIN = 12.0
+_PRIS_MIN = 14.0
 _PRIS_MAX = 37.0
 
 NORGE_BBOX = {'lat_min': 57.0, 'lat_max': 71.5, 'lon_min': 4.0, 'lon_max': 31.5}

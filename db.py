@@ -290,7 +290,7 @@ def lagre_stasjon(navn, kjede, lat, lon, osm_id, land=None):
 
 
 _pris_lock = threading.Lock()
-PRIS_MIN = 12.0
+PRIS_MIN = 14.0
 PRIS_MAX = 37.0
 
 
@@ -608,10 +608,13 @@ def antall_priser_for_bruker(bruker_id: int) -> int:
         ).fetchone()[0]
 
 
+KAMERA_PRISANTALL_GRENSE = 20
+
+
 def har_rolle(bruker: dict, rolle: str) -> bool:
     if not bruker:
         return False
-    if rolle == 'kamera' and antall_priser_for_bruker(bruker['id']) > 50:
+    if rolle == 'kamera' and antall_priser_for_bruker(bruker['id']) >= KAMERA_PRISANTALL_GRENSE:
         return True
     return rolle in (bruker.get('roller') or '').split()
 
