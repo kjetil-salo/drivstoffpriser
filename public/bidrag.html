@@ -173,7 +173,15 @@
       font-weight: 600;
       font-variant-numeric: tabular-nums;
       font-size: var(--font-md);
+      cursor: pointer;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      border-radius: var(--radius-sm);
+      padding: 4px 6px;
+      margin: -4px -6px;
     }
+    .b-rad-pris:hover { color: var(--color-accent); }
+    .b-rad-pris:active { background: rgba(96,165,250,0.1); }
     .b-rad-rediger {
       background: none;
       border: 1px solid var(--border-color-medium);
@@ -204,7 +212,23 @@
     .b-rad-bekreft:disabled { opacity: 0.5; cursor: default; }
     .b-rad-bekreft-placeholder { min-width: 44px; }
 
-    /* ── Inline edit ── */
+    /* ── Inline input (pris-tap) ── */
+    .b-inline-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid var(--color-accent);
+      color: var(--color-text);
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      font-size: var(--font-md);
+      min-width: 0;
+      padding: 0 2px;
+      outline: none;
+    }
+    .b-inline-input.b-input-feil { border-bottom-color: var(--color-error); animation: shake 0.3s; }
+
+    /* ── Drawer edit (✎-knapp) ── */
     .b-edit {
       display: flex;
       align-items: center;

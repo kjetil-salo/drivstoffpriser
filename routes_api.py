@@ -562,10 +562,11 @@ def oppdater_pris():
             return jsonify({'error': f'{navn} må være mellom {_PRIS_MIN:g} og {_PRIS_MAX:g} kr'}), 400
 
     bruker_id = session.get('bruker_id')
+    kilde = data.get('kilde') or None
 
-    lagret = lagre_pris(stasjon_id, bensin, diesel, bensin98, bruker_id=bruker_id, diesel_avgiftsfri=diesel_avgiftsfri, min_intervall=_PRIS_MIN_INTERVALL)
+    lagret = lagre_pris(stasjon_id, bensin, diesel, bensin98, bruker_id=bruker_id, diesel_avgiftsfri=diesel_avgiftsfri, min_intervall=_PRIS_MIN_INTERVALL, kilde=kilde)
     if lagret:
-        logger.info(f'Pris lagret: stasjon={stasjon_id} bensin={bensin} diesel={diesel} bensin98={bensin98} diesel_avgiftsfri={diesel_avgiftsfri} bruker={bruker_id}')
+        logger.info(f'Pris lagret: stasjon={stasjon_id} bensin={bensin} diesel={diesel} bensin98={bensin98} diesel_avgiftsfri={diesel_avgiftsfri} bruker={bruker_id} kilde={kilde}')
     else:
         logger.info(f'Pris ignorert (rate limit): stasjon={stasjon_id} bruker={bruker_id}')
     return jsonify({'ok': True})

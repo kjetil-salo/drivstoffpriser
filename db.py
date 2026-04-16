@@ -159,6 +159,10 @@ def _migrer_db():
         if 'har_diesel_avgiftsfri' not in stasjon_kolonner:
             conn.execute("ALTER TABLE stasjoner ADD COLUMN har_diesel_avgiftsfri INTEGER NOT NULL DEFAULT 1")
 
+        pris_kolonner = [r[1] for r in conn.execute("PRAGMA table_info(priser)").fetchall()]
+        if 'kilde' not in pris_kolonner:
+            conn.execute("ALTER TABLE priser ADD COLUMN kilde TEXT")
+
         # Rapporter-tabell og blogg_visninger (migrering)
         tabeller = [r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
         if 'blogg_visninger' not in tabeller:
@@ -333,7 +337,7 @@ def bekreft_pris(stasjon_id, type_navn, bruker_id, min_intervall=300):
     return True
 
 
-def lagre_pris(stasjon_id, bensin, diesel, bensin98=None, bruker_id=None, diesel_avgiftsfri=None, min_intervall=300):
+def lagre_pris(stasjon_id, bensin, diesel, bensin98=None, bruker_id=None, diesel_avgiftsfri=None, min_intervall=300, kilde=None):
     """Lagrer pris. Oppdaterer siste rad hvis bruker korrigerer innen intervallet, ellers insert.
     NULL-verdier bevares fra forrige pris slik at en delvis oppdatering ikke sletter eksisterende priser."""
     with _pris_lock:
@@ -368,8 +372,8 @@ def lagre_pris(stasjon_id, bensin, diesel, bensin98=None, bruker_id=None, diesel
                         )
                         return True
             conn.execute(
-                'INSERT INTO priser (stasjon_id, bensin, diesel, bensin98, bruker_id, diesel_avgiftsfri) VALUES (?, ?, ?, ?, ?, ?)',
-                (stasjon_id, bensin, diesel, bensin98, bruker_id, diesel_avgiftsfri)
+                'INSERT INTO priser (stasjon_id, bensin, diesel, bensin98, bruker_id, diesel_avgiftsfri, kilde) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                (stasjon_id, bensin, diesel, bensin98, bruker_id, diesel_avgiftsfri, kilde)
             )
     return True
 

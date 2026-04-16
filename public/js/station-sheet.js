@@ -114,6 +114,12 @@ export function initSheet(onOppdatert) {
     dieselInput.addEventListener('input', autoKomma);
     dieselAvgiftsfriInput.addEventListener('input', autoKomma);
 
+    const markDirty = () => { _inputsDirty = true; };
+    bensinInput.addEventListener('input', markDirty);
+    bensin98Input.addEventListener('input', markDirty);
+    dieselInput.addEventListener('input', markDirty);
+    dieselAvgiftsfriInput.addEventListener('input', markDirty);
+
     const selectAll = (e) => e.target.select();
     bensinInput.addEventListener('focus', selectAll);
     bensin98Input.addEventListener('focus', selectAll);
@@ -186,6 +192,9 @@ export function refreshSheetInnstillinger() {
 }
 
 export function lukkSheet() {
+    if (sheet.classList.contains('edit-modus') && _inputsDirty) {
+        if (!confirm('Prisen er ikke lagret. Vil du lukke uten å lagre?')) return;
+    }
     sheet.classList.remove('open');
     sheet.classList.remove('edit-modus');
     sheet.style.bottom = '';
@@ -256,6 +265,7 @@ function fyllVisning(s) {
 }
 
 function visVisModus() {
+    _inputsDirty = false;
     sheet.classList.remove('edit-modus');
     sheet.style.bottom = '';
     viewEl.removeAttribute('hidden');
@@ -280,6 +290,7 @@ function visEditModus() {
 
     visPrisStatus('', null);
     editLagreBtn.disabled = false;
+    _inputsDirty = false;
     sheet.classList.add('edit-modus');
     viewEl.setAttribute('hidden', '');
     editEl.removeAttribute('hidden');
@@ -296,6 +307,7 @@ function erTouchMobil() {
 }
 
 const _bekreftedeTyper = new Set();
+let _inputsDirty = false;
 
 async function håndterBekreftKlikk(e) {
     const knapp = e.target.closest('.btn-bekreft-rad');

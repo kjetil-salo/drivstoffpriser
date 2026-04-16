@@ -157,6 +157,10 @@ function lagKort(s) {
     li.querySelectorAll('.b-rad-rediger').forEach(btn => {
         btn.addEventListener('click', () => åpneEdit(li, s, btn.dataset.type));
     });
+    li.querySelectorAll('.b-rad-pris').forEach(el => {
+        const type = el.closest('.b-rad').dataset.type;
+        el.addEventListener('click', () => åpneInlineEdit(li, s, type, el));
+    });
     li.querySelectorAll('.b-rad-bekreft').forEach(btn => {
         btn.addEventListener('click', () => bekreftType(li, s, btn.dataset.type));
     });
@@ -166,11 +170,11 @@ function lagKort(s) {
 
 function lagRader(s) {
     return [
-        { type: 'bensin',            label: '95 oktan', v: s.bensin,            ts: s.bensin_tidspunkt },
-        { type: 'bensin98',          label: '98 oktan', v: s.bensin98,          ts: s.bensin98_tidspunkt },
-        { type: 'diesel',            label: 'Diesel',   v: s.diesel,            ts: s.diesel_tidspunkt },
-        { type: 'diesel_avgiftsfri', label: 'Avg.fri',  v: s.diesel_avgiftsfri, ts: s.diesel_avgiftsfri_tidspunkt },
-    ].map(({ type, label, v, ts }) => {
+        s.har_bensin !== false            ? { type: 'bensin',            label: '95 oktan', v: s.bensin,            ts: s.bensin_tidspunkt }            : null,
+        s.har_bensin98 !== false          ? { type: 'bensin98',          label: '98 oktan', v: s.bensin98,          ts: s.bensin98_tidspunkt }          : null,
+        s.har_diesel !== false            ? { type: 'diesel',            label: 'Diesel',   v: s.diesel,            ts: s.diesel_tidspunkt }            : null,
+        s.har_diesel_avgiftsfri !== false ? { type: 'diesel_avgiftsfri', label: 'Avg.fri',  v: s.diesel_avgiftsfri, ts: s.diesel_avgiftsfri_tidspunkt } : null,
+    ].filter(Boolean).map(({ type, label, v, ts }) => {
         const alder = ts ? (Date.now() - new Date(ts + 'Z')) / 3600000 : Infinity;
         const dot = alder < 6 ? 'b-dot-fersk' : alder < 24 ? 'b-dot-ok' : 'b-dot-gammel';
         const pris = v != null ? v.toFixed(2) : '–';
@@ -187,7 +191,43 @@ function lagRader(s) {
     }).join('');
 }
 
-// ── Inline edit ───────────────────────────────────
+// ── Inline edit (pris-span → input på plass) ──────
+function åpneInlineEdit(kortEl, stasjon, type, prisSpan) {
+    if (redigerer) lukkEdit(false);
+
+    const gjeldende = stasjon[type];
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.inputMode = 'numeric';
+    input.className = 'b-inline-input';
+    input.value = gjeldende != null ? formaterØre(String(Math.round(gjeldende * 100))) : '';
+    input.placeholder = '0,00';
+    input.setAttribute('aria-label', 'Ny pris');
+
+    prisSpan.replaceWith(input);
+    redigerer = { kortEl, stasjon, type, input, prisSpan, inline: true };
+
+    document.querySelectorAll('.b-rad-bekreft').forEach(b => { b.disabled = true; b.style.opacity = '0.3'; });
+
+    input.focus();
+    setTimeout(() => input.select(), 30);
+
+    input.addEventListener('input', () => {
+        const digits = input.value.replace(/\D/g, '').replace(/^0+/, '');
+        input.value = formaterØre(digits);
+        input.setSelectionRange(input.value.length, input.value.length);
+    });
+    input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); lagrePris(); }
+        if (e.key === 'Escape') lukkEdit(false);
+    });
+    // Lagre ved blur (kort forsinkelse lar click-events rekke å kjøre først)
+    input.addEventListener('blur', () => {
+        setTimeout(() => { if (redigerer?.input === input) lagrePris(); }, 150);
+    });
+}
+
+// ── Drawer edit (✎-knapp) ─────────────────────────
 function åpneEdit(kortEl, stasjon, type) {
     if (redigerer) lukkEdit(false);
 
@@ -206,28 +246,24 @@ function åpneEdit(kortEl, stasjon, type) {
       <button class="b-edit-avbryt" aria-label="Avbryt">✕</button>
     `;
 
-    const input    = editEl.querySelector('.b-edit-input');
-    const lagreBtn = editEl.querySelector('.b-edit-lagre');
+    const input     = editEl.querySelector('.b-edit-input');
+    const lagreBtn  = editEl.querySelector('.b-edit-lagre');
     const avbrytBtn = editEl.querySelector('.b-edit-avbryt');
 
     rad.after(editEl);
     rad.classList.add('b-rad-aktiv');
-    redigerer = { kortEl, stasjon, type, editEl };
+    redigerer = { kortEl, stasjon, type, input, editEl, inline: false };
 
-    // Disable alle bekreft-knapper mens edit er åpen
     document.querySelectorAll('.b-rad-bekreft').forEach(b => { b.disabled = true; b.style.opacity = '0.3'; });
 
-    // focus() må kalles synkront i user-gesture-handlern for at iOS-tastaturet skal åpne seg
     input.focus();
     setTimeout(() => input.select(), 50);
 
-    // Auto-komma: kun siffer tillatt, formateres fortløpende som KR,ØR
     input.addEventListener('input', () => {
         const digits = input.value.replace(/\D/g, '').replace(/^0+/, '');
         input.value = formaterØre(digits);
         input.setSelectionRange(input.value.length, input.value.length);
     });
-
     input.addEventListener('keydown', e => {
         if (e.key === 'Enter') { e.preventDefault(); lagrePris(); }
         if (e.key === 'Escape') lukkEdit(false);
@@ -238,36 +274,40 @@ function åpneEdit(kortEl, stasjon, type) {
 
 function lukkEdit(suksess = false) {
     if (!redigerer) return;
-    const { kortEl, type, editEl } = redigerer;
-    editEl.remove();
-    const rad = kortEl.querySelector(`.b-rad[data-type="${type}"]`);
-    if (rad) {
-        rad.classList.remove('b-rad-aktiv');
-        if (suksess) rad.classList.add('b-rad-suksess');
-    }
+    const { kortEl, type, editEl, input, prisSpan, inline } = redigerer;
     redigerer = null;
-
-    // Re-enable alle bekreft-knapper
     document.querySelectorAll('.b-rad-bekreft').forEach(b => { b.disabled = false; b.style.opacity = ''; });
+
+    if (inline) {
+        input.replaceWith(prisSpan);
+        const rad = kortEl.querySelector(`.b-rad[data-type="${type}"]`);
+        if (rad && suksess) rad.classList.add('b-rad-suksess');
+    } else {
+        editEl.remove();
+        const rad = kortEl.querySelector(`.b-rad[data-type="${type}"]`);
+        if (rad) {
+            rad.classList.remove('b-rad-aktiv');
+            if (suksess) rad.classList.add('b-rad-suksess');
+        }
+    }
 }
 
 async function lagrePris() {
     if (!redigerer) return;
-    const { kortEl, stasjon, type, editEl } = redigerer;
-    const input    = editEl.querySelector('.b-edit-input');
-    const lagreBtn = editEl.querySelector('.b-edit-lagre');
+    const { kortEl, stasjon, type, input, editEl, prisSpan, inline } = redigerer;
+    const lagreBtnEl = inline ? null : editEl.querySelector('.b-edit-lagre');
 
     const verdi = input.value.trim().replace(',', '.');
     const pris  = parseFloat(verdi);
     if (isNaN(pris) || pris < 12 || pris > 37) {
         input.classList.add('b-input-feil');
         setTimeout(() => input.classList.remove('b-input-feil'), 600);
-        input.focus();
+        if (inline) lukkEdit(false);
+        else input.focus();
         return;
     }
 
-    lagreBtn.disabled = true;
-    lagreBtn.textContent = '…';
+    if (lagreBtnEl) { lagreBtnEl.disabled = true; lagreBtnEl.textContent = '…'; }
 
     try {
         const resp = await fetch('/api/pris', {
@@ -279,35 +319,36 @@ async function lagrePris() {
                 bensin98:          type === 'bensin98'          ? pris : stasjon.bensin98,
                 diesel:            type === 'diesel'            ? pris : stasjon.diesel,
                 diesel_avgiftsfri: type === 'diesel_avgiftsfri' ? pris : stasjon.diesel_avgiftsfri,
+                kilde:             'bidrag',
             }),
         });
         if (resp.status === 401) { window.location.href = '/auth/logg-inn?neste=/bidrag'; return; }
         if (!resp.ok) throw new Error();
 
-        // Oppdater lokal kopi
         const naa = new Date().toISOString().replace('T', ' ').slice(0, 19);
         stasjon[type] = pris;
         stasjon[`${type}_tidspunkt`] = naa;
 
-        // Oppdater rad-tekst og avslutt edit med suksess-animasjon
-        const rad = kortEl.querySelector(`.b-rad[data-type="${type}"]`);
-        if (rad) {
-            rad.querySelector('.b-rad-pris').textContent = pris.toFixed(2);
-            rad.querySelector('.b-dot').className = 'b-dot b-dot-fersk';
+        if (inline) {
+            prisSpan.textContent = pris.toFixed(2);
+            const rad = kortEl.querySelector(`.b-rad[data-type="${type}"]`);
+            if (rad) rad.querySelector('.b-dot').className = 'b-dot b-dot-fersk';
+        } else {
+            const rad = kortEl.querySelector(`.b-rad[data-type="${type}"]`);
+            if (rad) {
+                rad.querySelector('.b-rad-pris').textContent = pris.toFixed(2);
+                rad.querySelector('.b-dot').className = 'b-dot b-dot-fersk';
+            }
         }
         lukkEdit(true);
 
         dagTeller++;
         sessionStorage.setItem('bidrag_dag', dagTeller);
-
-        // Hent fersk data og re-render etter at suksess-animasjonen er ferdig
         setTimeout(hentOgVis, 1500);
-        // Oppdater rang i bakgrunnen
         oppdaterRang();
 
     } catch {
-        lagreBtn.disabled = false;
-        lagreBtn.textContent = '✓';
+        if (lagreBtnEl) { lagreBtnEl.disabled = false; lagreBtnEl.textContent = '✓'; }
         input.classList.add('b-input-feil');
         setTimeout(() => input.classList.remove('b-input-feil'), 600);
     }
@@ -330,6 +371,7 @@ async function bekreftType(kortEl, stasjon, type) {
                 bensin98:          stasjon.bensin98,
                 diesel:            stasjon.diesel,
                 diesel_avgiftsfri: stasjon.diesel_avgiftsfri,
+                kilde:             'bidrag',
             }),
         });
         if (resp.status === 401) { window.location.href = '/auth/logg-inn?neste=/bidrag'; return; }

@@ -2416,3 +2416,56 @@ def admin_toppliste():
   <table>{rader_html}</table>
 </div>
 </div></body></html>'''
+
+
+@admin_bp.route('/admin/kilde-statistikk')
+@krever_admin
+def kilde_statistikk():
+    from db import get_conn
+    with get_conn() as conn:
+        rader = conn.execute('''
+            SELECT COALESCE(kilde, 'kart') AS kilde,
+                   COUNT(*) AS antall,
+                   COUNT(DISTINCT bruker_id) AS unike_brukere,
+                   MAX(tidspunkt) AS siste
+            FROM priser
+            GROUP BY kilde
+            ORDER BY antall DESC
+        ''').fetchall()
+    rader_html = ''.join(
+        f'<tr>'
+        f'<td><strong>{r["kilde"]}</strong></td>'
+        f'<td style="text-align:right">{r["antall"]}</td>'
+        f'<td style="text-align:right">{r["unike_brukere"]}</td>'
+        f'<td style="text-align:right;color:#94a3b8;font-size:0.85rem">{r["siste"] or "–"}</td>'
+        f'</tr>'
+        for r in rader
+    ) or '<tr><td colspan="4" style="color:#94a3b8">Ingen data</td></tr>'
+    return f'''<!DOCTYPE html><html lang="no"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Kilde-statistikk – Admin</title>
+<style>
+  *{{box-sizing:border-box;margin:0;padding:0}}
+  body{{font-family:system-ui,sans-serif;background:#0f172a;color:#e5e7eb;padding:2rem 1rem}}
+  .container{{max-width:560px;margin:0 auto}}
+  h1{{font-size:1.3rem;margin-bottom:0.5rem;color:#f1f5f9}}
+  p.info{{font-size:0.85rem;color:#94a3b8;margin-bottom:1.5rem}}
+  nav{{margin-bottom:1.5rem;font-size:0.85rem}}
+  nav a{{color:#94a3b8}}
+  .kort{{background:#111827;border:1px solid #1f2937;border-radius:10px;padding:1.5rem}}
+  table{{width:100%;border-collapse:collapse;font-size:0.9rem}}
+  th{{text-align:left;padding:6px 8px;color:#94a3b8;font-weight:500;border-bottom:1px solid #1f2937}}
+  th:not(:first-child){{text-align:right}}
+  td{{padding:10px 8px;border-bottom:1px solid #1f2937;vertical-align:middle}}
+  tr:last-child td{{border-bottom:none}}
+</style></head><body><div class="container">
+<nav><a href="/admin">← Admin</a></nav>
+<h1>Kilde-statistikk</h1>
+<p class="info">Alle prisregistreringer fordelt på kilde. Historisk data (før kilde-tracking) vises som «kart».</p>
+<div class="kort">
+  <table>
+    <thead><tr><th>Kilde</th><th>Registreringer</th><th>Unike brukere</th><th>Siste</th></tr></thead>
+    <tbody>{rader_html}</tbody>
+  </table>
+</div>
+</div></body></html>'''

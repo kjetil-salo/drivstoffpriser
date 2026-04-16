@@ -167,6 +167,26 @@ if (!window.__innlogget && !localStorage.getItem('velkommen_vist')) {
         localStorage.setItem('velkommen_vist', '1');
         const backdrop = document.getElementById('velkommen-backdrop');
         const dialog = document.getElementById('velkommen-dialog');
+
+        // Plattformspesifikk hjemskjerm-tip
+        const erStandalone = window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone;
+        const erIos = /iPad|iPhone|iPod/.test(navigator.userAgent);
+        const erAndroid = /Android/.test(navigator.userAgent);
+        let hjemskjermTips = null;
+        if (!erStandalone) {
+            if (erIos) {
+                hjemskjermTips = 'Tips: Legg til på hjemskjermen — trykk på del-ikonet \u{1F4E4} i Safari, velg "Legg til på hjemskjerm" og trykk "Legg til".';
+            } else if (erAndroid) {
+                hjemskjermTips = 'Tips: Legg til på startskjermen — trykk på meny-ikonet \u22EE øverst i Chrome og velg "Legg til på startskjerm".';
+            } else {
+                hjemskjermTips = 'Tips: Del siden til hjemskjermen på mobilen for å bruke den som en app — raskere tilgang og fullskjermmodus.';
+            }
+        }
+        document.getElementById('velkommen-tekst').textContent = [
+            'Du kan se alle priser uten å logge inn.',
+            hjemskjermTips,
+            'Vil du hjelpe til? Opprett en gratis bruker og oppdater priser på stasjoner nær deg — det tar bare noen sekunder.',
+        ].filter(Boolean).join('\n\n');
         const tidligereFokus = document.activeElement;
         backdrop.removeAttribute('hidden');
         dialog.removeAttribute('hidden');
