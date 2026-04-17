@@ -13,3 +13,4 @@ app.log
 drivstoff.db.backup-*
 drivstoffpriser-image-*.tar
 stasjonskart.png
+test_ocr_crop.py
