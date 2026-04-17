@@ -21,8 +21,9 @@ import re
 
 try:
     from PIL import Image, ImageEnhance, ImageFilter
+    import numpy as np
 except ImportError:  # pragma: no cover - produksjon har Pillow, fallback bruker originalbildet
-    Image = ImageEnhance = ImageFilter = None
+    Image = ImageEnhance = ImageFilter = np = None
 
 from db import (get_stasjoner_med_priser, lagre_pris, bekreft_pris, logg_visning,
                 antall_stasjoner_med_pris, finn_bruker_id, DB_PATH,
@@ -1125,44 +1126,36 @@ _OCR_DRIVSTOFF_LABELS = {
 }
 
 
-def _bbox_fra_maske(img, treff_fn):
-    """Finn enkel bbox for relevante fargepiksler i et nedskalert RGB-bilde."""
-    w, h = img.size
-    pix = img.load()
-    min_x, min_y, max_x, max_y, antall = w, h, -1, -1, 0
-    steg = 2 if max(w, h) > 1200 else 1
-    for y in range(0, h, steg):
-        for x in range(0, w, steg):
-            if treff_fn(pix[x, y]):
-                antall += 1
-                if x < min_x:
-                    min_x = x
-                if y < min_y:
-                    min_y = y
-                if x > max_x:
-                    max_x = x
-                if y > max_y:
-                    max_y = y
+def _bbox_fra_maske(maske):
+    """Finn enkel bbox for satte piksler i en numpy boolean-maske (h×w)."""
+    antall = int(maske.sum())
     if antall < _OCR_CROP_MIN_PIXLER:
         return None
+    rader = np.where(maske.any(axis=1))[0]
+    kolonner = np.where(maske.any(axis=0))[0]
+    min_y, max_y = int(rader[0]), int(rader[-1])
+    min_x, max_x = int(kolonner[0]), int(kolonner[-1])
     return (min_x, min_y, max_x + 1, max_y + 1, antall)
 
 
-def _led_klynge_bbox_fra_maske(img, treff_fn):
+def _led_klynge_bbox_fra_maske(maske):
     """Finn en strammere bbox rundt LED-lignende røde klynger.
 
     Store røde logoflater kan ellers dra vanlig bbox altfor bredt. Her deles
     masken i komponenter, og vi prioriterer små/medium komponenter som ligner
     segmenterte tall.
     """
-    w, h = img.size
-    pix = img.load()
+    h, w = maske.shape
     steg = 2 if max(w, h) > 1200 else 1
-    punkter = set()
-    for y in range(0, h, steg):
-        for x in range(0, w, steg):
-            if treff_fn(pix[x, y]):
-                punkter.add((x, y))
+    maske_sub = maske[::steg, ::steg]
+    ys_sub, xs_sub = np.where(maske_sub)
+    if len(xs_sub) < _OCR_CROP_MIN_PIXLER:
+        return None
+    if len(xs_sub) > 30_000:
+        # For mange røde piksler – sannsynligvis neonramme/logo, ikke LED-display.
+        # BFS på et så stort sett er tregt; faller tilbake til enkel bbox.
+        return None
+    punkter = set(zip((xs_sub * steg).tolist(), (ys_sub * steg).tolist()))
 
     komponenter = []
     naboer = (
@@ -1233,7 +1226,10 @@ def _led_klynge_bbox_fra_maske(img, treff_fn):
     def score(gruppe):
         x1, y1, x2, y2, total, n = gruppe
         areal = max(1, (x2 - x1) * (y2 - y1))
-        return total * min(n, 10) / math.sqrt(areal)
+        # Prisskilt sitter nesten alltid under logoen – boost grupper lavere i bildet.
+        cy = (y1 + y2) / 2
+        y_faktor = 1.0 + 0.4 * (cy / max(1, h))
+        return total * min(n, 10) / math.sqrt(areal) * y_faktor
 
     beste = max(grupper, key=score)
     if beste[5] < 2 or beste[4] < _OCR_CROP_MIN_PIXLER:
@@ -1283,17 +1279,23 @@ def _forbered_haiku_bilde(bilde_data, content_type):
         img.thumbnail((_OCR_CROP_MAX_SIDE, _OCR_CROP_MAX_SIDE), Image.Resampling.LANCZOS)
         w, h = img.size
 
-        def er_rod_led(rgb):
-            r, g, b = rgb
-            return r >= 115 and g <= 95 and b <= 95 and r >= g * 1.25 and r >= b * 1.25
+        img_np = np.array(img, dtype=np.float32)
+        r_ch = img_np[:, :, 0]
+        g_ch = img_np[:, :, 1]
+        b_ch = img_np[:, :, 2]
 
-        def er_gult_skilt(rgb):
-            r, g, b = rgb
-            return r >= 135 and g >= 95 and b <= 95 and abs(r - g) <= 95 and r >= b * 1.7 and g >= b * 1.4
+        rod_maske = (
+            (r_ch >= 115) & (g_ch <= 95) & (b_ch <= 95) &
+            (r_ch >= g_ch * 1.25) & (r_ch >= b_ch * 1.25)
+        )
+        gul_maske = (
+            (r_ch >= 135) & (g_ch >= 95) & (b_ch <= 95) &
+            (np.abs(r_ch - g_ch) <= 95) & (r_ch >= b_ch * 1.7) & (g_ch >= b_ch * 1.4)
+        )
 
-        rod_box = _bbox_fra_maske(img, er_rod_led)
-        led_box = _led_klynge_bbox_fra_maske(img, er_rod_led)
-        gul_box = _bbox_fra_maske(img, er_gult_skilt)
+        rod_box = _bbox_fra_maske(rod_maske)
+        led_box = _led_klynge_bbox_fra_maske(rod_maske)
+        gul_box = _bbox_fra_maske(gul_maske)
 
         valgt_box = None
         strategi = 'resized_original'
