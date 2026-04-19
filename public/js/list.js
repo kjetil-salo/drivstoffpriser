@@ -162,8 +162,7 @@ function prisAlderTekst(tidspunkt) {
     if (min < 60) return `${min} min siden`;
     if (timer < 3) { const restMin = min - timer * 60; return `${timer} t${restMin > 0 ? ` ${restMin} min` : ''} siden`; }
     if (timer < 24) return `${timer} t siden`;
-    if (dager < 7) return `${dager} d siden`;
-    return d.toLocaleDateString('no', { day: 'numeric', month: 'short' });
+    return 'over 24 t';
 }
 
 function prisAlderKlasse(tidspunkt) {
@@ -174,12 +173,6 @@ function prisAlderKlasse(tidspunkt) {
     return 'alder-utdatert';
 }
 
-function prisAlderBanner(tidspunkt) {
-    if (!tidspunkt) return null;
-    const dager = Math.floor((Date.now() - new Date(tidspunkt.replace(' ', 'T') + 'Z').getTime()) / 86400000);
-    if (dager < 2) return null;
-    return `⚠ Prisen er ${dager} dager gammel`;
-}
 
 function kortHtml(s, billigste = {}, erHovedBilligst = false) {
     const inn = getInnstillinger();
@@ -202,18 +195,10 @@ function kortHtml(s, billigste = {}, erHovedBilligst = false) {
     const nyesteTidspunkt = synligeTidspunkt.length
         ? synligeTidspunkt.reduce((a, b) => a > b ? a : b)
         : null;
-    // Eldste oppdatering blant synlige priser → for ⚠-banner
-    const eldsteTidspunkt = synligeTidspunkt.length
-        ? synligeTidspunkt.reduce((a, b) => a < b ? a : b)
-        : null;
     const alderTekst = prisAlderTekst(nyesteTidspunkt);
     const alderKlasse = prisAlderKlasse(nyesteTidspunkt);
-    const alderBanner = prisAlderBanner(eldsteTidspunkt);
-    const erKritisk = alderBanner !== null;
-    const kortKlasse = erKritisk ? ' gammel-kort' : (erHovedBilligst ? ' billigst-kort' : '');
-    const bannerHtml = erKritisk
-        ? `<div class="sk-gammel-banner">${alderBanner}</div>`
-        : (erHovedBilligst ? '<div class="sk-billigst-banner">★ billigste stasjon</div>' : '');
+    const kortKlasse = erHovedBilligst ? ' billigst-kort' : '';
+    const bannerHtml = erHovedBilligst ? '<div class="sk-billigst-banner">★ billigste stasjon</div>' : '';
     return `<div class="stasjon-kort${kortKlasse}" role="listitem" tabindex="0" aria-label="${s.navn}${s.kjede ? ', ' + s.kjede : ''}" data-id="${s.id}">
         ${bannerHtml}
         ${badgeHtml}

@@ -634,6 +634,8 @@ function formaterTid(tidStr) {
         if (min < 60) return `for ${min} min siden`;
         if (timer < 3) { const restMin = min - timer * 60; return `for ${timer} time${timer === 1 ? '' : 'r'}${restMin > 0 ? ` og ${restMin} min` : ''} siden`; }
         if (timer < 24) return `for ${timer} time${timer === 1 ? '' : 'r'} siden`;
+        const erPrivileged = window.__erAdmin || (window.__roller || []).includes('moderator');
+        if (!erPrivileged) return 'over 24 t siden';
         if (dager < 7) return `for ${dager} dag${dager === 1 ? '' : 'er'} siden`;
         return d.toLocaleDateString('no', { day: 'numeric', month: 'short', year: 'numeric' });
     } catch {

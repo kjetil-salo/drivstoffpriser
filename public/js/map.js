@@ -355,11 +355,11 @@ function kompaktIkon(s, erBilligst) {
         .reduce((a, b) => a > b ? a : b, null);
     const alder = prisAlderTimer(tidspunkt);
     let alderHtml = '';
-    if (alder !== null && alder >= 8) {
+    if (alder !== null && alder >= 1) {
         let alderTekst, alderKlass;
-        if (alder >= 48) { alderTekst = Math.round(alder / 24) + 'd'; alderKlass = 'red'; }
-        else if (alder >= 24) { alderTekst = Math.round(alder) + 't'; alderKlass = 'red'; }
-        else { alderTekst = Math.round(alder) + 't'; alderKlass = 'orange'; }
+        if (alder >= 24) { alderTekst = 'over 24t'; alderKlass = 'red'; }
+        else if (alder >= 8) { alderTekst = Math.round(alder) + 't'; alderKlass = 'orange'; }
+        else { alderTekst = Math.round(alder) + 't'; alderKlass = 'green'; }
         alderHtml = `<span class="km-alder km-alder--${alderKlass}">${alderTekst}</span>`;
     }
 

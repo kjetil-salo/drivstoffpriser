@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v79';
+const CACHE_VERSION = 'v80';
 const STATIC_CACHE = `drivstoff-static-${CACHE_VERSION}`;
 const DATA_CACHE = `drivstoff-data-${CACHE_VERSION}`;
 

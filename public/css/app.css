@@ -435,6 +435,7 @@ html, body {
   line-height: 1.2;
   letter-spacing: 0.01em;
 }
+.km-alder--green  { color: #86efac; }
 .km-alder--orange { color: #fdba74; }
 .km-alder--red    { color: #fca5a5; }
 
@@ -618,27 +619,7 @@ html, body {
   border-radius: var(--radius-md) var(--radius-md) 0 0;
 }
 
-.stasjon-kort.gammel-kort {
-  position: relative;
-  border: 2px solid #d97706;
-  background: rgba(217, 119, 6, 0.07);
-  padding-top: 28px;
-  box-shadow: 0 0 0 1px rgba(217,119,6,0.2), 0 4px 16px rgba(217,119,6,0.1);
-}
 
-.sk-gammel-banner {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  background: #b45309;
-  color: #fff;
-  font-size: 0.68rem;
-  font-weight: 700;
-  text-align: center;
-  padding: 3px 8px;
-  border-radius: var(--radius-md) var(--radius-md) 0 0;
-}
 
 .sk-pris-rad.sort-aktiv {
   border-color: var(--color-accent);
@@ -794,7 +775,7 @@ html, body {
 }
 .alder-fersk { color: #22c55e; }
 .alder-gammel { color: #f59e0b; }
-.alder-utdatert { color: #ef4444; }
+.alder-utdatert { color: var(--color-muted); }
 .alder-ingen { color: var(--color-muted); }
 
 .pris-alder-dot {
@@ -807,7 +788,7 @@ html, body {
 }
 .pris-alder-dot.alder-fersk { color: #22c55e; }
 .pris-alder-dot.alder-gammel { color: #f59e0b; }
-.pris-alder-dot.alder-utdatert { color: #ef4444; }
+.pris-alder-dot.alder-utdatert { color: var(--color-muted); }
 .pris-alder-dot.alder-ingen { display: none; }
 
 .sk-endre-btn {

@@ -3,7 +3,7 @@ export const KJEDE_NAVN = ['Best', 'Bunker Oil', 'Circle K', 'Din-X', 'Driv', 'E
 const KJEDE_DOMENER = [
     { match: ['circle k', 'circlek'],          logo: 'circlek',              farge: '#f97316' },
     { match: ['din-x', 'dinx', 'din x'],       logo: 'din-x',                farge: '#d45d00' },
-    { match: ['uno-x', 'unox', 'uno x'],       logo: 'uno-x',                farge: '#16a34a' },
+    { match: ['uno-x', 'unox', 'uno x'],       logo: 'uno-x',                farge: '#e8181b' },
     { match: ['yx'],                            logo: 'yx',                   farge: '#dc2626' },
     { match: ['esso'],                          logo: 'esso',                 farge: '#2563eb' },
     { match: ['shell'],                         logo: 'shell',                farge: '#ca8a04' },
