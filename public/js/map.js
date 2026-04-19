@@ -268,10 +268,10 @@ function prisFarge(s) {
         .filter(Boolean)
         .reduce((a, b) => a > b ? a : b, null);
     const alder = prisAlderTimer(tidspunkt);
-    if (alder === null || alder >= 168) return 'grey';  // > 7 dager
-    if (alder >= 48) return 'violet';                    // 2–7 dager
-    if (alder >= 8) return 'orange';                     // 8–48 timer
-    return 'green';                                      // < 8 timer
+    if (alder === null) return 'red';
+    if (alder >= 24) return 'red';    // > 24 timer
+    if (alder >= 8) return 'orange';  // 8–24 timer
+    return 'green';                   // < 8 timer
 }
 
 function prisIkon(s) {
@@ -290,9 +290,8 @@ function oppdaterMarkerTooltip(marker, s, erBilligst) {
     if (el) {
         el.classList.toggle('billigst-tooltip', erBilligst);
         const farge = prisFarge(s);
-        ['green', 'orange', 'violet', 'grey'].forEach(f =>
+        ['green', 'orange', 'red'].forEach(f =>
             el.classList.toggle(`tooltip-${f}`, !erBilligst && farge === f));
-        el.classList.toggle('tooltip-gammel', farge === 'grey' && harRelevantPris(s));
     }
 }
 
@@ -311,7 +310,7 @@ function lagMarker(s, erBilligst = false) {
         marker.bindTooltip(byggTooltip(s, erBilligst), {
             permanent: true,
             direction: 'top',
-            className: erBilligst ? 'station-tooltip billigst-tooltip' : `station-tooltip tooltip-${prisFarge(s)}${prisFarge(s) === 'grey' && harRelevantPris(s) ? ' tooltip-gammel' : ''}`,
+            className: erBilligst ? 'station-tooltip billigst-tooltip' : `station-tooltip tooltip-${prisFarge(s)}`,
             offset: [0, -38],
         });
     }
@@ -341,8 +340,7 @@ function kompaktIkon(s, erBilligst) {
     const farge = prisFarge(s);
     const borderFarge = farge === 'green'  ? '#22c55e'
         : farge === 'orange' ? '#f97316'
-        : farge === 'violet' ? '#a78bfa'
-        : '#9ca3af';
+        : '#ef4444';
 
     const kjedeEllerNavn = s.kjede || s.navn;
     const logoUrl = getKjedeLogo(kjedeEllerNavn);
@@ -359,8 +357,8 @@ function kompaktIkon(s, erBilligst) {
     let alderHtml = '';
     if (alder !== null && alder >= 8) {
         let alderTekst, alderKlass;
-        if (alder >= 168) { alderTekst = '>7d'; alderKlass = 'grey'; }
-        else if (alder >= 48) { alderTekst = Math.round(alder / 24) + 'd'; alderKlass = 'violet'; }
+        if (alder >= 48) { alderTekst = Math.round(alder / 24) + 'd'; alderKlass = 'red'; }
+        else if (alder >= 24) { alderTekst = Math.round(alder) + 't'; alderKlass = 'red'; }
         else { alderTekst = Math.round(alder) + 't'; alderKlass = 'orange'; }
         alderHtml = `<span class="km-alder km-alder--${alderKlass}">${alderTekst}</span>`;
     }

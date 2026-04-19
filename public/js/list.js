@@ -171,8 +171,7 @@ function prisAlderKlasse(tidspunkt) {
     const timer = (Date.now() - new Date(tidspunkt.replace(' ', 'T') + 'Z').getTime()) / 3600000;
     if (timer < 8) return 'alder-fersk';
     if (timer < 24) return 'alder-gammel';
-    if (timer < 48) return 'alder-utdatert';
-    return 'alder-kritisk';
+    return 'alder-utdatert';
 }
 
 function prisAlderBanner(tidspunkt) {

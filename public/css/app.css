@@ -348,16 +348,9 @@ html, body {
   border: 2px solid #f59e0b !important;
   box-shadow: 0 0 0 1px rgba(245,158,11,0.2), var(--shadow-md) !important;
 }
-.tooltip-violet {
-  border: 2px solid #a78bfa !important;
-  box-shadow: 0 0 0 1px rgba(167,139,250,0.2), var(--shadow-md) !important;
-}
-.tooltip-grey {
-  border: 2px solid #9ca3af !important;
-  box-shadow: 0 0 0 1px rgba(156,163,175,0.2), var(--shadow-md) !important;
-}
-.tooltip-gammel .tt-priser {
-  font-style: italic;
+.tooltip-red {
+  border: 2px solid #ef4444 !important;
+  box-shadow: 0 0 0 1px rgba(239,68,68,0.2), var(--shadow-md) !important;
 }
 /* Kompakt kart-markør */
 .km-root {
@@ -443,8 +436,7 @@ html, body {
   letter-spacing: 0.01em;
 }
 .km-alder--orange { color: #fdba74; }
-.km-alder--violet { color: #c4b5fd; }
-.km-alder--grey   { color: #9ca3af; }
+.km-alder--red    { color: #fca5a5; }
 
 .billigst-tooltip {
   background: #15803d !important;
@@ -803,7 +795,6 @@ html, body {
 .alder-fersk { color: #22c55e; }
 .alder-gammel { color: #f59e0b; }
 .alder-utdatert { color: #ef4444; }
-.alder-kritisk { color: #f59e0b; }
 .alder-ingen { color: var(--color-muted); }
 
 .pris-alder-dot {
@@ -817,7 +808,6 @@ html, body {
 .pris-alder-dot.alder-fersk { color: #22c55e; }
 .pris-alder-dot.alder-gammel { color: #f59e0b; }
 .pris-alder-dot.alder-utdatert { color: #ef4444; }
-.pris-alder-dot.alder-kritisk { color: #ef4444; }
 .pris-alder-dot.alder-ingen { display: none; }
 
 .sk-endre-btn {
