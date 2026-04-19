@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
 from db import (finn_bruker_id, hent_alle_brukere, slett_bruker, har_rolle, sett_roller_bruker,
-                opprett_invitasjon, hent_siste_prisoppdateringer,
+                opprett_invitasjon, hent_siste_prisoppdateringer, slett_pris,
                 stasjoner_med_pris_koordinater, get_statistikk,
                 antall_stasjoner_med_pris, antall_brukere,
                 hent_brukerstasjoner, slett_stasjon,
@@ -552,23 +552,26 @@ def prislogg():
         else:
             stasjon = stasjon_tekst
         rader.append(
-            f'<tr>'
+            f'<tr id="rad-{p["id"]}">'
             f'<td style="color:#94a3b8;font-size:0.78rem">{tidspunkt}</td>'
             f'<td>{stasjon}</td>'
             f'<td style="color:#93c5fd">{bruker}</td>'
             f'<td style="text-align:right">{fmt(p["bensin"])}</td>'
             f'<td style="text-align:right">{fmt(p["bensin98"])}</td>'
             f'<td style="text-align:right">{fmt(p["diesel"])}</td>'
+            f'<td style="text-align:center">'
+            f'<button class="slett-btn" data-id="{p["id"]}" aria-label="Slett rad">✕</button>'
+            f'</td>'
             f'</tr>'
         )
-    rader_html = ''.join(rader) or '<tr><td colspan="6" style="color:#94a3b8;text-align:center">Ingen prisoppdateringer</td></tr>'
+    rader_html = ''.join(rader) or '<tr><td colspan="7" style="color:#94a3b8;text-align:center">Ingen prisoppdateringer</td></tr>'
     return f'''<!DOCTYPE html><html lang="no"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Prislogg – Drivstoffpriser</title>
 <style>
   *{{box-sizing:border-box;margin:0;padding:0}}
   body{{font-family:system-ui,sans-serif;background:#0f172a;color:#e5e7eb;padding:2rem 1rem}}
-  .container{{max-width:900px;margin:0 auto}}
+  .container{{max-width:960px;margin:0 auto}}
   h1{{font-size:1.3rem;margin-bottom:2rem;color:#f1f5f9}}
   .kort{{background:#111827;border:1px solid #1f2937;border-radius:10px;padding:1.5rem;margin-bottom:1.5rem;overflow-x:auto}}
   table{{width:100%;border-collapse:collapse;font-size:0.85rem}}
@@ -576,16 +579,42 @@ def prislogg():
   th{{color:#94a3b8;font-weight:500}}
   nav{{margin-bottom:1.5rem;font-size:0.85rem}}
   nav a{{color:#94a3b8}}
+  .slett-btn{{background:none;border:none;color:#6b7280;cursor:pointer;font-size:0.9rem;padding:2px 6px;border-radius:4px}}
+  .slett-btn:hover{{color:#ef4444;background:rgba(239,68,68,0.1)}}
 </style></head><body><div class="container">
 <nav><a href="/admin">← Admin</a></nav>
 <h1>Prislogg (siste 200)</h1>
 <div class="kort">
   <table>
-    <tr><th>Tidspunkt</th><th>Stasjon</th><th>Bruker</th><th style="text-align:right">95</th><th style="text-align:right">98</th><th style="text-align:right">Diesel</th></tr>
+    <tr><th>Tidspunkt</th><th>Stasjon</th><th>Bruker</th><th style="text-align:right">95</th><th style="text-align:right">98</th><th style="text-align:right">Diesel</th><th></th></tr>
     {rader_html}
   </table>
 </div>
-</div></body></html>'''
+</div>
+<script>
+document.querySelectorAll('.slett-btn').forEach(btn => {{
+  btn.addEventListener('click', async () => {{
+    const id = btn.dataset.id;
+    if (!confirm('Slett denne prisoppdateringen?')) return;
+    const resp = await fetch(`/admin/prislogg/${{id}}`, {{ method: 'DELETE' }});
+    if (resp.ok) {{
+      document.getElementById(`rad-${{id}}`).remove();
+    }} else {{
+      alert('Sletting feilet');
+    }}
+  }});
+}});
+</script>
+</body></html>'''
+
+
+@admin_bp.route('/admin/prislogg/<int:pris_id>', methods=['DELETE'])
+@krever_innlogging
+@krever_moderator
+def slett_prislogg_rad(pris_id):
+    if slett_pris(pris_id):
+        return '', 204
+    return jsonify({'error': 'Ikke funnet'}), 404
 
 
 @admin_bp.route('/admin/toggle-registrering', methods=['POST'])

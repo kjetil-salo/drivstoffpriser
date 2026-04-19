@@ -878,9 +878,8 @@ def om():
 <div class="kort">
   <h2>Fargekoder p&#229; kartet</h2>
   <div class="farge-rad"><span class="farge-prikk" style="background:#22c55e"></span> Fersk pris (under 8 timer)</div>
-  <div class="farge-rad"><span class="farge-prikk" style="background:#f59e0b"></span> Pris 8&#8211;48 timer gammel</div>
-  <div class="farge-rad"><span class="farge-prikk" style="background:#8b5cf6"></span> Pris 2&#8211;7 dager gammel</div>
-  <div class="farge-rad"><span class="farge-prikk" style="background:#6b7280"></span> Eldre pris eller ingen pris</div>
+  <div class="farge-rad"><span class="farge-prikk" style="background:#fb923c"></span> Pris 8&#8211;24 timer gammel</div>
+  <div class="farge-rad"><span class="farge-prikk" style="background:#ef4444"></span> Pris over 24 timer gammel eller ingen pris</div>
 </div>
 
 <div class="kort">

@@ -70,6 +70,32 @@ function haversine(a, b) {
 
 startGPS();
 
+// ── Wake Lock ─────────────────────────────────────
+let wakeLock = null;
+
+async function aktiverWakeLock() {
+    if (!('wakeLock' in navigator)) {
+        console.log('[WakeLock] Ikke støttet i denne nettleseren');
+        return;
+    }
+    try {
+        wakeLock = await navigator.wakeLock.request('screen');
+        wakeLock.addEventListener('release', () => {
+            console.log('[WakeLock] Frigitt');
+            wakeLock = null;
+        });
+        console.log('[WakeLock] Aktiv');
+    } catch (e) {
+        console.log('[WakeLock] Feil:', e.message);
+    }
+}
+
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && !wakeLock) aktiverWakeLock();
+});
+
+aktiverWakeLock();
+
 // ── Hent og vis ───────────────────────────────────
 async function hentOgVis() {
     clearTimeout(refreshTimer);

@@ -395,6 +395,12 @@ def hent_siste_prisoppdateringer(limit=100) -> list:
         return [dict(r) for r in rows]
 
 
+def slett_pris(pris_id: int) -> bool:
+    with get_conn() as conn:
+        cur = conn.execute('DELETE FROM priser WHERE id = ?', (pris_id,))
+        return cur.rowcount > 0
+
+
 def unike_enheter_per_dag(dager: int = 30) -> list[dict]:
     from datetime import date, timedelta
     with get_conn() as conn:

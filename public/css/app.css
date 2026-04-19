@@ -1045,6 +1045,16 @@ html, body {
 }
 #velkommen-lukk:hover { color: var(--color-text); border-color: var(--color-text); }
 
+#velkommen-om {
+  display: block;
+  text-align: center;
+  margin: 0 var(--space-lg) var(--space-lg);
+  color: var(--color-muted);
+  font-size: var(--font-xs);
+  text-decoration: none;
+}
+#velkommen-om:hover { color: var(--color-text); }
+
 /* ── Lokasjonsfeil-dialog ────────────────────────── */
 #lok-feil-backdrop {
   position: fixed;

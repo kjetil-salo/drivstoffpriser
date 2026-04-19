@@ -175,14 +175,15 @@ if (!window.__innlogget && !localStorage.getItem('velkommen_vist')) {
         let hjemskjermTips = null;
         if (!erStandalone) {
             if (erIos) {
-                hjemskjermTips = 'Tips: Legg til på hjemskjermen — trykk på del-ikonet \u{1F4E4} i Safari, velg "Legg til på hjemskjerm" og trykk "Legg til".';
+                hjemskjermTips = 'Tips: Legg til på hjemskjermen — trykk del-ikonet \u{1F4E4} i Safari \u2192 \u00ABLegg til p\u00E5 hjemskjerm\u00BB.';
             } else if (erAndroid) {
-                hjemskjermTips = 'Tips: Legg til på startskjermen — trykk på meny-ikonet \u22EE øverst i Chrome og velg "Legg til på startskjerm".';
+                hjemskjermTips = 'Tips: Legg til på startskjermen — trykk meny-ikonet \u22EE i Chrome \u2192 \u00ABLegg til p\u00E5 startskjerm\u00BB.';
             } else {
-                hjemskjermTips = 'Tips: Del siden til hjemskjermen på mobilen for å bruke den som en app — raskere tilgang og fullskjermmodus.';
+                hjemskjermTips = 'Tips: Legg til på hjemskjermen på mobilen for raskere tilgang og fullskjermmodus.';
             }
         }
         document.getElementById('velkommen-tekst').textContent = [
+            'Finn billigste drivstoff nær deg — oppdatert av brukere i sanntid.',
             'Du kan se alle priser uten å logge inn.',
             hjemskjermTips,
             'Vil du hjelpe til? Opprett en gratis bruker og oppdater priser på stasjoner nær deg — det tar bare noen sekunder.',
