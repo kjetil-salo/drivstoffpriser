@@ -2573,19 +2573,22 @@ def admin_ocr_bilder():
 
     with get_conn() as conn:
         if filtre == 'feil':
-            rows = conn.execute('''SELECT id, bruker_id, tidspunkt, kilde, claude_resultat,
-                lagret_priser, bilde_original, bilde_crop, stasjon_id, claude_ms
-                FROM ocr_statistikk WHERE lagret_priser IS NOT NULL AND claude_resultat IS NOT NULL
-                ORDER BY id DESC LIMIT ?''', (limit * 3,)).fetchall()
+            rows = conn.execute('''SELECT o.id, COALESCE(b.brukernavn, 'bruker ' || o.bruker_id), o.tidspunkt, o.kilde, o.claude_resultat,
+                o.lagret_priser, o.bilde_original, o.bilde_crop, o.stasjon_id, o.claude_ms
+                FROM ocr_statistikk o LEFT JOIN brukere b ON b.id = o.bruker_id
+                WHERE o.lagret_priser IS NOT NULL AND o.claude_resultat IS NOT NULL
+                ORDER BY o.id DESC LIMIT ?''', (limit * 3,)).fetchall()
         elif filtre == 'fasit':
-            rows = conn.execute('''SELECT id, bruker_id, tidspunkt, kilde, claude_resultat,
-                lagret_priser, bilde_original, bilde_crop, stasjon_id, claude_ms
-                FROM ocr_statistikk WHERE lagret_priser IS NOT NULL
-                ORDER BY id DESC LIMIT ?''', (limit,)).fetchall()
+            rows = conn.execute('''SELECT o.id, COALESCE(b.brukernavn, 'bruker ' || o.bruker_id), o.tidspunkt, o.kilde, o.claude_resultat,
+                o.lagret_priser, o.bilde_original, o.bilde_crop, o.stasjon_id, o.claude_ms
+                FROM ocr_statistikk o LEFT JOIN brukere b ON b.id = o.bruker_id
+                WHERE o.lagret_priser IS NOT NULL
+                ORDER BY o.id DESC LIMIT ?''', (limit,)).fetchall()
         else:
-            rows = conn.execute('''SELECT id, bruker_id, tidspunkt, kilde, claude_resultat,
-                lagret_priser, bilde_original, bilde_crop, stasjon_id, claude_ms
-                FROM ocr_statistikk ORDER BY id DESC LIMIT ?''', (limit,)).fetchall()
+            rows = conn.execute('''SELECT o.id, COALESCE(b.brukernavn, 'bruker ' || o.bruker_id), o.tidspunkt, o.kilde, o.claude_resultat,
+                o.lagret_priser, o.bilde_original, o.bilde_crop, o.stasjon_id, o.claude_ms
+                FROM ocr_statistikk o LEFT JOIN brukere b ON b.id = o.bruker_id
+                ORDER BY o.id DESC LIMIT ?''', (limit,)).fetchall()
 
     felt_liste = ('bensin', 'diesel', 'bensin98', 'diesel_avgiftsfri')
     kort_html = []
@@ -2648,7 +2651,7 @@ def admin_ocr_bilder():
 <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start">
   <div style="flex:0 0 auto">{img_html}</div>
   <div style="flex:1;min-width:200px">
-    <div style="color:#9ca3af;font-size:0.85em">{dato} · bruker {bruker} · st.{st_id or "?"} · {html.escape(str(modell))} · {ms or "?"}ms{crop_info}</div>
+    <div style="color:#9ca3af;font-size:0.85em">{dato} · {html.escape(str(bruker))} · st.{st_id or "?"} · {html.escape(str(modell))} · {ms or "?"}ms{crop_info}</div>
     <div style="color:#d1d5db;font-size:0.85em">{html.escape(str(kjede or ""))} · confidence: {confidence}</div>
     <div style="margin-top:6px;font-family:monospace;font-size:0.9em">{pris_html}</div>
   </div>
