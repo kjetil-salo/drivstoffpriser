@@ -1,6 +1,11 @@
 """Tester for OCR-hjelpere."""
 
-from routes_api import _ocr_korriger_med_forrige, _ocr_stasjon_id_fra_statistikk
+from routes_api import (
+    _ocr_bor_prove_gemini_fallback,
+    _ocr_gemini_er_bedre,
+    _ocr_korriger_med_forrige,
+    _ocr_stasjon_id_fra_statistikk,
+)
 
 
 def test_ocr_korrigerer_1_til_7_mot_forrige_pris():
@@ -40,3 +45,18 @@ def test_ocr_statistikk_prioriterer_eksplisitt_stasjon_id():
     lagret = {'stasjon_id': 1765}
 
     assert _ocr_stasjon_id_fra_statistikk(data, lagret) == 42
+
+
+def test_ocr_prover_gemini_fallback_naar_haiku_mangler_vanlig_rad():
+    resultat = {'bensin': None, 'diesel': 21.39, 'bensin98': None, 'diesel_avgiftsfri': None}
+    kontekst = {'tillatte': {'bensin': True, 'diesel': True, 'bensin98': True, 'diesel_avgiftsfri': True}}
+
+    assert _ocr_bor_prove_gemini_fallback(resultat, kontekst)
+
+
+def test_ocr_velger_gemini_naar_den_dekker_flere_vanlige_rader():
+    haiku = {'bensin': None, 'diesel': 21.39, 'bensin98': None, 'diesel_avgiftsfri': None}
+    gemini = {'bensin': 18.19, 'diesel': 21.39, 'bensin98': None, 'diesel_avgiftsfri': None}
+    kontekst = {'tillatte': {'bensin': True, 'diesel': True, 'bensin98': True, 'diesel_avgiftsfri': True}}
+
+    assert _ocr_gemini_er_bedre(gemini, haiku, kontekst)

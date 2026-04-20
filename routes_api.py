@@ -1374,13 +1374,15 @@ def _forbered_haiku_bilde(bilde_data, content_type):
             (r_ch >= 115) & (g_ch <= 95) & (b_ch <= 95) &
             (r_ch >= g_ch * 1.25) & (r_ch >= b_ch * 1.25)
         )
+        luminans = 0.299 * r_ch + 0.587 * g_ch + 0.114 * b_ch
+        rod_led_maske = rod_maske & (luminans <= 90)
         gul_maske = (
             (r_ch >= 135) & (g_ch >= 95) & (b_ch <= 95) &
             (np.abs(r_ch - g_ch) <= 95) & (r_ch >= b_ch * 1.7) & (g_ch >= b_ch * 1.4)
         )
 
         rod_box = _bbox_fra_maske(rod_maske)
-        led_box = _led_klynge_bbox_fra_maske(rod_maske)
+        led_box = _led_klynge_bbox_fra_maske(rod_led_maske) or _led_klynge_bbox_fra_maske(rod_maske)
         gul_box = _bbox_fra_maske(gul_maske)
 
         valgt_box = None
@@ -1422,6 +1424,7 @@ def _forbered_haiku_bilde(bilde_data, content_type):
             'processed_size': list(crop.size),
             'crop_box': list(valgt_box),
             'red_pixels': rod_box[4] if rod_box else 0,
+            'red_led_dark_pixels': int(rod_led_maske.sum()),
             'red_led_components': led_komponenter,
             'yellow_pixels': gul_box[4] if gul_box else 0,
         })
@@ -1750,6 +1753,32 @@ def _parse_ocr_pris(verdi):
 
 def _har_ocr_priser(data: dict) -> bool:
     return any(data.get(felt) is not None for felt in ('bensin', 'diesel', 'bensin98', 'diesel_avgiftsfri'))
+
+
+def _ocr_antall_priser(data: dict) -> int:
+    return sum(1 for felt in _OCR_DRIVSTOFF_FELT if data.get(felt) is not None)
+
+
+def _ocr_dekker_vanlige_drivstoff(data: dict, stasjon_kontekst) -> int:
+    tillatte = _ocr_tillatte_felt(stasjon_kontekst) if stasjon_kontekst else {'bensin', 'diesel'}
+    return sum(1 for felt in ('bensin', 'diesel') if felt in tillatte and data.get(felt) is not None)
+
+
+def _ocr_bor_prove_gemini_fallback(data: dict, stasjon_kontekst) -> bool:
+    """Bruk Gemini som kontroll når Haiku mister vanlige prisrader."""
+    if not _har_ocr_priser(data):
+        return True
+    tillatte = _ocr_tillatte_felt(stasjon_kontekst) if stasjon_kontekst else {'bensin', 'diesel'}
+    vanlige = [felt for felt in ('bensin', 'diesel') if felt in tillatte]
+    return len(vanlige) >= 2 and any(data.get(felt) is None for felt in vanlige)
+
+
+def _ocr_gemini_er_bedre(gemini_resultat: dict, haiku_resultat: dict, stasjon_kontekst) -> bool:
+    if not _har_ocr_priser(gemini_resultat):
+        return False
+    gemini_score = _ocr_antall_priser(gemini_resultat) + 2 * _ocr_dekker_vanlige_drivstoff(gemini_resultat, stasjon_kontekst)
+    haiku_score = _ocr_antall_priser(haiku_resultat) + 2 * _ocr_dekker_vanlige_drivstoff(haiku_resultat, stasjon_kontekst)
+    return gemini_score > haiku_score
 
 
 def _normaliser_ocr_resultat(data):
@@ -2121,6 +2150,17 @@ def gjenkjenn_priser():
             crop_sti = _ocr_lagre_bilde(base64.b64decode(haiku_b64), 'crops', f'{bilde_id}-crop.jpg')
             priser = _ocr_via_haiku(haiku_b64, haiku_content_type, forventet_kjede=forventet_kjede, bilde_meta=haiku_bilde_meta, stasjon_kontekst=stasjon_kontekst)
             brukt_modell = 'haiku'
+            if os.environ.get('GEMINI_API_KEY') and _ocr_bor_prove_gemini_fallback(priser, stasjon_kontekst):
+                try:
+                    gemini_priser = _ocr_via_gemini(bilde_b64, content_type, forventet_kjede=forventet_kjede, stasjon_kontekst=stasjon_kontekst)
+                    if _ocr_gemini_er_bedre(gemini_priser, priser, stasjon_kontekst):
+                        logger.info(
+                            f'OCR Gemini-kontroll valgt: haiku={priser} gemini={gemini_priser}'
+                        )
+                        priser = gemini_priser
+                        brukt_modell = 'gemini-control'
+                except (ValueError, httpx.HTTPError, KeyError, json.JSONDecodeError, IndexError, RuntimeError) as e:
+                    logger.warning(f'Gemini OCR-kontroll feilet etter Haiku for bruker={bruker_id}: {e}')
         priser = _ocr_korriger_med_forrige(priser, stasjon_kontekst)
         priser['_modell'] = brukt_modell
         if stasjon_kontekst:
