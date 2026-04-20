@@ -653,16 +653,17 @@ def foreslaa_endring():
         return jsonify({'error': 'stasjon_id er påkrevd'}), 400
     foreslatt_navn = (data.get('foreslatt_navn') or '').strip() or None
     foreslatt_kjede = (data.get('foreslatt_kjede') or '').strip() or None
+    kommentar = (data.get('kommentar') or '').strip()[:500] or None
     er_nedlagt = bool(data.get('er_nedlagt'))
-    if not foreslatt_navn and not foreslatt_kjede and not er_nedlagt:
+    if not foreslatt_navn and not foreslatt_kjede and not er_nedlagt and not kommentar:
         return jsonify({'error': 'Minst ett felt må fylles ut'}), 400
     bruker_id = session.get('bruker_id')
     try:
         if er_nedlagt:
             meld_stasjon_nedlagt(stasjon_id, bruker_id)
-        if foreslatt_navn or foreslatt_kjede:
-            legg_til_endringsforslag(stasjon_id, bruker_id, foreslatt_navn, foreslatt_kjede)
-        logger.info(f'Endringsforslag for stasjon {stasjon_id} fra bruker {bruker_id}: navn={foreslatt_navn}, kjede={foreslatt_kjede}, nedlagt={er_nedlagt}')
+        if foreslatt_navn or foreslatt_kjede or kommentar:
+            legg_til_endringsforslag(stasjon_id, bruker_id, foreslatt_navn, foreslatt_kjede, kommentar)
+        logger.info(f'Endringsforslag for stasjon {stasjon_id} fra bruker {bruker_id}: navn={foreslatt_navn}, kjede={foreslatt_kjede}, nedlagt={er_nedlagt}, kommentar={bool(kommentar)}')
         return jsonify({'ok': True})
     except Exception as e:
         logger.warning(f'Endringsforslag feilet: {e}')
@@ -1358,19 +1359,32 @@ def _hent_ocr_stasjon_kontekst(stasjon_id):
                FROM stasjoner WHERE id = ?''',
             (stasjon_id,)
         ).fetchone()
-    if not row:
-        return None
-    tillatte = {
-        'bensin': bool(row[3]),
-        'bensin98': bool(row[4]),
-        'diesel': bool(row[5]),
-        'diesel_avgiftsfri': bool(row[6]),
-    }
+        if not row:
+            return None
+        tillatte = {
+            'bensin': bool(row[3]),
+            'bensin98': bool(row[4]),
+            'diesel': bool(row[5]),
+            'diesel_avgiftsfri': bool(row[6]),
+        }
+        # Hent siste kjente priser for stasjonen (hjelper modellen med å unngå sifferfeil)
+        forrige_priser = {}
+        for felt, kolonne in [('bensin', 'bensin'), ('diesel', 'diesel'),
+                               ('bensin98', 'bensin98'), ('diesel_avgiftsfri', 'diesel_avgiftsfri')]:
+            pris_row = conn.execute(
+                f'''SELECT {kolonne} FROM priser
+                    WHERE stasjon_id = ? AND {kolonne} IS NOT NULL
+                    ORDER BY id DESC LIMIT 1''',
+                (stasjon_id,)
+            ).fetchone()
+            if pris_row and pris_row[0] is not None:
+                forrige_priser[felt] = round(float(pris_row[0]), 2)
     return {
         'id': row[0],
         'navn': row[1],
         'kjede': row[2],
         'tillatte': tillatte,
+        'forrige_priser': forrige_priser,
     }
 
 
@@ -1412,6 +1426,15 @@ def _ocr_stasjon_prompt_tillegg(stasjon_kontekst):
     )
     if ikke_solgt:
         tekst += f'- Ikke bruk disse feltene: {ikke_solgt}.\n'
+    forrige = stasjon_kontekst.get('forrige_priser') or {}
+    if forrige:
+        deler = [f'{_OCR_DRIVSTOFF_LABELS.get(k, k)}: {v} kr' for k, v in forrige.items()]
+        tekst += (
+            f'- Sist kjente priser for denne stasjonen: {", ".join(deler)}.\n'
+            '  Bruk dette som sanity-check: hvis ditt OCR-resultat avviker mer enn ~3 kr fra '
+            'forrige pris, dobbeltsjekk sifrene nøye (spesielt 1↔7, 8↔9, 6↔8 på LED). '
+            'Priser KAN ha endret seg, men store avvik bør verifiseres.\n'
+        )
     return tekst
 
 
@@ -1447,7 +1470,8 @@ Radlogikk:
 - Ikke fyll "bensin98" hvis du ikke ser 98/V-Power/miles 98/Futura 98/tilsvarende etikett.
 - Ikke fyll "diesel_avgiftsfri" hvis du ikke ser FD/Farget/Avgiftsfri/Avg.fri/Anleggsdiesel/tilsvarende etikett.
 - Hvis både D/Diesel og HVO/HVO100 vises på samme skilt, skal D/Diesel-raden brukes som "diesel". HVO-raden skal ignoreres fordi appen ikke har eget HVO-felt.
-- Hvis 3 rader er synlige, er det vanligvis 95 + 98 + diesel.
+- Hvis 3 rader er synlige, er det vanligvis 95 + 98 + diesel ELLER 95 + diesel + farget diesel (FD/avgiftsfri).
+- Haltbakk Express og liknende har ofte 95 + diesel + FD (farget diesel) — IKKE 98. Les etikettene nøye.
 - 98 har ingen fast plassering. Bruk etiketten på raden, ikke radnummer.
 - Hvis etiketten er tydelig, stol på etiketten selv om prisnivået virker overraskende.
 - Ikke flytt en pris fra én rad til en annen bare fordi prisnivået passer bedre.
@@ -1527,6 +1551,15 @@ Eksempel 6:
 Svar:
 {"bensin": 21.49, "diesel": 20.89, "bensin98": 23.29, "diesel_avgiftsfri": null, "kjede": null, "confidence": "medium", "uncertain_fields": []}
 
+Eksempel 7 (Haltbakk Express / 3 rader med farget diesel):
+- Tavlen viser tre prisrader
+- Rad 1 viser "95" og "17.59"
+- Rad 2 viser "D" og "22.49"
+- Rad 3 viser "FG" og "19.29"
+- Ingen 98-rad er synlig
+Svar:
+{"bensin": 17.59, "diesel": 22.49, "bensin98": null, "diesel_avgiftsfri": 19.29, "kjede": "Haltbakk Express", "confidence": "high", "uncertain_fields": []}
+
 """
 
 
@@ -1540,7 +1573,8 @@ Oppgaven er mye enklere enn vanlig:
 
 Viktige regler:
 - Hvis du ser bare 2 rader, er det nesten alltid bensin 95 og diesel.
-- Hvis du ser 3 rader, er det vanligvis bensin 95, bensin 98 og diesel.
+- Hvis du ser 3 rader, er det vanligvis bensin 95, bensin 98 og diesel ELLER bensin 95, diesel og farget diesel (FD/FG/avgiftsfri).
+- Les etikettene nøye — ikke anta 98 hvis det står FD/FG/Farget/Avgiftsfri.
 - Det finnes ingen fast vertikal plassering for 98.
 - Hvis en rad tydelig er merket "95", skal den mappes til bensin.
 - Hvis nederste rad er merket "95", skal nederste pris være bensin, og en umerket øverste rad på et vanlig 2-raders skilt skal vanligvis være diesel.
@@ -1566,7 +1600,7 @@ Ekstra instruks for Haiku:
 - Tell synlige prisrader: vanligvis 2, av og til 3. Ikke let etter mange andre tall.
 - Hvis to rader er synlige og bare én rad har lesbar etikett, bruk den etiketten først. Hvis nederste rad viser "95", er nederste pris bensin 95 og den andre synlige prisen er vanlig diesel.
 - Hvis to rader er synlige og ingen etiketter er lesbare, returner de to prisene bare hvis de passer klart som 95 + diesel; ikke stol blindt på vertikal rekkefølge.
-- Hvis tre rader er synlige og etikettene er uklare, er beste antakelse 95 oktan, 98 oktan og diesel. Bruk etiketter hvis de er synlige; 98 har ingen fast plass.
+- Hvis tre rader er synlige, les etikettene nøye. Det kan være 95+98+diesel ELLER 95+diesel+FD/FG (farget diesel). Bruk etiketter hvis de er synlige; 98 har ingen fast plass.
 - Ikke fyll 98 eller avgiftsfri diesel bare fordi du forventer flere produkter. Fyll dem bare når raden/etiketten er synlig eller svært tydelig.
 - For gule Uno-X-skilt tatt langt unna: finn de røde LED-tallene i midten av skiltet. Hvis nederste rad har liten "95", skal nederste pris være bensin 95 og øverste synlige pris vanligvis diesel. Ikke bruk faste eksempelpriser.
 - Røde LED-tall er punktmatrise/segmenter. Ikke les "20.79" som "2019" eller "20.19" hvis det tredje sifferet har tydelig 7-form.
@@ -1666,6 +1700,58 @@ def _normaliser_ocr_resultat(data):
         andre = [v for k, v in resultat.items() if k in ('bensin', 'bensin98', 'diesel') and v is not None]
         if andre and resultat['diesel_avgiftsfri'] >= min(andre):
             resultat['diesel_avgiftsfri'] = None
+
+    return resultat
+
+
+def _ocr_korriger_med_forrige(resultat, stasjon_kontekst):
+    """Post-prosessering: korriger sannsynlige 1↔7-forvekslinger ved å sammenligne med forrige priser.
+
+    Kun 1↔7-swap (den vanligste LED-feilen). Korrigerer kun hvis:
+    - Originalen avviker >1 kr fra forrige pris
+    - Korreksjonen gir en verdi innenfor 0.30 kr fra forrige pris
+    """
+    if not stasjon_kontekst:
+        return resultat
+    forrige = stasjon_kontekst.get('forrige_priser') or {}
+    if not forrige:
+        return resultat
+
+    for felt in _OCR_DRIVSTOFF_FELT:
+        ocr_val = resultat.get(felt)
+        forrige_val = forrige.get(felt)
+        if ocr_val is None or forrige_val is None:
+            continue
+        original_diff = abs(ocr_val - forrige_val)
+        if original_diff < 0.30:
+            continue  # Nær nok, ingen korreksjon nødvendig
+
+        # Prøv alle enkelt-siffer 1↔7-swaps
+        ocr_str = f'{ocr_val:.2f}'
+        beste = ocr_val
+        beste_diff = original_diff
+        for i, ch in enumerate(ocr_str):
+            if ch == '1':
+                ny = ocr_str[:i] + '7' + ocr_str[i+1:]
+            elif ch == '7':
+                ny = ocr_str[:i] + '1' + ocr_str[i+1:]
+            else:
+                continue
+            try:
+                ny_val = float(ny)
+            except ValueError:
+                continue
+            if not (_OCR_MIN_PRIS <= ny_val <= _OCR_MAX_PRIS):
+                continue
+            ny_diff = abs(ny_val - forrige_val)
+            if ny_diff < beste_diff:
+                beste = ny_val
+                beste_diff = ny_diff
+
+        # Bare korriger hvis resultatet er svært nært forrige pris
+        if beste != ocr_val and beste_diff <= 0.30:
+            logger.info(f'OCR 1↔7 korreksjon: {felt} {ocr_val} → {beste} (forrige={forrige_val})')
+            resultat[felt] = beste
 
     return resultat
 
@@ -1910,6 +1996,7 @@ def gjenkjenn_priser():
             haiku_b64, haiku_content_type, haiku_bilde_meta = _forbered_haiku_bilde(bilde_data, content_type)
             priser = _ocr_via_haiku(haiku_b64, haiku_content_type, forventet_kjede=forventet_kjede, bilde_meta=haiku_bilde_meta, stasjon_kontekst=stasjon_kontekst)
             brukt_modell = 'haiku'
+        priser = _ocr_korriger_med_forrige(priser, stasjon_kontekst)
         logger.info(
             f'OCR-gjenkjenning: bruker={bruker_id} modell={brukt_modell} '
             f'haiku_calls={priser.get("_haiku_calls")} bilde={priser.get("_ocr_bilde")} resultat={priser}'
