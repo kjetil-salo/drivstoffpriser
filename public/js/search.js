@@ -57,9 +57,10 @@ function visResultater(resultater) {
         searchResults.removeAttribute('hidden');
         return;
     }
-    searchResults.innerHTML = resultater.map((r, i) =>
-        `<div class="search-rad" role="option" id="search-opt-${i}" data-i="${i}">${r.navn}</div>`
-    ).join('');
+    searchResults.innerHTML = resultater.map((r, i) => {
+        const ikon = r.type === 'stasjon' ? '⛽' : '📍';
+        return `<div class="search-rad" role="option" id="search-opt-${i}" data-i="${i}">${ikon} ${r.navn}</div>`;
+    }).join('');
     searchResults.removeAttribute('hidden');
 
     searchResults.querySelectorAll('.search-rad').forEach((el, i) => {

@@ -199,6 +199,31 @@ def stedssok():
     if cached and now - cached[0] < _STEDSSOK_TTL:
         return jsonify(cached[1])
 
+    # Søk i egne stasjoner
+    stasjons_treff = []
+    try:
+        conn = get_conn()
+        rader = conn.execute(
+            '''SELECT id, navn, kjede, lat, lon FROM stasjoner
+               WHERE godkjent = 1 AND (land IS NULL OR land = 'NO')
+                 AND (LOWER(navn) LIKE ? OR LOWER(kjede) LIKE ?)
+               LIMIT 5''',
+            (f'%{q}%', f'%{q}%')
+        ).fetchall()
+        for r in rader:
+            visningsnavn = f"{r['navn']}" + (f" ({r['kjede']})" if r['kjede'] else "")
+            stasjons_treff.append({
+                'navn': visningsnavn,
+                'lat': r['lat'],
+                'lon': r['lon'],
+                'type': 'stasjon',
+                'id': r['id'],
+            })
+    except Exception as e:
+        logger.warning(f'Stasjonssøk feilet: {e}')
+
+    # Søk i Photon (eksterne steder)
+    steds_treff = []
     try:
         resp = httpx.get(
             'https://photon.komoot.io/api/',
@@ -207,7 +232,6 @@ def stedssok():
             timeout=8,
         )
         features = resp.json().get('features', [])
-        results = []
         for f in features:
             props = f.get('properties', {})
             if props.get('countrycode', '').upper() != 'NO':
@@ -217,13 +241,20 @@ def stedssok():
                 continue
             deler = [props.get(k) for k in ('name', 'county', 'state', 'country') if props.get(k)]
             navn = ', '.join(dict.fromkeys(deler))
-            results.append({'navn': navn, 'lat': float(coords[1]), 'lon': float(coords[0])})
-
-        _stedssok_cache[q] = (now, results)
-        return jsonify(results)
+            steds_treff.append({'navn': navn, 'lat': float(coords[1]), 'lon': float(coords[0]), 'type': 'sted'})
     except Exception as e:
         logger.warning(f'Stedssøk feilet: {e}')
-        return jsonify([])
+
+    # Fjern Photon-treff som er nær en av våre stasjoner (< 200m)
+    for s in stasjons_treff:
+        steds_treff = [
+            st for st in steds_treff
+            if abs(st['lat'] - s['lat']) + abs(st['lon'] - s['lon']) > 0.002
+        ]
+
+    results = stasjons_treff + steds_treff
+    _stedssok_cache[q] = (now, results)
+    return jsonify(results)
 
 
 def _punkt_til_segment_m(lat, lon, a, b):
