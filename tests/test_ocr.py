@@ -60,3 +60,18 @@ def test_ocr_velger_gemini_naar_den_dekker_flere_vanlige_rader():
     kontekst = {'tillatte': {'bensin': True, 'diesel': True, 'bensin98': True, 'diesel_avgiftsfri': True}}
 
     assert _ocr_gemini_er_bedre(gemini, haiku, kontekst)
+
+
+def test_ocr_prover_gemini_fallback_for_tre_rader_med_98_og_diesel():
+    resultat = {'bensin': 18.19, 'diesel': 20.69, 'bensin98': 21.39, 'diesel_avgiftsfri': None}
+    kontekst = {'tillatte': {'bensin': True, 'diesel': True, 'bensin98': True, 'diesel_avgiftsfri': True}}
+
+    assert _ocr_bor_prove_gemini_fallback(resultat, kontekst)
+
+
+def test_ocr_velger_gemini_ved_samme_dekning_paa_98_skilt():
+    haiku = {'bensin': 18.19, 'diesel': 20.69, 'bensin98': 21.39, 'diesel_avgiftsfri': None}
+    gemini = {'bensin': 18.19, 'diesel': 20.39, 'bensin98': 20.69, 'diesel_avgiftsfri': None}
+    kontekst = {'tillatte': {'bensin': True, 'diesel': True, 'bensin98': True, 'diesel_avgiftsfri': True}}
+
+    assert _ocr_gemini_er_bedre(gemini, haiku, kontekst)

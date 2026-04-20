@@ -1765,12 +1765,14 @@ def _ocr_dekker_vanlige_drivstoff(data: dict, stasjon_kontekst) -> int:
 
 
 def _ocr_bor_prove_gemini_fallback(data: dict, stasjon_kontekst) -> bool:
-    """Bruk Gemini som kontroll når Haiku mister vanlige prisrader."""
+    """Bruk Gemini som kontroll når Haiku mister eller kan ha byttet viktige rader."""
     if not _har_ocr_priser(data):
         return True
     tillatte = _ocr_tillatte_felt(stasjon_kontekst) if stasjon_kontekst else {'bensin', 'diesel'}
     vanlige = [felt for felt in ('bensin', 'diesel') if felt in tillatte]
-    return len(vanlige) >= 2 and any(data.get(felt) is None for felt in vanlige)
+    if len(vanlige) >= 2 and any(data.get(felt) is None for felt in vanlige):
+        return True
+    return 'bensin98' in tillatte and data.get('bensin98') is not None and data.get('diesel') is not None
 
 
 def _ocr_gemini_er_bedre(gemini_resultat: dict, haiku_resultat: dict, stasjon_kontekst) -> bool:
@@ -1778,7 +1780,12 @@ def _ocr_gemini_er_bedre(gemini_resultat: dict, haiku_resultat: dict, stasjon_ko
         return False
     gemini_score = _ocr_antall_priser(gemini_resultat) + 2 * _ocr_dekker_vanlige_drivstoff(gemini_resultat, stasjon_kontekst)
     haiku_score = _ocr_antall_priser(haiku_resultat) + 2 * _ocr_dekker_vanlige_drivstoff(haiku_resultat, stasjon_kontekst)
-    return gemini_score > haiku_score
+    if gemini_score > haiku_score:
+        return True
+    if gemini_score < haiku_score:
+        return False
+    tillatte = _ocr_tillatte_felt(stasjon_kontekst) if stasjon_kontekst else set()
+    return 'bensin98' in tillatte and gemini_resultat != haiku_resultat
 
 
 def _normaliser_ocr_resultat(data):
