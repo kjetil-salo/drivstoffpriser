@@ -1551,6 +1551,7 @@ Nøyaktighet — LED-display:
 - På bilder tatt langt unna er desimalpunkt/komma ofte svakt eller usynlig. Les fire røde LED-siffer som XX.XX, ikke som heltall. Eksempel: 1949 -> 19.49 og 2079 -> 20.79.
 - Uno-X-skilt kan ha to røde prisrader uten store produktnavn. Ofte er en liten "95" synlig ved nederste rad. Da er nederste rad bensin 95, og øverste rad er diesel selv om den er dyrere enn bensin.
 - Røde/oransje LED-display: sifrene 1 og 7 forveksles svært lett. Sjekk: har sifferet et topphorisontalt segment? Da er det trolig 7, ikke 1. Eks: "18.19" der 95-oktan er i nærheten av 21.29 (98-oktan), er feil — den laveste prisen for 95 kan gjerne være 18.79 (7 lest som 1).
+- Les 7-tall ekstra strengt på røde LED-skilt: et 7-tall har toppstrek og høyre segmenter, mens 1 mangler toppstreken. Hvis en pris ser ut som "16.19", men tredje siffer har en tydelig toppstrek, skal den leses som "16.79".
 - 8 og 9 forveksles svært ofte på LED-skilt. Sjekk spesielt nedre venstre segment: hvis nedre venstre segment er tent, er sifferet trolig 8; hvis nedre venstre segment mangler mens øvre/midtre/nedre og høyre side er tent, er det trolig 9. Ikke velg 8 eller 9 uten å kontrollere dette segmentet.
 - 4 og 9 kan også ligne på LED-skilt. Sjekk topp- og bunnsegmentene: 9 har vanligvis både toppsegment og bunnsegment tent, mens 4 vanligvis mangler toppsegment og bunnsegment og består mest av midtsegment + øvre venstre + høyre side. Ikke les 19.49 som 19.99 eller omvendt uten å sjekke disse segmentene.
 - 6 og 8, 3 og 8, 9 og 5 forveksles også på LED. Sjekk spesielt siste siffer: 6 har nederste venstre segment tent, 5 mangler normalt nederste høyre segment. Ikke les 26.86 som 26.85 hvis siste siffer har lukket 6-form.
@@ -1659,6 +1660,7 @@ Ekstra instruks for Haiku:
 - Ikke fyll 98 eller avgiftsfri diesel bare fordi du forventer flere produkter. Fyll dem bare når raden/etiketten er synlig eller svært tydelig.
 - For gule Uno-X-skilt tatt langt unna: finn de røde LED-tallene i midten av skiltet. Hvis nederste rad har liten "95", skal nederste pris være bensin 95 og øverste synlige pris vanligvis diesel. Ikke bruk faste eksempelpriser.
 - Røde LED-tall er punktmatrise/segmenter. Ikke les "20.79" som "2019" eller "20.19" hvis det tredje sifferet har tydelig 7-form.
+- På samme måte: ikke les "16.79" som "16.19" hvis tredje siffer har topphorisontal strek. Det er en 7, ikke en 1.
 - Sjekk 8 og 9 ekstra nøye: 8 har nedre venstre del/segment, 9 mangler vanligvis nedre venstre del/segment.
 - Sjekk 4 og 9 ekstra nøye: 9 har topp og bunn, 4 mangler vanligvis topp og bunn.
 - Sjekk 5 og 6 ekstra nøye i siste siffer: 6 har en lukket/nedre venstre form; 5 har ikke samme nedre venstre segment.
@@ -1837,6 +1839,26 @@ def _ocr_tidspunkt_fra_data(data):
         if tidspunkt:
             return tidspunkt[:40]
     return datetime.now(timezone.utc).isoformat(timespec='seconds')
+
+
+def _ocr_stasjon_id_fra_statistikk(data, lagret):
+    """Finn stasjon_id til OCR-statistikk fra eksplisitt felt eller lagret fasit."""
+    kandidater = [data.get('stasjon_id')]
+    claude_resultat = data.get('claude_resultat')
+    if isinstance(claude_resultat, dict):
+        kandidater.append(claude_resultat.get('_stasjon_id'))
+    if isinstance(lagret, dict):
+        kandidater.append(lagret.get('stasjon_id'))
+    for verdi in kandidater:
+        if not verdi:
+            continue
+        try:
+            stasjon_id = int(verdi)
+        except (TypeError, ValueError):
+            continue
+        if stasjon_id > 0:
+            return stasjon_id
+    return None
 
 
 def _haiku_json_request(bilde_b64, content_type, prompt):
@@ -2069,11 +2091,13 @@ def gjenkjenn_priser():
             priser = _ocr_via_haiku(haiku_b64, haiku_content_type, forventet_kjede=forventet_kjede, bilde_meta=haiku_bilde_meta, stasjon_kontekst=stasjon_kontekst)
             brukt_modell = 'haiku'
         priser = _ocr_korriger_med_forrige(priser, stasjon_kontekst)
+        priser['_modell'] = brukt_modell
+        if stasjon_kontekst:
+            priser['_stasjon_id'] = stasjon_kontekst.get('id')
         logger.info(
             f'OCR-gjenkjenning: bruker={bruker_id} modell={brukt_modell} '
             f'haiku_calls={priser.get("_haiku_calls")} bilde={priser.get("_ocr_bilde")} resultat={priser}'
         )
-        priser['_modell'] = brukt_modell
         if original_sti or crop_sti:
             priser['_ocr_bilder'] = {'original': original_sti, 'crop': crop_sti}
         return jsonify(priser)
@@ -2103,17 +2127,10 @@ def ocr_statistikk():
     ocr_bilder = claude_resultat.get('_ocr_bilder') if isinstance(claude_resultat, dict) else None
     bilde_original = ocr_bilder.get('original') if isinstance(ocr_bilder, dict) else None
     bilde_crop = ocr_bilder.get('crop') if isinstance(ocr_bilder, dict) else None
-    stasjon_id = None
     if isinstance(claude_resultat, dict):
         tillatte = claude_resultat.get('_tillatte_drivstoff')
         ocr_bilde = claude_resultat.get('_ocr_bilde')
-        # stasjon_id kan komme fra frontend via kilde-data
-    stasjon_id_raw = data.get('stasjon_id')
-    if stasjon_id_raw:
-        try:
-            stasjon_id = int(stasjon_id_raw)
-        except (TypeError, ValueError):
-            pass
+    stasjon_id = _ocr_stasjon_id_fra_statistikk(data, lagret)
 
     with get_conn() as conn:
         conn.execute('''INSERT INTO ocr_statistikk

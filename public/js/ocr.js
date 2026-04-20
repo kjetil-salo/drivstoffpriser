@@ -45,6 +45,9 @@ export function initOcr(onPriserGjenkjent, getKontekst = null) {
             try {
                 priser = await gjenkjennMedBackend(nedskalert, kontekst);
                 kilde = priser._modell || 'ai';
+                if (!sisteOcrStat.stasjon_id && priser._stasjon_id) {
+                    sisteOcrStat.stasjon_id = priser._stasjon_id;
+                }
                 sisteOcrStat.claude_ms = Math.round(performance.now() - cStart);
                 sisteOcrStat.claude_resultat = priser;
                 sisteOcrStat.claude_ok = !!(priser && harGyldigePriser(priser));
@@ -103,6 +106,9 @@ export async function gjenkjennPriserFraBilde(bildeFile, onStatus, kontekst = nu
     try {
         priser = await gjenkjennMedBackend(nedskalert, kontekst);
         kilde = priser._modell || 'ai';
+        if (priser._stasjon_id) {
+            stat.stasjon_id = priser._stasjon_id;
+        }
         stat.claude_ms = Math.round(performance.now() - cStart);
         stat.claude_resultat = priser;
         stat.claude_ok = !!(priser && harGyldigePriser(priser));
