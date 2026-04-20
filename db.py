@@ -192,6 +192,9 @@ def _migrer_db():
                 FOREIGN KEY (stasjon_id) REFERENCES stasjoner(id),
                 FOREIGN KEY (bruker_id) REFERENCES brukere(id)
             )''')
+        forslag_kolonner = [r[1] for r in conn.execute("PRAGMA table_info(endringsforslag)").fetchall()]
+        if 'kommentar' not in forslag_kolonner:
+            conn.execute("ALTER TABLE endringsforslag ADD COLUMN kommentar TEXT")
         if 'rate_limit' not in tabeller:
             conn.execute('''CREATE TABLE rate_limit (
                 id        INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -217,6 +220,13 @@ def _migrer_db():
                 tesseract_feil     TEXT,
                 claude_feil        TEXT
             )''')
+        ocr_kolonner = [r[1] for r in conn.execute("PRAGMA table_info(ocr_statistikk)").fetchall()]
+        if 'bilde_original' not in ocr_kolonner:
+            conn.execute("ALTER TABLE ocr_statistikk ADD COLUMN bilde_original TEXT")
+        if 'bilde_crop' not in ocr_kolonner:
+            conn.execute("ALTER TABLE ocr_statistikk ADD COLUMN bilde_crop TEXT")
+        if 'stasjon_id' not in ocr_kolonner:
+            conn.execute("ALTER TABLE ocr_statistikk ADD COLUMN stasjon_id INTEGER")
 
 
 def sjekk_rate_limit(type: str, nokkel: str, maks: int, vindu_sekunder: int) -> bool:
@@ -939,11 +949,11 @@ def antall_ubehandlede_rapporter() -> int:
         ).fetchone()[0]
 
 
-def legg_til_endringsforslag(stasjon_id: int, bruker_id: int, foreslatt_navn: str | None, foreslatt_kjede: str | None):
+def legg_til_endringsforslag(stasjon_id: int, bruker_id: int, foreslatt_navn: str | None, foreslatt_kjede: str | None, kommentar: str | None = None):
     with get_conn() as conn:
         conn.execute(
-            'INSERT INTO endringsforslag (stasjon_id, bruker_id, foreslatt_navn, foreslatt_kjede) VALUES (?, ?, ?, ?)',
-            (stasjon_id, bruker_id, foreslatt_navn or None, foreslatt_kjede or None)
+            'INSERT INTO endringsforslag (stasjon_id, bruker_id, foreslatt_navn, foreslatt_kjede, kommentar) VALUES (?, ?, ?, ?, ?)',
+            (stasjon_id, bruker_id, foreslatt_navn or None, foreslatt_kjede or None, kommentar or None)
         )
 
 
@@ -951,7 +961,7 @@ def hent_endringsforslag() -> list:
     with get_conn() as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
-            '''SELECT e.id, e.stasjon_id, e.foreslatt_navn, e.foreslatt_kjede, e.tidspunkt,
+            '''SELECT e.id, e.stasjon_id, e.bruker_id, e.foreslatt_navn, e.foreslatt_kjede, e.kommentar, e.tidspunkt,
                       s.navn, s.kjede, s.lat, s.lon,
                       b.brukernavn
                FROM endringsforslag e

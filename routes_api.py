@@ -1112,6 +1112,10 @@ def blogg_vis():
 _OCR_GRENSE_PER_DAG = 50  # maks kall per bruker per dag
 _ocr_bruk = {}  # {bruker_id: (dato, antall)}
 
+# Bildelagring for treningsdata (feature-flagget via env)
+_OCR_LAGRE_BILDER = os.environ.get('OCR_LAGRE_BILDER', '').strip() == '1'
+_OCR_BILDE_DIR = os.environ.get('OCR_BILDE_DIR', '/app/data/ocr-bilder')
+_OCR_BILDE_RETENTION_DAGER = int(os.environ.get('OCR_BILDE_RETENTION_DAGER', '90'))
 
 _OCR_MIN_PRIS = 15.0
 _OCR_MAX_PRIS = 35.0
@@ -1124,6 +1128,57 @@ _OCR_DRIVSTOFF_LABELS = {
     'bensin98': '98 oktan bensin',
     'diesel_avgiftsfri': 'avgiftsfri/farget diesel',
 }
+
+
+def _ocr_lagre_bilde(bilde_data, underkatalog, filnavn):
+    """Lagre OCR-bilde til disk. Best effort — returnerer relativ sti eller None."""
+    if not _OCR_LAGRE_BILDER:
+        return None
+    try:
+        dato_dir = datetime.now().strftime('%Y/%m/%d')
+        full_dir = os.path.join(_OCR_BILDE_DIR, underkatalog, dato_dir)
+        os.makedirs(full_dir, exist_ok=True)
+        full_sti = os.path.join(full_dir, filnavn)
+        with open(full_sti, 'wb') as f:
+            f.write(bilde_data)
+        return os.path.join(underkatalog, dato_dir, filnavn)
+    except Exception as e:
+        logger.warning(f'OCR bildelagring feilet ({underkatalog}/{filnavn}): {e}')
+        return None
+
+
+def _ocr_rydd_gamle_bilder():
+    """Slett OCR-bilder eldre enn retention-perioden. Kjøres best-effort."""
+    if not _OCR_LAGRE_BILDER or _OCR_BILDE_RETENTION_DAGER <= 0:
+        return
+    try:
+        grense = datetime.now() - timedelta(days=_OCR_BILDE_RETENTION_DAGER)
+        for underkatalog in ('originals', 'crops'):
+            base = os.path.join(_OCR_BILDE_DIR, underkatalog)
+            if not os.path.isdir(base):
+                continue
+            for aar in os.listdir(base):
+                aar_dir = os.path.join(base, aar)
+                if not os.path.isdir(aar_dir):
+                    continue
+                for mnd in os.listdir(aar_dir):
+                    mnd_dir = os.path.join(aar_dir, mnd)
+                    if not os.path.isdir(mnd_dir):
+                        continue
+                    for dag in os.listdir(mnd_dir):
+                        dag_dir = os.path.join(mnd_dir, dag)
+                        if not os.path.isdir(dag_dir):
+                            continue
+                        try:
+                            dato = datetime(int(aar), int(mnd), int(dag))
+                            if dato < grense:
+                                import shutil
+                                shutil.rmtree(dag_dir)
+                                logger.info(f'OCR retention: slettet {dag_dir}')
+                        except (ValueError, OSError):
+                            continue
+    except Exception as e:
+        logger.warning(f'OCR retention-opprydding feilet: {e}')
 
 
 def _bbox_fra_maske(maske):
@@ -1953,6 +2008,13 @@ def gjenkjenn_priser():
     dato, antall = _ocr_bruk.get(bruker_id, (i_dag, 0))
     if dato != i_dag:
         antall = 0
+        # Kjør retention-opprydding én gang per dag (best effort)
+        if not _ocr_bruk.get('_retention_dato') or _ocr_bruk['_retention_dato'] != i_dag:
+            _ocr_bruk['_retention_dato'] = i_dag
+            try:
+                _ocr_rydd_gamle_bilder()
+            except Exception:
+                pass
     if antall >= _OCR_GRENSE_PER_DAG:
         return jsonify({'error': f'Maks {_OCR_GRENSE_PER_DAG} bildeanalyser per dag'}), 429
     _ocr_bruk[bruker_id] = (i_dag, antall + 1)
@@ -1971,13 +2033,20 @@ def gjenkjenn_priser():
 
     bilde_b64 = base64.b64encode(bilde_data).decode('utf-8')
     ocr_modell = os.environ.get('OCR_MODELL', 'haiku').lower()
-    stasjon_kontekst = _hent_ocr_stasjon_kontekst(request.form.get('stasjon_id'))
+    stasjon_id_str = request.form.get('stasjon_id')
+    stasjon_kontekst = _hent_ocr_stasjon_kontekst(stasjon_id_str)
     forventet_kjede = (request.form.get('forventet_kjede') or '').strip()[:60] or None
     if stasjon_kontekst and stasjon_kontekst.get('kjede') and not forventet_kjede:
         forventet_kjede = stasjon_kontekst.get('kjede')
 
+    # Lagre originalbilde (best effort)
+    ts = datetime.now().strftime('%H%M%S')
+    bilde_id = f'ocr-{bruker_id}-{ts}'
+    original_sti = _ocr_lagre_bilde(bilde_data, 'originals', f'{bilde_id}-original.jpg')
+
     try:
         haiku_b64 = haiku_content_type = haiku_bilde_meta = None
+        crop_sti = None
         if ocr_modell == 'gemini':
             try:
                 priser = _ocr_via_gemini(bilde_b64, content_type, forventet_kjede=forventet_kjede, stasjon_kontekst=stasjon_kontekst)
@@ -1985,15 +2054,18 @@ def gjenkjenn_priser():
                 if not _har_ocr_priser(priser):
                     logger.warning(f'Gemini OCR fant ingen priser for bruker={bruker_id}; prøver Haiku fallback')
                     haiku_b64, haiku_content_type, haiku_bilde_meta = _forbered_haiku_bilde(bilde_data, content_type)
+                    crop_sti = _ocr_lagre_bilde(base64.b64decode(haiku_b64), 'crops', f'{bilde_id}-crop.jpg')
                     priser = _ocr_via_haiku(haiku_b64, haiku_content_type, forventet_kjede=forventet_kjede, bilde_meta=haiku_bilde_meta, stasjon_kontekst=stasjon_kontekst)
                     brukt_modell = 'haiku-fallback'
             except (ValueError, httpx.HTTPError, KeyError, json.JSONDecodeError, IndexError, RuntimeError) as e:
                 logger.warning(f'Gemini OCR feilet for bruker={bruker_id}; prøver Haiku fallback: {e}')
                 haiku_b64, haiku_content_type, haiku_bilde_meta = _forbered_haiku_bilde(bilde_data, content_type)
+                crop_sti = _ocr_lagre_bilde(base64.b64decode(haiku_b64), 'crops', f'{bilde_id}-crop.jpg')
                 priser = _ocr_via_haiku(haiku_b64, haiku_content_type, forventet_kjede=forventet_kjede, bilde_meta=haiku_bilde_meta, stasjon_kontekst=stasjon_kontekst)
                 brukt_modell = 'haiku-fallback'
         else:
             haiku_b64, haiku_content_type, haiku_bilde_meta = _forbered_haiku_bilde(bilde_data, content_type)
+            crop_sti = _ocr_lagre_bilde(base64.b64decode(haiku_b64), 'crops', f'{bilde_id}-crop.jpg')
             priser = _ocr_via_haiku(haiku_b64, haiku_content_type, forventet_kjede=forventet_kjede, bilde_meta=haiku_bilde_meta, stasjon_kontekst=stasjon_kontekst)
             brukt_modell = 'haiku'
         priser = _ocr_korriger_med_forrige(priser, stasjon_kontekst)
@@ -2002,6 +2074,8 @@ def gjenkjenn_priser():
             f'haiku_calls={priser.get("_haiku_calls")} bilde={priser.get("_ocr_bilde")} resultat={priser}'
         )
         priser['_modell'] = brukt_modell
+        if original_sti or crop_sti:
+            priser['_ocr_bilder'] = {'original': original_sti, 'crop': crop_sti}
         return jsonify(priser)
     except ValueError as e:
         logger.error(f'OCR konfigurasjonsfeil: {e}')
@@ -2025,12 +2099,29 @@ def ocr_statistikk():
     match = _ocr_match_oppsummering(claude_resultat, lagret)
     tidspunkt = _ocr_tidspunkt_fra_data(data)
 
+    # Hent bildestier fra claude_resultat
+    ocr_bilder = claude_resultat.get('_ocr_bilder') if isinstance(claude_resultat, dict) else None
+    bilde_original = ocr_bilder.get('original') if isinstance(ocr_bilder, dict) else None
+    bilde_crop = ocr_bilder.get('crop') if isinstance(ocr_bilder, dict) else None
+    stasjon_id = None
+    if isinstance(claude_resultat, dict):
+        tillatte = claude_resultat.get('_tillatte_drivstoff')
+        ocr_bilde = claude_resultat.get('_ocr_bilde')
+        # stasjon_id kan komme fra frontend via kilde-data
+    stasjon_id_raw = data.get('stasjon_id')
+    if stasjon_id_raw:
+        try:
+            stasjon_id = int(stasjon_id_raw)
+        except (TypeError, ValueError):
+            pass
+
     with get_conn() as conn:
         conn.execute('''INSERT INTO ocr_statistikk
             (bruker_id, tidspunkt, kilde, tesseract_ok, tesseract_ms, tesseract_resultat,
              tesseract_raatekst, claude_ok, claude_ms, claude_resultat,
-             lagret_priser, tesseract_feil, claude_feil)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+             lagret_priser, tesseract_feil, claude_feil,
+             bilde_original, bilde_crop, stasjon_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
             (bruker_id,
              tidspunkt,
              data.get('kilde'),
@@ -2043,7 +2134,10 @@ def ocr_statistikk():
              json.dumps(claude_resultat) if claude_resultat else None,
              json.dumps(lagret) if lagret else None,
              data.get('tesseract_feil'),
-             data.get('claude_feil')))
+             data.get('claude_feil'),
+             bilde_original,
+             bilde_crop,
+             stasjon_id))
 
     bilde_meta = claude_resultat.get('_ocr_bilde') if isinstance(claude_resultat, dict) else None
     logger.info(

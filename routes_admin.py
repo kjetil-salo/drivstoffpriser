@@ -37,6 +37,35 @@ from db import (finn_bruker_id, hent_alle_brukere, slett_bruker, har_rolle, sett
 admin_bp = Blueprint('admin', __name__)
 
 
+def _send_forslag_svar(epost: str, brukernavn: str, stasjonsnavn: str, godkjent: bool, ekstra: str = ''):
+    """Send svar til bruker om endringsforslag er godkjent eller avvist."""
+    if not epost:
+        return
+    import resend
+    import logging
+    if godkjent:
+        overskrift = 'Forslaget ditt er godkjent!'
+        ingress = (f'Vi har oppdatert <strong>{stasjonsnavn}</strong> basert på forslaget ditt. '
+                   f'Takk for at du hjelper oss med å holde dataene nøyaktige!')
+    else:
+        overskrift = 'Forslaget ditt er gjennomgått'
+        ingress = (f'Vi har sett på forslaget ditt for <strong>{stasjonsnavn}</strong>, '
+                   f'men valgte ikke å gjøre endringer denne gangen.')
+    ekstra_html = f'<p>{ekstra}</p>' if ekstra else ''
+    try:
+        resend.Emails.send({
+            'from': 'Drivstoffpriser <noreply@ksalo.no>',
+            'to': epost,
+            'subject': overskrift,
+            'html': (f'<p>Hei{(" " + brukernavn) if brukernavn else ""}!</p>'
+                     f'<p>{ingress}</p>'
+                     f'{ekstra_html}'
+                     f'<p>Mvh,<br>Drivstoffpriser</p>'),
+        })
+    except Exception as e:
+        logging.getLogger('drivstoff').error(f'Forslag-svar til {epost} feilet: {e}')
+
+
 def _send_takk_for_rapport(eposter: list[str], stasjonsnavn: str):
     """Send takke-e-post til brukere som rapporterte en nedlagt stasjon."""
     if not eposter:
@@ -321,6 +350,11 @@ def admin():
     <div class="tile-ikon">&#9981;</div>
     <div class="tile-tittel">Drivstofftyper</div>
     <div class="tile-info">Aktiver/deaktiver per stasjon</div>
+  </a>
+  <a href="/admin/ocr-bilder" class="tile">
+    <div class="tile-ikon">&#128247;</div>
+    <div class="tile-tittel">OCR-bilder</div>
+    <div class="tile-info">Bilder, AI-resultat og fasit</div>
   </a>
 {admin_tiles}
 </div>
@@ -947,30 +981,44 @@ def admin_endringsforslag():
         dato = f['tidspunkt'][:10] if f['tidspunkt'] else '–'
         foreslatt_kjede = f['foreslatt_kjede'] or '–'
         foreslatt_navn = f['foreslatt_navn'] or '–'
+        kommentar_html = f'<span style="color:#fbbf24">{f["kommentar"]}</span>' if f.get('kommentar') else '–'
+        har_epost = bool(f.get('bruker_id') and f.get('brukernavn') and '@' in (f.get('brukernavn') or ''))
+        epost_hint = '' if har_epost else ' title="Anonym bruker – ingen e-post sendes"'
         rader.append(
             f'<tr>'
             f'<td><a href="{kart_url}" target="_blank" style="color:#93c5fd;text-decoration:none">{naavarende}</a></td>'
             f'<td style="color:#e5e7eb">{foreslatt_navn}</td>'
             f'<td style="color:#e5e7eb">{foreslatt_kjede}</td>'
+            f'<td style="color:#e5e7eb;max-width:200px;word-break:break-word">{kommentar_html}</td>'
             f'<td style="color:#94a3b8;font-size:0.78rem">{f["brukernavn"] or "–"}</td>'
             f'<td style="color:#94a3b8;font-size:0.78rem">{dato}</td>'
-            f'<td style="display:flex;gap:6px;padding:6px 10px">'
-            f'<form method="post" action="/admin/godkjenn-endringsforslag" style="margin:0">'
+            f'<td style="padding:6px 10px">'
+            f'<form method="post" action="/admin/godkjenn-endringsforslag" style="margin:0 0 6px 0">'
             f'<input type="hidden" name="forslag_id" value="{f["id"]}">'
             f'<input type="hidden" name="stasjon_id" value="{f["stasjon_id"]}">'
             f'<input type="hidden" name="foreslatt_navn" value="{f["foreslatt_navn"] or ""}">'
             f'<input type="hidden" name="foreslatt_kjede" value="{f["foreslatt_kjede"] or ""}">'
+            f'<input type="hidden" name="bruker_id" value="{f["bruker_id"] or ""}">'
+            f'<input type="hidden" name="stasjon_navn" value="{naavarende}">'
+            f'<input type="text" name="ekstra_melding" placeholder="Tilleggsmelding (valgfritt)" {epost_hint}'
+            f' style="width:180px;font-size:0.75rem;padding:3px 6px;border-radius:4px;'
+            f'background:#1f2937;border:1px solid #374151;color:#e5e7eb;margin-bottom:4px">'
             f'<button style="background:transparent;border:1px solid #22c55e;color:#22c55e;'
-            f'font-size:0.75rem;padding:3px 8px;border-radius:4px;cursor:pointer">'
-            f'Godkjenn</button></form>'
+            f'font-size:0.75rem;padding:3px 8px;border-radius:4px;cursor:pointer;display:block">'
+            f'Godkjenn{"" if har_epost else " (ingen epost)"}</button></form>'
             f'<form method="post" action="/admin/avvis-endringsforslag" style="margin:0">'
             f'<input type="hidden" name="forslag_id" value="{f["id"]}">'
+            f'<input type="hidden" name="bruker_id" value="{f["bruker_id"] or ""}">'
+            f'<input type="hidden" name="stasjon_navn" value="{naavarende}">'
+            f'<input type="text" name="ekstra_melding" placeholder="Begrunnelse (valgfritt)" {epost_hint}'
+            f' style="width:180px;font-size:0.75rem;padding:3px 6px;border-radius:4px;'
+            f'background:#1f2937;border:1px solid #374151;color:#e5e7eb;margin-bottom:4px">'
             f'<button style="background:transparent;border:1px solid #6b7280;color:#9ca3af;'
-            f'font-size:0.75rem;padding:3px 8px;border-radius:4px;cursor:pointer">'
-            f'Avvis</button></form>'
+            f'font-size:0.75rem;padding:3px 8px;border-radius:4px;cursor:pointer;display:block">'
+            f'Avvis{"" if har_epost else " (ingen epost)"}</button></form>'
             f'</td></tr>'
         )
-    rader_html = ''.join(rader) or '<tr><td colspan="6" style="color:#94a3b8">Ingen endringsforslag</td></tr>'
+    rader_html = ''.join(rader) or '<tr><td colspan="7" style="color:#94a3b8">Ingen endringsforslag</td></tr>'
     return f'''<!DOCTYPE html><html lang="no"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Endringsforslag – Admin</title>
@@ -991,7 +1039,7 @@ def admin_endringsforslag():
 <h1>Endringsforslag fra brukere</h1>
 <p class="info">Brukere har foreslått endringer i kjede eller navn. Godkjenn for å anvende, eller avvis for å slette.</p>
 <div class="kort">
-  <table><tr><th>Nåværende stasjon</th><th>Foreslått navn</th><th>Foreslått kjede</th><th>Bruker</th><th>Dato</th><th></th></tr>{rader_html}</table>
+  <table><tr><th>Nåværende stasjon</th><th>Foreslått navn</th><th>Foreslått kjede</th><th>Kommentar</th><th>Bruker</th><th>Dato</th><th></th></tr>{rader_html}</table>
 </div>
 </div></body></html>'''
 
@@ -1004,11 +1052,18 @@ def admin_godkjenn_endringsforslag():
     stasjon_id = request.form.get('stasjon_id', type=int)
     foreslatt_navn = request.form.get('foreslatt_navn', '').strip()
     foreslatt_kjede = request.form.get('foreslatt_kjede', '').strip()
+    bruker_id = request.form.get('bruker_id', type=int)
+    stasjon_navn = request.form.get('stasjon_navn', '').strip()
+    ekstra_melding = request.form.get('ekstra_melding', '').strip()
     if stasjon_id:
         if foreslatt_navn:
             endre_navn_stasjon(stasjon_id, foreslatt_navn)
         if foreslatt_kjede:
             sett_kjede_for_stasjon(stasjon_id, foreslatt_kjede)
+    if bruker_id:
+        bruker = finn_bruker_id(bruker_id)
+        if bruker and bruker.get('brukernavn') and '@' in bruker['brukernavn']:
+            _send_forslag_svar(bruker['brukernavn'], bruker.get('kallenavn') or '', stasjon_navn, godkjent=True, ekstra=ekstra_melding)
     if forslag_id:
         slett_endringsforslag(forslag_id)
     return redirect('/admin/endringsforslag')
@@ -1019,6 +1074,13 @@ def admin_godkjenn_endringsforslag():
 @krever_moderator
 def admin_avvis_endringsforslag():
     forslag_id = request.form.get('forslag_id', type=int)
+    bruker_id = request.form.get('bruker_id', type=int)
+    stasjon_navn = request.form.get('stasjon_navn', '').strip()
+    ekstra_melding = request.form.get('ekstra_melding', '').strip()
+    if bruker_id:
+        bruker = finn_bruker_id(bruker_id)
+        if bruker and bruker.get('brukernavn') and '@' in bruker['brukernavn']:
+            _send_forslag_svar(bruker['brukernavn'], bruker.get('kallenavn') or '', stasjon_navn, godkjent=False, ekstra=ekstra_melding)
     if forslag_id:
         slett_endringsforslag(forslag_id)
     return redirect('/admin/endringsforslag')
@@ -2498,3 +2560,134 @@ def kilde_statistikk():
   </table>
 </div>
 </div></body></html>'''
+
+
+@admin_bp.route('/admin/ocr-bilder')
+@krever_innlogging
+@krever_admin
+def admin_ocr_bilder():
+    """Vis OCR-forsøk med original/crop-bilder, AI-resultat og fasit."""
+    from db import get_conn
+    filtre = request.args.get('filter', '')  # 'feil', 'fasit', ''
+    limit = min(int(request.args.get('limit', 50)), 200)
+
+    with get_conn() as conn:
+        if filtre == 'feil':
+            rows = conn.execute('''SELECT id, bruker_id, tidspunkt, kilde, claude_resultat,
+                lagret_priser, bilde_original, bilde_crop, stasjon_id, claude_ms
+                FROM ocr_statistikk WHERE lagret_priser IS NOT NULL AND claude_resultat IS NOT NULL
+                ORDER BY id DESC LIMIT ?''', (limit * 3,)).fetchall()
+        elif filtre == 'fasit':
+            rows = conn.execute('''SELECT id, bruker_id, tidspunkt, kilde, claude_resultat,
+                lagret_priser, bilde_original, bilde_crop, stasjon_id, claude_ms
+                FROM ocr_statistikk WHERE lagret_priser IS NOT NULL
+                ORDER BY id DESC LIMIT ?''', (limit,)).fetchall()
+        else:
+            rows = conn.execute('''SELECT id, bruker_id, tidspunkt, kilde, claude_resultat,
+                lagret_priser, bilde_original, bilde_crop, stasjon_id, claude_ms
+                FROM ocr_statistikk ORDER BY id DESC LIMIT ?''', (limit,)).fetchall()
+
+    felt_liste = ('bensin', 'diesel', 'bensin98', 'diesel_avgiftsfri')
+    kort_html = []
+    for r in rows:
+        ocr_id, bruker, tidspunkt, kilde, claude_json, lagret_json, bilde_orig, bilde_crop, st_id, ms = r
+        ai = json.loads(claude_json) if claude_json else {}
+        lagret = json.loads(lagret_json) if lagret_json else None
+
+        # Filtrer: bare vis feil
+        if filtre == 'feil' and lagret:
+            har_avvik = False
+            for f in felt_liste:
+                a = ai.get(f)
+                l = lagret.get(f)
+                if (a is not None or l is not None) and not (a is not None and l is not None and abs(float(a) - float(l)) < 0.02):
+                    har_avvik = True
+                    break
+            if not har_avvik:
+                continue
+
+        dato = (tidspunkt or '')[:16].replace('T', ' ')
+        modell = ai.get('_modell', kilde or '?')
+        confidence = ai.get('confidence', '?')
+        kjede = ai.get('kjede', '')
+
+        # Priser-sammenligning
+        pris_html = ''
+        for f in felt_liste:
+            a = ai.get(f)
+            l = lagret.get(f) if lagret else None
+            if a is None and l is None:
+                continue
+            a_str = f'{a:.2f}' if a is not None else '–'
+            l_str = f'{l:.2f}' if l is not None else '–'
+            if a is not None and l is not None and abs(float(a) - float(l)) < 0.02:
+                farge = '#22c55e'
+            else:
+                farge = '#ef4444'
+            etk = {'bensin': '95', 'diesel': 'D', 'bensin98': '98', 'diesel_avgiftsfri': 'FD'}[f]
+            pris_html += f'<div style="display:flex;justify-content:space-between;gap:8px"><span>{etk}</span><span>AI: {a_str}</span><span style="color:{farge}">Fasit: {l_str}</span></div>'
+
+        if not pris_html:
+            pris_html = '<span style="color:#6b7280">Ingen priser</span>'
+
+        # Bilder
+        img_html = ''
+        if bilde_orig:
+            img_html += f'<a href="/admin/ocr-bilde/{html.escape(bilde_orig)}" target="_blank"><img src="/admin/ocr-bilde/{html.escape(bilde_orig)}" style="max-width:180px;max-height:140px;border-radius:6px;margin-right:6px" loading="lazy"></a>'
+        if bilde_crop:
+            img_html += f'<a href="/admin/ocr-bilde/{html.escape(bilde_crop)}" target="_blank"><img src="/admin/ocr-bilde/{html.escape(bilde_crop)}" style="max-width:180px;max-height:140px;border-radius:6px" loading="lazy"></a>'
+        if not img_html:
+            img_html = '<span style="color:#6b7280">Ingen bilder</span>'
+
+        crop_info = ''
+        ocr_bilde = ai.get('_ocr_bilde')
+        if isinstance(ocr_bilde, dict):
+            crop_info = f' · {ocr_bilde.get("preprocess", "?")}'
+
+        kort_html.append(f'''<div class="kort" style="margin-bottom:16px">
+<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start">
+  <div style="flex:0 0 auto">{img_html}</div>
+  <div style="flex:1;min-width:200px">
+    <div style="color:#9ca3af;font-size:0.85em">{dato} · bruker {bruker} · st.{st_id or "?"} · {html.escape(str(modell))} · {ms or "?"}ms{crop_info}</div>
+    <div style="color:#d1d5db;font-size:0.85em">{html.escape(str(kjede or ""))} · confidence: {confidence}</div>
+    <div style="margin-top:6px;font-family:monospace;font-size:0.9em">{pris_html}</div>
+  </div>
+</div></div>''')
+
+    if filtre == 'feil':
+        kort_html = kort_html[:limit]
+
+    filter_links = (
+        '<a href="/admin/ocr-bilder" class="btn">Alle</a> '
+        '<a href="/admin/ocr-bilder?filter=fasit" class="btn">Med fasit</a> '
+        '<a href="/admin/ocr-bilder?filter=feil" class="btn">Bare feil</a>'
+    )
+
+    return f'''<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<title>OCR-bilder</title><style>
+  body{{background:#111827;color:#e5e7eb;font-family:system-ui;margin:0;padding:16px}}
+  .container{{max-width:900px;margin:0 auto}}
+  nav a{{color:#93c5fd;text-decoration:none}}
+  .kort{{background:#1f2937;border-radius:10px;padding:14px}}
+  .btn{{display:inline-block;padding:6px 14px;background:#374151;color:#e5e7eb;border-radius:6px;text-decoration:none;margin:2px;font-size:0.9em}}
+</style></head><body><div class="container">
+<nav><a href="/admin">← Admin</a></nav>
+<h1>OCR-bilder ({len(kort_html)})</h1>
+<div style="margin-bottom:16px">{filter_links}</div>
+{"".join(kort_html) or "<p>Ingen OCR-forsøk funnet.</p>"}
+</div></body></html>'''
+
+
+@admin_bp.route('/admin/ocr-bilde/<path:sti>')
+@krever_innlogging
+@krever_admin
+def admin_ocr_bilde(sti):
+    """Server OCR-bilder bak admin-autentisering."""
+    from flask import send_from_directory, abort
+    bilde_dir = os.environ.get('OCR_BILDE_DIR', '/app/data/ocr-bilder')
+    if '..' in sti or sti.startswith('/'):
+        abort(403)
+    full_sti = os.path.join(bilde_dir, sti)
+    if not os.path.isfile(full_sti):
+        abort(404)
+    return send_from_directory(os.path.dirname(full_sti), os.path.basename(full_sti), mimetype='image/jpeg')

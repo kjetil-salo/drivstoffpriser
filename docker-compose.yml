@@ -21,6 +21,9 @@ services:
       GEMINI_MODELLER: "${GEMINI_MODELLER:-gemini-flash-latest,gemini-2.5-flash}"
       GRAPHHOPPER_API_KEY: "${GRAPHHOPPER_API_KEY:-}"
       RUTE_MOTOR: "${RUTE_MOTOR:-graphhopper}"
+      OCR_LAGRE_BILDER: "1"
+      OCR_BILDE_DIR: "/app/data/ocr-bilder"
+      OCR_BILDE_RETENTION_DAGER: "90"
       LOG_LEVEL: "WARNING"
     volumes:
       - drivstoff-data:/app/data

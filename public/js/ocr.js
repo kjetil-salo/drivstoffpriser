@@ -24,6 +24,8 @@ export function initOcr(onPriserGjenkjent, getKontekst = null) {
         if (!fil) return;
 
         sisteOcrStat = { tidspunkt: new Date().toISOString() };
+        const kontekstInit = typeof getKontekst === 'function' ? getKontekst() : null;
+        if (kontekstInit?.stasjon_id) sisteOcrStat.stasjon_id = kontekstInit.stasjon_id;
 
         // Vis preview
         const url = URL.createObjectURL(fil);
