@@ -4,6 +4,7 @@ import { getKjedeFarge, getKjedeInitials, getKjedeLogo } from './kjede.js';
 let aktivSort = 'avstand';
 let sisteStasjoner = [];
 let sisteOnKlikk = null;
+let visGamle = localStorage.getItem('liste_vis_gamle') === '1';
 const MAKS_TOPPLISTE_ALDER_TIMER = 24 * 7;
 
 export function visListe(stasjoner, onKlikk) {
@@ -20,7 +21,10 @@ export function visListe(stasjoner, onKlikk) {
     }
 
     const inn = getInnstillinger();
-    const medPris = stasjoner.filter(s => s.bensin != null || s.bensin98 != null || s.diesel != null || s.diesel_avgiftsfri != null).length;
+
+    // Filtrer bort stasjoner uten fersk pris (<24t) med mindre visGamle er på
+    const filtrert = visGamle ? stasjoner : stasjoner.filter(s => harFerskPris(s));
+    const medPris = filtrert.filter(s => s.bensin != null || s.bensin98 != null || s.diesel != null || s.diesel_avgiftsfri != null).length;
 
     // Tilbakestill aktivSort hvis valgt type ikke lenger er synlig
     if (aktivSort === 'bensin' && !inn.bensin) aktivSort = 'avstand';
@@ -29,14 +33,15 @@ export function visListe(stasjoner, onKlikk) {
     if (aktivSort === 'diesel_avgiftsfri' && !inn.diesel_avgiftsfri) aktivSort = 'avstand';
 
     info.innerHTML = `
-        <span id="sort-label">${stasjoner.length} stasjoner (${medPris} med pris) – sorter:</span>
+        <span id="sort-label">${filtrert.length} stasjoner (${medPris} med pris) – sorter:</span>
         <div id="sort-knapper">
             <button class="sort-btn ${aktivSort === 'avstand' ? 'aktiv' : ''}" data-sort="avstand">Avstand</button>
             ${inn.bensin ? `<button class="sort-btn ${aktivSort === 'bensin' ? 'aktiv' : ''}" data-sort="bensin">95 oktan</button>` : ''}
             ${inn.bensin98 ? `<button class="sort-btn ${aktivSort === 'bensin98' ? 'aktiv' : ''}" data-sort="bensin98">98 oktan</button>` : ''}
             ${inn.diesel ? `<button class="sort-btn ${aktivSort === 'diesel' ? 'aktiv' : ''}" data-sort="diesel">Diesel</button>` : ''}
             ${inn.diesel_avgiftsfri ? `<button class="sort-btn ${aktivSort === 'diesel_avgiftsfri' ? 'aktiv' : ''}" data-sort="diesel_avgiftsfri">Avg.fri</button>` : ''}
-        </div>`;
+        </div>
+        <label id="vis-gamle-label"><input id="vis-gamle-check" type="checkbox" ${visGamle ? 'checked' : ''}> Vis eldre enn 24 t</label>`;
 
     info.querySelectorAll('.sort-btn').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -44,10 +49,15 @@ export function visListe(stasjoner, onKlikk) {
             visListe(sisteStasjoner, sisteOnKlikk);
         });
     });
+    info.querySelector('#vis-gamle-check').addEventListener('change', (e) => {
+        visGamle = e.target.checked;
+        localStorage.setItem('liste_vis_gamle', visGamle ? '1' : '0');
+        visListe(sisteStasjoner, sisteOnKlikk);
+    });
 
     const listeStasjoner = aktivSort === 'avstand'
-        ? stasjoner
-        : stasjoner.filter(s => aktuellPris(s, aktivSort) != null);
+        ? filtrert
+        : filtrert.filter(s => aktuellPris(s, aktivSort) != null);
     const billigste = finnBilligste(listeStasjoner, inn);
     const billigsteId = finnBilligsteId(listeStasjoner, inn, aktivSort);
     const sortert = sorter(listeStasjoner, aktivSort, billigsteId);
@@ -56,7 +66,7 @@ export function visListe(stasjoner, onKlikk) {
     container.querySelectorAll('.stasjon-kort').forEach(kort => {
         const id = parseInt(kort.dataset.id, 10);
         const handler = () => {
-            const stasjon = stasjoner.find(s => s.id === id);
+            const stasjon = filtrert.find(s => s.id === id);
             if (stasjon) onKlikk(stasjon);
         };
         kort.addEventListener('click', handler);
@@ -69,7 +79,7 @@ export function visListe(stasjoner, onKlikk) {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             const id = parseInt(btn.dataset.kartId, 10);
-            const stasjon = stasjoner.find(s => s.id === id);
+            const stasjon = filtrert.find(s => s.id === id);
             if (stasjon) document.dispatchEvent(new CustomEvent('vis-pa-kart', { detail: stasjon }));
         });
     });
@@ -132,6 +142,17 @@ function sorter(stasjoner, felt, billigsteId) {
         const bv = aktuellPris(b, felt) ?? Infinity;
         return av - bv;
     });
+}
+
+function harFerskPris(s) {
+    for (const type of ['bensin', 'bensin98', 'diesel', 'diesel_avgiftsfri']) {
+        if (s[type] == null) continue;
+        const ts = s[`${type}_tidspunkt`];
+        if (!ts) continue;
+        const alderTimer = (Date.now() - new Date(ts.replace(' ', 'T') + 'Z').getTime()) / 3600000;
+        if (alderTimer <= 24) return true;
+    }
+    return false;
 }
 
 function aktuellPris(s, type) {

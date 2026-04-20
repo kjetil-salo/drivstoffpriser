@@ -584,6 +584,17 @@ html, body {
   color: #fff;
 }
 
+#vis-gamle-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: var(--space-sm);
+  font-size: var(--font-sm);
+  color: var(--color-muted);
+  cursor: pointer;
+}
+#vis-gamle-label input { margin: 0; }
+
 .stasjon-kort {
   background: var(--color-card-bg);
   border: 1px solid var(--border-color-medium);
