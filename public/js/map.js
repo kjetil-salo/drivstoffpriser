@@ -168,10 +168,11 @@ export function visStasjoner(stasjoner, onKlikk) {
         stasjoner.forEach(s => stasjonData.set(s.id, s));
         return;
     }
-    const billigsteId = finnBilligsteId(stasjoner);
+    const billigstePerType = finnBilligstePerType(stasjoner);
     stasjoner.forEach(s => {
         stasjonData.set(s.id, s);
-        const marker = lagMarker(s, s.id === billigsteId);
+        const billigsteTyper = billigsteTyperForStasjon(s, billigstePerType);
+        const marker = lagMarker(s, billigsteTyper);
         const klikk = () => onKlikk(stasjonData.get(s.id));
         marker.on('click', klikk);
         const tooltipEl = marker.getTooltip()?.getElement();
@@ -180,21 +181,30 @@ export function visStasjoner(stasjoner, onKlikk) {
     });
 }
 
-function finnBilligsteId(stasjoner) {
+function finnBilligstePerType(stasjoner) {
     const inn = getInnstillinger();
-    let minPris = Infinity, minId = null;
-    for (const s of stasjoner) {
-        const priser = [
-            inn.bensin              ? aktuellPris(s, 'bensin')              : null,
-            inn.bensin98            ? aktuellPris(s, 'bensin98')            : null,
-            inn.diesel              ? aktuellPris(s, 'diesel')              : null,
-            inn.diesel_avgiftsfri   ? aktuellPris(s, 'diesel_avgiftsfri')   : null,
-        ].filter(v => v != null);
-        if (!priser.length) continue;
-        const min = Math.min(...priser);
-        if (min < minPris) { minPris = min; minId = s.id; }
+    const result = new Map(); // type → stasjonId
+    const typer = [
+        inn.bensin             ? 'bensin'             : null,
+        inn.bensin98           ? 'bensin98'           : null,
+        inn.diesel             ? 'diesel'             : null,
+        inn.diesel_avgiftsfri  ? 'diesel_avgiftsfri'  : null,
+    ].filter(Boolean);
+    for (const type of typer) {
+        let minPris = Infinity, minId = null;
+        for (const s of stasjoner) {
+            const pris = aktuellPris(s, type);
+            if (pris != null && pris < minPris) { minPris = pris; minId = s.id; }
+        }
+        if (minId != null) result.set(type, minId);
     }
-    return minId;
+    return result;
+}
+
+function billigsteTyperForStasjon(s, billigstePerType) {
+    const typer = [];
+    billigstePerType.forEach((id, type) => { if (id === s.id) typer.push(type); });
+    return typer;
 }
 
 function aktuellPris(s, type) {
@@ -216,15 +226,16 @@ export function refreshKartInnstillinger() {
         return;
     }
 
-    const billigsteId = finnBilligsteId([...stasjonData.values()]);
+    const billigstePerType = finnBilligstePerType([...stasjonData.values()]);
     stasjonData.forEach((s) => {
         const marker = stasjonMarkorer.get(s.id);
         if (!marker) return;
-        const erBilligst = s.id === billigsteId;
+        const billigsteTyper = billigsteTyperForStasjon(s, billigstePerType);
+        const erBilligst = billigsteTyper.length > 0;
         if (nyKartvisning === 'kompakt') {
-            marker.setIcon(kompaktIkon(s, erBilligst));
+            marker.setIcon(kompaktIkon(s, billigsteTyper));
         } else {
-            oppdaterMarkerTooltip(marker, s, erBilligst);
+            oppdaterMarkerTooltip(marker, s, billigsteTyper);
             marker.setIcon(prisIkon(s));
         }
         marker.setZIndexOffset(erBilligst ? 5000 : 0);
@@ -235,15 +246,16 @@ export function oppdaterStasjonPriser(stasjon, onKlikk) {
     stasjonData.set(stasjon.id, stasjon);
     const inn = getInnstillinger();
     const kompakt = (inn.kartvisning ?? 'kompakt') === 'kompakt';
-    const billigsteId = finnBilligsteId([...stasjonData.values()]);
+    const billigstePerType = finnBilligstePerType([...stasjonData.values()]);
     stasjonData.forEach((s) => {
         const m = stasjonMarkorer.get(s.id);
         if (!m) return;
-        const erBilligst = s.id === billigsteId;
+        const billigsteTyper = billigsteTyperForStasjon(s, billigstePerType);
+        const erBilligst = billigsteTyper.length > 0;
         if (kompakt) {
-            m.setIcon(kompaktIkon(s, erBilligst));
+            m.setIcon(kompaktIkon(s, billigsteTyper));
         } else {
-            oppdaterMarkerTooltip(m, s, erBilligst);
+            oppdaterMarkerTooltip(m, s, billigsteTyper);
             m.setIcon(prisIkon(s));
         }
         m.setZIndexOffset(erBilligst ? 5000 : 0);
@@ -284,8 +296,9 @@ function prisAlderTimer(tidspunkt) {
     return (Date.now() - ts.getTime()) / 3600000;
 }
 
-function oppdaterMarkerTooltip(marker, s, erBilligst) {
-    marker.setTooltipContent(byggTooltip(s, erBilligst));
+function oppdaterMarkerTooltip(marker, s, billigsteTyper) {
+    const erBilligst = billigsteTyper.length > 0;
+    marker.setTooltipContent(byggTooltip(s, billigsteTyper));
     const el = marker.getTooltip()?.getElement();
     if (el) {
         el.classList.toggle('billigst-tooltip', erBilligst);
@@ -295,19 +308,20 @@ function oppdaterMarkerTooltip(marker, s, erBilligst) {
     }
 }
 
-function lagMarker(s, erBilligst = false) {
+function lagMarker(s, billigsteTyper = []) {
     const inn = getInnstillinger();
     const kompakt = (inn.kartvisning ?? 'kompakt') === 'kompakt';
+    const erBilligst = billigsteTyper.length > 0;
 
     const marker = L.marker([s.lat, s.lon], {
-        icon: kompakt ? kompaktIkon(s, erBilligst) : prisIkon(s),
+        icon: kompakt ? kompaktIkon(s, billigsteTyper) : prisIkon(s),
         zIndexOffset: erBilligst ? 5000 : 0,
         title: s.navn,
         alt: s.navn,
     }).addTo(map);
 
     if (!kompakt) {
-        marker.bindTooltip(byggTooltip(s, erBilligst), {
+        marker.bindTooltip(byggTooltip(s, billigsteTyper), {
             permanent: true,
             direction: 'top',
             className: erBilligst ? 'station-tooltip billigst-tooltip' : `station-tooltip tooltip-${prisFarge(s)}`,
@@ -328,15 +342,21 @@ function fargeIkon(farge, stor = false) {
     });
 }
 
-function getKompaktPris(s) {
+function getKompaktPris(s, billigsteTyper = []) {
     const inn = getInnstillinger();
+    // Hvis stasjonen er billigst for spesifikke typer, vis lavest av disse
+    if (billigsteTyper.length > 0) {
+        const priser = billigsteTyper.map(t => s[t]).filter(v => v != null);
+        if (priser.length) return Math.min(...priser);
+    }
     if (inn.bensin && s.bensin != null) return s.bensin;
     if (inn.bensin98 && s.bensin98 != null) return s.bensin98;
     if (inn.diesel && s.diesel != null) return s.diesel;
     return null;
 }
 
-function kompaktIkon(s, erBilligst) {
+function kompaktIkon(s, billigsteTyper = []) {
+    const erBilligst = billigsteTyper.length > 0;
     const farge = prisFarge(s);
     const borderFarge = farge === 'green'  ? '#22c55e'
         : farge === 'orange' ? '#f97316'
@@ -347,7 +367,7 @@ function kompaktIkon(s, erBilligst) {
     const initials = getKjedeInitials(kjedeEllerNavn);
     const kjedeFarge = getKjedeFarge(kjedeEllerNavn);
 
-    const pris = getKompaktPris(s);
+    const pris = getKompaktPris(s, billigsteTyper);
     const prisStr = pris != null ? pris.toFixed(2).replace('.', ',') : null;
 
     const tidspunkt = [s.bensin_tidspunkt, s.diesel_tidspunkt, s.bensin98_tidspunkt]
@@ -415,7 +435,9 @@ function billigstIkon() {
     });
 }
 
-function byggTooltip(s, erBilligst = false) {
+const FUEL_LABEL = { bensin: '95', bensin98: '98', diesel: 'D', diesel_avgiftsfri: 'D-avg' };
+
+function byggTooltip(s, billigsteTyper = []) {
     const inn = getInnstillinger();
     const fmt = v => v != null ? v.toFixed(2).replace('.', ',') : null;
     const rader = [
@@ -424,8 +446,9 @@ function byggTooltip(s, erBilligst = false) {
         inn.diesel   && { label: 'D',  v: fmt(s.diesel) },
     ].filter(Boolean);
     const harPris = rader.some(r => r.v != null);
-    if (erBilligst) {
-        return `<span class="tt-billigst-label">BILLIGST</span>` +
+    if (billigsteTyper.length > 0) {
+        const typeLabel = billigsteTyper.map(t => FUEL_LABEL[t] ?? t).join('/');
+        return `<span class="tt-billigst-label">BILLIGST ${typeLabel}</span>` +
             `<span class="tt-navn">${s.navn}</span>` +
             (harPris
                 ? `<span class="tt-priser">${rader.filter(r => r.v).map(r => `${r.label}: ${r.v}`).join(' &nbsp; ')}</span>`

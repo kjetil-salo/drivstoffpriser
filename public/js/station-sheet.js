@@ -29,6 +29,7 @@ const forslagModalEl = document.getElementById('forslag-modal');
 const forslagBackdropEl = document.getElementById('forslag-backdrop');
 const forslagKjedeEl = document.getElementById('forslag-kjede-select');
 const forslagNavnEl = document.getElementById('forslag-navn-input');
+const forslagKommentarEl = document.getElementById('forslag-kommentar-input');
 const forslagNedlagtEl = document.getElementById('forslag-nedlagt-check');
 const forslagStatusEl = document.getElementById('forslag-status');
 const forslagLagreEl = document.getElementById('forslag-lagre-btn');
@@ -344,6 +345,7 @@ function åpneForslagModal() {
     forslagKjedeEl.value = aktivStasjon.kjede || '';
     forslagNavnEl.value = '';
     forslagNavnEl.placeholder = aktivStasjon.navn || '';
+    forslagKommentarEl.value = '';
     forslagNedlagtEl.checked = false;
     forslagStatusEl.style.display = 'none';
     forslagLagreEl.disabled = false;
@@ -361,10 +363,11 @@ function lukkForslagModal() {
 async function sendEndringsforslag() {
     const navn = forslagNavnEl.value.trim();
     const kjede = forslagKjedeEl.value;
+    const kommentar = forslagKommentarEl.value.trim();
     const nedlagt = forslagNedlagtEl.checked;
     const naaværendeKjede = aktivStasjon.kjede || '';
     const kjedeEndret = kjede !== naaværendeKjede;
-    if (!navn && !kjedeEndret && !nedlagt) {
+    if (!navn && !kjedeEndret && !nedlagt && !kommentar) {
         forslagStatusEl.textContent = 'Fyll ut minst ett felt.';
         forslagStatusEl.style.display = 'block';
         forslagStatusEl.style.color = '#ef4444';
@@ -374,7 +377,7 @@ async function sendEndringsforslag() {
     forslagLagreEl.textContent = 'Sender …';
     forslagStatusEl.style.display = 'none';
     try {
-        const res = await foreslåEndring(aktivStasjon.id, navn || null, kjedeEndret ? kjede : null, nedlagt);
+        const res = await foreslåEndring(aktivStasjon.id, navn || null, kjedeEndret ? kjede : null, nedlagt, kommentar || null);
         if (res?.status === 401) {
             forslagStatusEl.textContent = 'Du må logge inn for å sende forslag.';
             forslagStatusEl.style.display = 'block';

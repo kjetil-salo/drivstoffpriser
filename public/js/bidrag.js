@@ -133,8 +133,14 @@ function sorter(list) {
 function visListe() {
     if (redigerer) lukkEdit(false);
     const sortert = sorter(stasjoner);
-    listeEl.innerHTML = '';
 
+    // FLIP – ta opp nåværende posisjoner før DOM-endring
+    const gamleTops = new Map();
+    listeEl.querySelectorAll('.b-kort[data-id]').forEach(el => {
+        gamleTops.set(el.dataset.id, el.getBoundingClientRect().top);
+    });
+
+    listeEl.innerHTML = '';
     for (const s of sortert) listeEl.appendChild(lagKort(s));
 
     if (!sortert.length) {
@@ -142,7 +148,25 @@ function visListe() {
         tom.id = 'b-tom';
         tom.textContent = 'Ingen stasjoner funnet i valgt radius';
         listeEl.appendChild(tom);
+        return;
     }
+
+    if (!gamleTops.size) return; // første render – ingen animasjon
+
+    // FLIP – plasser hvert kort på gammel posisjon, animer til ny
+    listeEl.querySelectorAll('.b-kort[data-id]').forEach(el => {
+        const gammelTop = gamleTops.get(el.dataset.id);
+        if (gammelTop === undefined) return; // ny stasjon
+        const delta = gammelTop - el.getBoundingClientRect().top;
+        if (Math.abs(delta) < 1) return;
+        el.style.transition = 'none';
+        el.style.transform = `translateY(${delta}px)`;
+        requestAnimationFrame(() => requestAnimationFrame(() => {
+            el.style.transition = 'transform 350ms cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+            el.style.transform = '';
+            el.addEventListener('transitionend', () => { el.style.transition = ''; }, { once: true });
+        }));
+    });
 }
 
 function lagKort(s) {

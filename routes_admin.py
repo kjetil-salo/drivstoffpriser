@@ -2465,7 +2465,7 @@ def admin_import_opprett_stasjon():
 
 @admin_bp.route('/admin/toppliste')
 @krever_innlogging
-@krever_admin
+@krever_moderator
 def admin_toppliste():
     liste = hent_toppliste_admin(limit=50)
     medaljer = ['&#127947;', '&#129352;', '&#129353;']
@@ -2564,7 +2564,7 @@ def kilde_statistikk():
 
 @admin_bp.route('/admin/ocr-bilder')
 @krever_innlogging
-@krever_admin
+@krever_moderator
 def admin_ocr_bilder():
     """Vis OCR-forsøk med original/crop-bilder, AI-resultat og fasit."""
     from db import get_conn
@@ -2683,7 +2683,7 @@ def admin_ocr_bilder():
 
 @admin_bp.route('/admin/ocr-bilde/<path:sti>')
 @krever_innlogging
-@krever_admin
+@krever_moderator
 def admin_ocr_bilde(sti):
     """Server OCR-bilder bak admin-autentisering."""
     from flask import send_from_directory, abort
