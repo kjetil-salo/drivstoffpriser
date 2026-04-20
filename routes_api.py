@@ -1936,7 +1936,7 @@ def _gemini_json_request(bilde_b64, content_type, prompt):
     api_key = os.environ.get('GEMINI_API_KEY', '')
     if not api_key:
         raise ValueError('GEMINI_API_KEY ikke satt')
-    modeller = os.environ.get('GEMINI_MODELLER') or os.environ.get('GEMINI_MODELL', 'gemini-flash-latest')
+    modeller = os.environ.get('GEMINI_MODELLER') or os.environ.get('GEMINI_MODELL', 'gemini-2.5-flash-lite')
     siste_feil = None
     for modell in [m.strip() for m in modeller.split(',') if m.strip()]:
         try:
