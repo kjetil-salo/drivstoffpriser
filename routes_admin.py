@@ -2596,11 +2596,15 @@ def admin_ocr_bilder():
         ocr_id, bruker, tidspunkt, kilde, claude_json, lagret_json, bilde_orig, bilde_crop, st_id, ms = r
         ai = json.loads(claude_json) if claude_json else {}
         lagret = json.loads(lagret_json) if lagret_json else None
+        bekreftet_felt = set()
+        if isinstance(lagret, dict) and isinstance(lagret.get('_bekreftet_felt'), list):
+            bekreftet_felt = {f for f in lagret.get('_bekreftet_felt') if f in felt_liste}
+        sammenlign_felt = tuple(bekreftet_felt) if bekreftet_felt else felt_liste
 
         # Filtrer: bare vis feil
         if filtre == 'feil' and lagret:
             har_avvik = False
-            for f in felt_liste:
+            for f in sammenlign_felt:
                 a = ai.get(f)
                 l = lagret.get(f)
                 if (a is not None or l is not None) and not (a is not None and l is not None and abs(float(a) - float(l)) < 0.02):
@@ -2616,7 +2620,7 @@ def admin_ocr_bilder():
 
         # Priser-sammenligning
         pris_html = ''
-        for f in felt_liste:
+        for f in sammenlign_felt:
             a = ai.get(f)
             l = lagret.get(f) if lagret else None
             if a is None and l is None:

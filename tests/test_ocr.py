@@ -4,6 +4,7 @@ from routes_api import (
     _ocr_bor_prove_gemini_fallback,
     _ocr_gemini_er_bedre,
     _ocr_korriger_med_forrige,
+    _ocr_match_oppsummering,
     _ocr_stasjon_id_fra_statistikk,
 )
 
@@ -75,3 +76,12 @@ def test_ocr_velger_gemini_ved_samme_dekning_paa_98_skilt():
     kontekst = {'tillatte': {'bensin': True, 'diesel': True, 'bensin98': True, 'diesel_avgiftsfri': True}}
 
     assert _ocr_gemini_er_bedre(gemini, haiku, kontekst)
+
+
+def test_ocr_match_bruker_bare_bekreftet_felt_for_ok_knapp():
+    ai = {'bensin': 18.19, 'diesel': 20.39, 'bensin98': 20.69, 'diesel_avgiftsfri': None}
+    lagret = {'stasjon_id': 4, '_bekreftet_felt': ['diesel'], 'diesel': 20.39}
+
+    match = _ocr_match_oppsummering(ai, lagret)
+
+    assert match == {'riktige': 1, 'totalt': 1, 'ok': True}

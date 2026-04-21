@@ -1806,6 +1806,10 @@ def _normaliser_ocr_resultat(data):
         if kjede:
             resultat['kjede'] = kjede[:60]
 
+    confidence = data.get('confidence')
+    if confidence in ('low', 'medium', 'high'):
+        resultat['confidence'] = confidence
+
     if resultat['bensin'] is not None and resultat['bensin98'] is not None and resultat['bensin98'] < resultat['bensin']:
         diff = resultat['bensin'] - resultat['bensin98']
         if 0.2 <= diff <= 4.5:
@@ -1883,7 +1887,11 @@ def _ocr_korriger_med_forrige(resultat, stasjon_kontekst):
 def _ocr_match_oppsummering(ai_resultat, lagret_priser):
     if not isinstance(ai_resultat, dict) or not isinstance(lagret_priser, dict):
         return None
-    felt = ('bensin', 'diesel', 'bensin98', 'diesel_avgiftsfri')
+    bekreftet_felt = lagret_priser.get('_bekreftet_felt')
+    if isinstance(bekreftet_felt, list):
+        felt = tuple(f for f in bekreftet_felt if f in _OCR_DRIVSTOFF_FELT)
+    else:
+        felt = _OCR_DRIVSTOFF_FELT
     relevante = []
     riktige = 0
     for navn in felt:
@@ -2211,7 +2219,7 @@ def ocr_statistikk():
     stasjon_id = _ocr_stasjon_id_fra_statistikk(data, lagret)
 
     with get_conn() as conn:
-        conn.execute('''INSERT INTO ocr_statistikk
+        cursor = conn.execute('''INSERT INTO ocr_statistikk
             (bruker_id, tidspunkt, kilde, tesseract_ok, tesseract_ms, tesseract_resultat,
              tesseract_raatekst, claude_ok, claude_ms, claude_resultat,
              lagret_priser, tesseract_feil, claude_feil,
@@ -2233,6 +2241,7 @@ def ocr_statistikk():
              bilde_original,
              bilde_crop,
              stasjon_id))
+        rad_id = cursor.lastrowid
 
     bilde_meta = claude_resultat.get('_ocr_bilde') if isinstance(claude_resultat, dict) else None
     logger.info(
@@ -2243,4 +2252,18 @@ def ocr_statistikk():
         f'bilde={bilde_meta} match={match}'
     )
 
+    return jsonify({'ok': True, 'id': rad_id})
+
+
+@api_bp.route('/api/ocr-statistikk/<int:rad_id>', methods=['PATCH'])
+@krever_innlogging
+def ocr_statistikk_oppdater(rad_id):
+    """Oppdater lagret_priser på en eksisterende OCR-statistikk-rad."""
+    data = request.get_json(silent=True) or {}
+    bruker_id = session.get('bruker_id')
+    lagret = data.get('lagret')
+    with get_conn() as conn:
+        conn.execute(
+            'UPDATE ocr_statistikk SET lagret_priser = ? WHERE id = ? AND bruker_id = ?',
+            (json.dumps(lagret) if lagret else None, rad_id, bruker_id))
     return jsonify({'ok': True})

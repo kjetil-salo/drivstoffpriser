@@ -66,7 +66,7 @@ export function initOcr(onPriserGjenkjent, getKontekst = null) {
             if (priser && harGyldigePriser(priser)) {
                 const kildeTekst = kilde === 'tesseract' ? 'lokal OCR' : `AI${modellHint(kilde)}`;
                 visOcrStatus(`Priser gjenkjent (${kildeTekst})! Sjekk og lagre.`, false, true);
-                loggOcrStat(sisteOcrStat);
+                loggOcrStat(sisteOcrStat).then(id => { if (id) sisteOcrStat._db_id = id; });
                 onPriserGjenkjent(priser);
             } else {
                 loggOcrStat(sisteOcrStat);
@@ -84,9 +84,31 @@ export function initOcr(onPriserGjenkjent, getKontekst = null) {
 /** Kalles fra station-sheet når pris faktisk lagres, for å logge endelig resultat. */
 export function loggOcrVedLagring(lagretPriser) {
     if (!sisteOcrStat) return;
-    sisteOcrStat.lagret = lagretPriser;
-    loggOcrStat(sisteOcrStat);
+    const dbId = sisteOcrStat._db_id;
+    if (dbId) {
+        fetch(`/api/ocr-statistikk/${dbId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ lagret: lagretPriser }),
+        }).catch(() => {});
+    } else {
+        sisteOcrStat.lagret = lagretPriser;
+        loggOcrStat(sisteOcrStat);
+    }
     sisteOcrStat = null;
+}
+
+/** Kalles når brukeren bekrefter ett OCR-felt med OK-knappen. */
+export function loggOcrVedBekreftelse(stasjonId, type, verdi) {
+    if (!sisteOcrStat || !type || verdi == null) return;
+    const stat = { ...sisteOcrStat };
+    if (!stat.stasjon_id && stasjonId) stat.stasjon_id = stasjonId;
+    stat.lagret = {
+        stasjon_id: stasjonId,
+        _bekreftet_felt: [type],
+        [type]: verdi,
+    };
+    loggOcrStat(stat);
 }
 
 /**
@@ -160,13 +182,13 @@ function harGyldigePriser(priser) {
            priser.bensin98 != null || priser.diesel_avgiftsfri != null;
 }
 
-/** Logg OCR-statistikk til backend. */
+/** Logg OCR-statistikk til backend. Returnerer Promise med rad-ID. */
 function loggOcrStat(stat) {
-    fetch('/api/ocr-statistikk', {
+    return fetch('/api/ocr-statistikk', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(stat),
-    }).catch(() => {});
+    }).then(r => r.ok ? r.json() : null).then(d => d?.id ?? null).catch(() => null);
 }
 
 /** Skaler bilde ned via canvas for å spare båndbredde og OCR-tid. */

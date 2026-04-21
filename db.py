@@ -624,7 +624,7 @@ def antall_priser_for_bruker(bruker_id: int) -> int:
         ).fetchone()[0]
 
 
-KAMERA_PRISANTALL_GRENSE = 20
+KAMERA_PRISANTALL_GRENSE = 0
 
 
 def har_rolle(bruker: dict, rolle: str) -> bool:
