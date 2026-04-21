@@ -5,7 +5,7 @@ import { visListe, oppdaterKort } from './list.js';
 import { initSheet, visStasjonSheet, oppdaterSheetStasjon, lukkSheet, refreshSheetInnstillinger } from './station-sheet.js';
 import { initHurtigpris, åpneHurtigKamera } from './hurtigpris.js';
 import { initSearch } from './search.js';
-import { initInnstillinger, getInnstillinger } from './settings.js';
+import { initInnstillinger, getInnstillinger, triggerInstallPrompt, erInstallbar } from './settings.js';
 import { initAddStation, openAddStation } from './add-station.js';
 import { lastStatistikk } from './stats.js';
 import { initRuteplanlegger } from './route-planner.js';
@@ -99,6 +99,26 @@ fetch('/api/instance').then(r => r.json()).then(d => {
 let nyhetVises = false;
 const nyhetData = await fetch('/api/nyhet').then(r => r.json()).catch(() => ({}));
 if (nyhetData.tekst) {
+    // Platform-tilpasset tekst for install-nyheten — vises bare til brukere som kan bruke funksjonen
+    if (nyhetData.noekkel === 'install_2026') {
+        const _standalone = window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone;
+        const _ios = /iPad|iPhone|iPod/.test(navigator.userAgent);
+        const _android = /Android/.test(navigator.userAgent);
+        const _chromiumDesktop = !_ios && !_android && /Chrome|Edg/.test(navigator.userAgent);
+        if (_standalone) {
+            nyhetData.tekst = null;
+        } else if (_ios) {
+            nyhetData.tekst = 'Du kan legge til Drivstoffprisene som en ekte app!\n\nTrykk ⚙️ øverst → «Legg til som app» — så havner den på hjemskjermen som hvilken som helst annen app.';
+        } else if (_android) {
+            nyhetData.tekst = 'Du kan installere Drivstoffprisene som en ekte app!\n\nTrykk ⚙️ øverst → «Legg til som app» — Chrome spør deg om å installere.';
+        } else if (_chromiumDesktop) {
+            nyhetData.tekst = 'Du kan installere Drivstoffprisene som en app på PC-en!\n\nTrykk ⚙️ øverst → «Legg til som app».';
+        } else {
+            nyhetData.tekst = null; // Firefox o.l. — støtter ikke install-prompt
+        }
+    }
+}
+if (nyhetData.tekst) {
     const cookieName = `nyhet_lest_${nyhetData.id}`;
     if (!document.cookie.split(';').some(c => c.trim().startsWith(cookieName + '='))) {
         nyhetVises = true;
@@ -168,26 +188,32 @@ if (!window.__innlogget && !localStorage.getItem('velkommen_vist')) {
         const backdrop = document.getElementById('velkommen-backdrop');
         const dialog = document.getElementById('velkommen-dialog');
 
-        // Plattformspesifikk hjemskjerm-tip
         const erStandalone = window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone;
         const erIos = /iPad|iPhone|iPod/.test(navigator.userAgent);
         const erAndroid = /Android/.test(navigator.userAgent);
-        let hjemskjermTips = null;
-        if (!erStandalone) {
-            if (erIos) {
-                hjemskjermTips = 'Tips: Legg til på hjemskjermen — trykk del-ikonet \u{1F4E4} i Safari \u2192 \u00ABLegg til p\u00E5 hjemskjerm\u00BB.';
-            } else if (erAndroid) {
-                hjemskjermTips = 'Tips: Legg til på startskjermen — trykk meny-ikonet \u22EE i Chrome \u2192 \u00ABLegg til p\u00E5 startskjerm\u00BB.';
-            } else {
-                hjemskjermTips = 'Tips: Legg til på hjemskjermen på mobilen for raskere tilgang og fullskjermmodus.';
-            }
-        }
+        const erMobil = erIos || erAndroid;
+
         document.getElementById('velkommen-tekst').textContent = [
             'Finn billigste drivstoff nær deg — oppdatert av brukere i sanntid.',
             'Du kan se alle priser uten å logge inn.',
-            hjemskjermTips,
             'Vil du hjelpe til? Opprett en gratis bruker og oppdater priser på stasjoner nær deg — det tar bare noen sekunder.',
-        ].filter(Boolean).join('\n\n');
+        ].join('\n\n');
+
+        // Vis install-knapp for mobilbrukere som ikke allerede har installert
+        const velkomstInstallBtn = document.getElementById('velkommen-hjemskjerm-btn');
+        if (velkomstInstallBtn && erMobil && !erStandalone) {
+            velkomstInstallBtn.removeAttribute('hidden');
+            velkomstInstallBtn.addEventListener('click', () => {
+                if (erInstallbar()) {
+                    triggerInstallPrompt();
+                    velkomstInstallBtn.setAttribute('hidden', '');
+                } else {
+                    velkomstInstallBtn.setAttribute('hidden', '');
+                    document.getElementById('velkommen-install-steg')?.removeAttribute('hidden');
+                }
+            });
+        }
+
         const tidligereFokus = document.activeElement;
         backdrop.removeAttribute('hidden');
         dialog.removeAttribute('hidden');

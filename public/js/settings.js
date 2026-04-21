@@ -1,5 +1,24 @@
 const SETTINGS_KEY = 'drivstoff_innstillinger';
 
+let deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    const btn = document.getElementById('hjemskjerm-btn');
+    if (btn) btn.removeAttribute('hidden');
+});
+
+export function triggerInstallPrompt() {
+    if (!deferredInstallPrompt) return false;
+    deferredInstallPrompt.prompt();
+    deferredInstallPrompt.userChoice.then(() => { deferredInstallPrompt = null; });
+    return true;
+}
+
+export function erInstallbar() {
+    return !!deferredInstallPrompt;
+}
+
 let toastTimer;
 function visToast(tekst) {
     const el = document.getElementById('toast');
@@ -80,6 +99,34 @@ export function initInnstillinger(onChange) {
     radVanlig.addEventListener('change', lagre);
     radKompakt.addEventListener('change', lagre);
 
+    const erStandalone = window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone;
+    const erIos = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const erAndroid = /Android/.test(navigator.userAgent);
+    const hjemskjermBtn = document.getElementById('hjemskjerm-btn');
+    if (hjemskjermBtn && !erStandalone) {
+        if (erIos) hjemskjermBtn.removeAttribute('hidden');
+        else if (deferredInstallPrompt) hjemskjermBtn.removeAttribute('hidden'); // Android + desktop Chrome/Edge
+
+        hjemskjermBtn.addEventListener('click', async () => {
+            if (deferredInstallPrompt) {
+                triggerInstallPrompt();
+                hjemskjermBtn.setAttribute('hidden', '');
+            } else {
+                visIosInstallModal();
+            }
+        });
+    }
+
+    const iosBackdrop = document.getElementById('ios-install-backdrop');
+    const iosModal = document.getElementById('ios-install-modal');
+    if (iosBackdrop && iosModal) {
+        document.getElementById('ios-install-lukk')?.addEventListener('click', lukkIosInstallModal);
+        iosBackdrop.addEventListener('click', lukkIosInstallModal);
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !iosModal.hasAttribute('hidden')) lukkIosInstallModal();
+        });
+    }
+
     document.getElementById('del-btn').addEventListener('click', async () => {
         const data = { title: 'Drivstoffprisene', text: 'Finn billigste drivstoff i nærheten', url: 'https://drivstoffprisene.no' };
         if (navigator.share) {
@@ -97,11 +144,13 @@ export function initInnstillinger(onChange) {
 
     const delModalBackdrop = document.getElementById('del-modal-backdrop');
     const delModal = document.getElementById('del-modal');
-    document.getElementById('del-modal-lukk').addEventListener('click', lukkDelModal);
-    delModalBackdrop.addEventListener('click', lukkDelModal);
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && !delModal.hasAttribute('hidden')) lukkDelModal();
-    });
+    if (delModalBackdrop && delModal) {
+        document.getElementById('del-modal-lukk')?.addEventListener('click', lukkDelModal);
+        delModalBackdrop.addEventListener('click', lukkDelModal);
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !delModal.hasAttribute('hidden')) lukkDelModal();
+        });
+    }
 }
 
 function visDelModal() {
@@ -113,4 +162,18 @@ function visDelModal() {
 function lukkDelModal() {
     document.getElementById('del-modal-backdrop').setAttribute('hidden', '');
     document.getElementById('del-modal').setAttribute('hidden', '');
+}
+
+function visIosInstallModal() {
+    document.getElementById('ios-install-backdrop')?.removeAttribute('hidden');
+    const modal = document.getElementById('ios-install-modal');
+    if (modal) {
+        modal.removeAttribute('hidden');
+        modal.querySelector('#ios-install-lukk')?.focus();
+    }
+}
+
+function lukkIosInstallModal() {
+    document.getElementById('ios-install-backdrop')?.setAttribute('hidden', '');
+    document.getElementById('ios-install-modal')?.setAttribute('hidden', '');
 }

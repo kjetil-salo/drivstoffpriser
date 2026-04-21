@@ -81,6 +81,7 @@
     </label>
     <div class="innstilling-separator"></div>
     <button id="del-btn" class="innstilling-del-btn"><span aria-hidden="true">↗️</span> Del appen</button>
+    <button id="hjemskjerm-btn" class="innstilling-del-btn" hidden><span aria-hidden="true">📲</span> Legg til som app</button>
   </div>
 
   <!-- Kartvisning -->
@@ -180,6 +181,17 @@
   </div>
 
   <!-- Nyhet-dialog -->
+  <div id="ios-install-backdrop" hidden></div>
+  <div id="ios-install-modal" hidden role="dialog" aria-modal="true" aria-labelledby="ios-install-tittel">
+    <div id="ios-install-tittel">Legg til som app</div>
+    <ol id="ios-install-steg">
+      <li>Trykk del-ikonet <span aria-hidden="true">⎙</span> nederst i Safari</li>
+      <li>Bla ned og trykk <strong>«Legg til på Hjem-skjerm»</strong></li>
+      <li>Trykk <strong>«Legg til»</strong> øverst til høyre</li>
+    </ol>
+    <button id="ios-install-lukk">Lukk</button>
+  </div>
+
   <div id="nyhet-backdrop" hidden></div>
   <div id="nyhet-dialog" hidden role="dialog" aria-modal="true" aria-labelledby="nyhet-tittel">
     <div id="nyhet-stripe"></div>

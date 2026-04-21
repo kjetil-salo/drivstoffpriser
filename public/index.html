@@ -90,6 +90,7 @@
     <label class="innstilling-rad"><input type="radio" name="sett-kartvisning" id="sett-kartvisning-kompakt" value="kompakt"> Kompakt</label>
     <div class="innstilling-separator"></div>
     <button id="del-btn" class="innstilling-del-btn"><span aria-hidden="true">↗️</span> Del appen</button>
+    <button id="hjemskjerm-btn" class="innstilling-del-btn" hidden><span aria-hidden="true">📲</span> Legg til som app</button>
   </div>
 
   <!-- Kartvisning -->
@@ -176,6 +177,11 @@
         <span id="stat-antall" class="stat-tall">–</span>
         <span class="stat-label">prisoppdateringer siste 24 timer</span>
       </div>
+
+      <h3 class="stat-seksjon-tittel">Snitt per kjede siste 24 timer</h3>
+      <div id="stat-kjede-snitt" class="stat-kjede-snitt">
+        <div class="stat-pris-loading">Laster …</div>
+      </div>
     </div>
   </main>
 
@@ -224,6 +230,12 @@
     <h2 id="velkommen-tittel">Velkommen!</h2>
     <div id="velkommen-tekst"></div>
     <a id="velkommen-registrer" href="/registrer">Registrer deg gratis</a>
+    <button id="velkommen-hjemskjerm-btn" class="velkommen-install-btn" hidden><span aria-hidden="true">📲</span> Legg til som app</button>
+    <ol id="velkommen-install-steg" hidden class="velkommen-install-steg">
+      <li>Trykk del-ikonet <strong>⎙</strong> nederst i Safari</li>
+      <li>Bla ned og trykk <strong>«Legg til på Hjem-skjerm»</strong></li>
+      <li>Trykk <strong>«Legg til»</strong> øverst til høyre</li>
+    </ol>
     <button id="velkommen-lukk">Bare se priser</button>
     <a id="velkommen-om" href="/om">Les mer om appen &#8594;</a>
   </div>
@@ -536,6 +548,17 @@
   </div>
 
   <!-- Del-modal (desktop) -->
+  <div id="ios-install-backdrop" hidden></div>
+  <div id="ios-install-modal" hidden role="dialog" aria-modal="true" aria-labelledby="ios-install-tittel">
+    <div id="ios-install-tittel">Legg til som app</div>
+    <ol id="ios-install-steg">
+      <li>Trykk del-ikonet <span aria-hidden="true">⎙</span> nederst i Safari</li>
+      <li>Bla ned og trykk <strong>«Legg til på Hjem-skjerm»</strong></li>
+      <li>Trykk <strong>«Legg til»</strong> øverst til høyre</li>
+    </ol>
+    <button id="ios-install-lukk">Lukk</button>
+  </div>
+
   <div id="del-modal-backdrop" hidden></div>
   <div id="del-modal" hidden role="dialog" aria-modal="true" aria-labelledby="del-modal-tittel">
     <div id="del-modal-tittel">Del appen</div>
