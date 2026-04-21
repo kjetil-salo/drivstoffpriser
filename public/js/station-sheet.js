@@ -298,10 +298,10 @@ function visVisModus() {
 function visEditModus() {
     const tittelEl = document.getElementById('sheet-edit-tittel');
     tittelEl.textContent = aktivStasjon.navn || 'Endre pris';
-    bensinInput.value = aktivStasjon.bensin != null ? formatPrisInput(aktivStasjon.bensin) : '';
-    bensin98Input.value = aktivStasjon.bensin98 != null ? formatPrisInput(aktivStasjon.bensin98) : '';
-    dieselInput.value = aktivStasjon.diesel != null ? formatPrisInput(aktivStasjon.diesel) : '';
-    dieselAvgiftsfriInput.value = aktivStasjon.diesel_avgiftsfri != null ? formatPrisInput(aktivStasjon.diesel_avgiftsfri) : '';
+    bensinInput.value = (aktivStasjon.har_bensin !== false && aktivStasjon.bensin != null) ? formatPrisInput(aktivStasjon.bensin) : '';
+    bensin98Input.value = (aktivStasjon.har_bensin98 !== false && aktivStasjon.bensin98 != null) ? formatPrisInput(aktivStasjon.bensin98) : '';
+    dieselInput.value = (aktivStasjon.har_diesel !== false && aktivStasjon.diesel != null) ? formatPrisInput(aktivStasjon.diesel) : '';
+    dieselAvgiftsfriInput.value = (aktivStasjon.har_diesel_avgiftsfri !== false && aktivStasjon.diesel_avgiftsfri != null) ? formatPrisInput(aktivStasjon.diesel_avgiftsfri) : '';
 
     const skjul = (id, vis) => document.getElementById(id)?.toggleAttribute('hidden', !vis);
     skjul('sheet-gruppe-bensin',            aktivStasjon.har_bensin !== false);
