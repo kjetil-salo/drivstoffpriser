@@ -496,6 +496,33 @@ def hent_billigste_priser_24t() -> list:
         return resultater
 
 
+def hent_kjede_snitt_24t() -> list:
+    """Gjennomsnittspriser per kjede basert på siste registrerte pris per stasjon siste 24 timer."""
+    with get_conn() as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            '''SELECT s.kjede,
+                      ROUND(AVG(CASE WHEN p.bensin > 0 THEN p.bensin END), 2)          AS snitt_bensin,
+                      ROUND(AVG(CASE WHEN p.bensin98 > 0 THEN p.bensin98 END), 2)      AS snitt_bensin98,
+                      ROUND(AVG(CASE WHEN p.diesel > 0 THEN p.diesel END), 2)           AS snitt_diesel,
+                      ROUND(AVG(CASE WHEN p.diesel_avgiftsfri > 0 THEN p.diesel_avgiftsfri END), 2) AS snitt_diesel_avgiftsfri,
+                      COUNT(*) AS antall_stasjoner
+               FROM priser p
+               JOIN stasjoner s ON s.id = p.stasjon_id
+               WHERE s.godkjent != 0
+                 AND (s.land IS NULL OR s.land = 'NO')
+                 AND s.kjede IS NOT NULL AND s.kjede != ''
+                 AND p.tidspunkt > datetime('now', '-24 hours')
+                 AND p.id IN (SELECT MAX(p2.id) FROM priser p2
+                              WHERE p2.tidspunkt > datetime('now', '-24 hours')
+                              GROUP BY p2.stasjon_id)
+               GROUP BY s.kjede
+               HAVING antall_stasjoner >= 2
+               ORDER BY snitt_diesel'''
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
 def nye_brukere_per_time_48t() -> list:
     """Antall nye brukere per time siste 48 timer."""
     from datetime import timedelta, timezone

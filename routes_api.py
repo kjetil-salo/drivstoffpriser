@@ -34,7 +34,7 @@ from db import (get_stasjoner_med_priser, lagre_pris, bekreft_pris, logg_visning
                 legg_til_endringsforslag, unike_enheter_per_dag,
                 prisoppdateringer_per_time_24t,
                 prisoppdateringer_rullende_24t_uke,
-                har_rolle)
+                har_rolle, hent_kjede_snitt_24t)
 
 logger = logging.getLogger('drivstoff')
 
@@ -206,11 +206,13 @@ def stedssok():
         rader = conn.execute(
             '''SELECT id, navn, kjede, lat, lon FROM stasjoner
                WHERE godkjent = 1 AND (land IS NULL OR land = 'NO')
-                 AND (LOWER(navn) LIKE ? OR LOWER(kjede) LIKE ?)
-               LIMIT 5''',
-            (f'%{q}%', f'%{q}%')
+               LIMIT 2000''',
         ).fetchall()
         for r in rader:
+            navn_l = (r['navn'] or '').lower()
+            kjede_l = (r['kjede'] or '').lower()
+            if q not in navn_l and q not in kjede_l:
+                continue
             visningsnavn = f"{r['navn']}" + (f" ({r['kjede']})" if r['kjede'] else "")
             stasjons_treff.append({
                 'navn': visningsnavn,
@@ -219,6 +221,7 @@ def stedssok():
                 'type': 'stasjon',
                 'id': r['id'],
             })
+        stasjons_treff = stasjons_treff[:5]
     except Exception as e:
         logger.warning(f'Stasjonssøk feilet: {e}')
 
@@ -539,6 +542,11 @@ def statistikk():
     })
 
 
+@api_bp.route('/api/kjede-snitt')
+def kjede_snitt():
+    return jsonify(hent_kjede_snitt_24t())
+
+
 @api_bp.route('/api/prisregistreringer-per-time')
 def prisregistreringer_per_time():
     data = prisoppdateringer_per_time_24t()
@@ -708,12 +716,13 @@ def nyhet():
     # Admin-nyhet trumfer alltid
     tekst = hent_innstilling('nyhet_tekst', '')
     utloper = hent_innstilling('nyhet_utloper', '')
+    noekkel = hent_innstilling('nyhet_noekkel', '')
     if tekst and utloper:
         try:
             utloper_dt = datetime.fromisoformat(utloper)
             if datetime.now() < utloper_dt:
                 nyhet_id = hashlib.md5(tekst.encode()).hexdigest()[:8]
-                return jsonify({'tekst': tekst, 'utloper': utloper, 'id': nyhet_id, 'tittel': 'Nyhet'})
+                return jsonify({'tekst': tekst, 'utloper': utloper, 'id': nyhet_id, 'tittel': 'Nyhet', 'noekkel': noekkel})
         except ValueError:
             pass
 

@@ -5,6 +5,103 @@ let sistLastet = 0;
 let laster = false;
 let autoOppdateringStartet = false;
 
+let _kjedeData = [];
+let _kjedeSortKol = 'snitt_diesel';
+let _kjedeSortAsc = true;
+
+function visKjedeSnitt(kjedeData) {
+    _kjedeData = kjedeData || [];
+    _kjedeSortKol = 'snitt_diesel';
+    _kjedeSortAsc = true;
+    _byggKjedeTabell();
+}
+
+function _byggKjedeTabell() {
+    const el = document.getElementById('stat-kjede-snitt');
+    if (!el) return;
+    if (!_kjedeData.length) {
+        el.innerHTML = '<div class="stat-pris-ingen">Ingen data</div>';
+        return;
+    }
+
+    const harBensin98 = _kjedeData.some(k => k.snitt_bensin98);
+    const harAvgiftsfri = _kjedeData.some(k => k.snitt_diesel_avgiftsfri);
+
+    const kolonner = [
+        { tekst: 'Kjede',    felt: 'kjede',                    num: false },
+        { tekst: '95 oktan', felt: 'snitt_bensin',              num: true  },
+        ...(harBensin98   ? [{ tekst: '98 oktan', felt: 'snitt_bensin98',          num: true }] : []),
+        { tekst: 'Diesel',   felt: 'snitt_diesel',              num: true  },
+        ...(harAvgiftsfri ? [{ tekst: 'Avg.fri',  felt: 'snitt_diesel_avgiftsfri', num: true }] : []),
+        { tekst: 'Ant.',     felt: 'antall_stasjoner',          num: true  },
+    ];
+
+    // Sorter data
+    const sortert = [..._kjedeData].sort((a, b) => {
+        const av = a[_kjedeSortKol] ?? (typeof a[_kjedeSortKol] === 'string' ? '' : Infinity);
+        const bv = b[_kjedeSortKol] ?? (typeof b[_kjedeSortKol] === 'string' ? '' : Infinity);
+        if (av === bv) return 0;
+        const cmp = av < bv ? -1 : 1;
+        return _kjedeSortAsc ? cmp : -cmp;
+    });
+
+    // Finn min-verdi per numerisk kolonne for å fremheve billigste
+    const minVerdier = {};
+    kolonner.filter(k => k.num && k.felt !== 'antall_stasjoner').forEach(k => {
+        const verdier = _kjedeData.map(r => r[k.felt]).filter(v => v);
+        if (verdier.length) minVerdier[k.felt] = Math.min(...verdier);
+    });
+
+    const tabell = document.createElement('table');
+    tabell.className = 'kjede-snitt-tabell';
+
+    // Header
+    const thead = tabell.createTHead();
+    const hRad = thead.insertRow();
+    kolonner.forEach(kol => {
+        const th = document.createElement('th');
+        const aktiv = _kjedeSortKol === kol.felt;
+        th.innerHTML = `<button class="kjede-sort-btn${aktiv ? ' aktiv' : ''}" data-felt="${kol.felt}">${kol.tekst}<span class="kjede-sort-pil">${aktiv ? (_kjedeSortAsc ? '↑' : '↓') : ''}</span></button>`;
+        hRad.appendChild(th);
+    });
+
+    // Body
+    const tbody = tabell.createTBody();
+    sortert.forEach(k => {
+        const rad = tbody.insertRow();
+        kolonner.forEach(kol => {
+            const td = rad.insertCell();
+            const v = k[kol.felt];
+            if (kol.felt === 'kjede') {
+                td.className = 'kjede-snitt-navn';
+                td.textContent = v || '–';
+            } else if (kol.num && kol.felt !== 'antall_stasjoner') {
+                td.textContent = v ? v.toFixed(2) : '–';
+                if (v && minVerdier[kol.felt] === v) td.className = 'kjede-snitt-billigst';
+            } else {
+                td.textContent = v ?? '–';
+            }
+        });
+    });
+
+    el.innerHTML = '';
+    el.appendChild(tabell);
+
+    // Sorter-klikk
+    el.querySelectorAll('.kjede-sort-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const felt = btn.dataset.felt;
+            if (_kjedeSortKol === felt) {
+                _kjedeSortAsc = !_kjedeSortAsc;
+            } else {
+                _kjedeSortKol = felt;
+                _kjedeSortAsc = felt !== 'kjede'; // tall: billigst først; tekst: A-Z
+            }
+            _byggKjedeTabell();
+        });
+    });
+}
+
 function statistikkErSynlig() {
     const view = document.getElementById('view-statistikk');
     return !!view && view.style.display !== 'none' && !document.hidden;
@@ -176,9 +273,10 @@ export async function lastStatistikk({ force = false } = {}) {
 
     laster = true;
     try {
-        const [respStat, respTopp] = await Promise.all([
+        const [respStat, respTopp, respKjede] = await Promise.all([
             fetch('/api/statistikk', { cache: 'no-store' }),
             fetch('/api/toppliste', { cache: 'no-store' }),
+            fetch('/api/kjede-snitt', { cache: 'no-store' }),
         ]);
         if (!respStat.ok) return;
         const data = await respStat.json();
@@ -197,6 +295,9 @@ export async function lastStatistikk({ force = false } = {}) {
 
         const toppliste = respTopp.ok ? await respTopp.json() : [];
         visToppliste(toppliste);
+
+        const kjedeData = respKjede.ok ? await respKjede.json() : [];
+        visKjedeSnitt(kjedeData);
 
         sistLastet = Date.now();
     } catch (e) {
