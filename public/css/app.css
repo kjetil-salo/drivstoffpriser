@@ -588,7 +588,6 @@ html, body {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-top: var(--space-sm);
   font-size: var(--font-sm);
   color: var(--color-muted);
   cursor: pointer;
@@ -778,6 +777,78 @@ html, body {
 }
 .sk-kart-btn:active {
   background: rgba(59,130,246,0.25);
+}
+
+.sk-fav-btn {
+  background: transparent;
+  border: 1px solid rgba(148,163,184,0.2);
+  border-radius: var(--radius-sm);
+  color: var(--color-muted);
+  padding: 5px 7px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.sk-fav-btn svg {
+  fill: none;
+  transition: fill 0.15s;
+}
+.sk-fav-btn.aktiv {
+  color: #f87171;
+  border-color: rgba(239,68,68,0.4);
+  background: rgba(239,68,68,0.1);
+}
+.sk-fav-btn.aktiv svg {
+  fill: currentColor;
+}
+.sk-fav-btn:active {
+  background: rgba(239,68,68,0.2);
+}
+
+.fav-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  background: transparent;
+  border: 1px solid rgba(148,163,184,0.3);
+  border-radius: 20px;
+  color: var(--color-muted);
+  font-size: var(--font-xs);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.fav-filter-btn svg {
+  fill: none;
+  flex-shrink: 0;
+  transition: fill 0.15s;
+}
+.fav-filter-btn.aktiv {
+  background: rgba(239,68,68,0.12);
+  border-color: rgba(239,68,68,0.5);
+  color: #f87171;
+}
+.fav-filter-btn.aktiv svg {
+  fill: currentColor;
+}
+
+#liste-filter-rad {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.favoritter-tom {
+  text-align: center;
+  color: var(--color-muted);
+  font-size: var(--font-sm);
+  padding: 2rem 1rem;
+  line-height: 1.6;
 }
 
 .sk-alder {
@@ -1396,6 +1467,35 @@ html, body {
 .btn-kart {
   background: rgba(59,130,246,0.15);
   color: #60a5fa;
+}
+
+.btn-favoritt {
+  background: transparent;
+  border: 1px solid rgba(148,163,184,0.3);
+  border-radius: var(--radius-sm);
+  color: var(--color-muted);
+  padding: 11px 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.btn-favoritt svg {
+  fill: none;
+  transition: fill 0.15s;
+}
+.btn-favoritt.aktiv {
+  color: #f87171;
+  border-color: rgba(239,68,68,0.5);
+  background: rgba(239,68,68,0.1);
+}
+.btn-favoritt.aktiv svg {
+  fill: currentColor;
+}
+.btn-favoritt:active {
+  background: rgba(239,68,68,0.2);
 }
 .btn-kart:active { background: rgba(59,130,246,0.3); }
 

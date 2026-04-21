@@ -1,11 +1,17 @@
 import { getInnstillinger } from './settings.js';
 import { getKjedeFarge, getKjedeInitials, getKjedeLogo } from './kjede.js';
+import { erFavoritt, toggleFavoritt, hentFavoritter } from './favoritter.js';
 
 let aktivSort = 'avstand';
 let sisteStasjoner = [];
 let sisteOnKlikk = null;
 let visGamle = localStorage.getItem('liste_vis_gamle') === '1';
+let visFavoritter = false;
 const MAKS_TOPPLISTE_ALDER_TIMER = 24 * 7;
+
+document.addEventListener('favoritt-endret', () => {
+    if (sisteStasjoner.length) visListe(sisteStasjoner, sisteOnKlikk);
+});
 
 export function visListe(stasjoner, onKlikk) {
     sisteStasjoner = stasjoner;
@@ -32,6 +38,9 @@ export function visListe(stasjoner, onKlikk) {
     if (aktivSort === 'diesel' && !inn.diesel) aktivSort = 'avstand';
     if (aktivSort === 'diesel_avgiftsfri' && !inn.diesel_avgiftsfri) aktivSort = 'avstand';
 
+    const favIds = hentFavoritter();
+    const favAntall = stasjoner.filter(s => favIds.has(s.id)).length;
+
     info.innerHTML = `
         <span id="sort-label">${filtrert.length} stasjoner (${medPris} med pris) – sorter:</span>
         <div id="sort-knapper">
@@ -41,7 +50,13 @@ export function visListe(stasjoner, onKlikk) {
             ${inn.diesel ? `<button class="sort-btn ${aktivSort === 'diesel' ? 'aktiv' : ''}" data-sort="diesel">Diesel</button>` : ''}
             ${inn.diesel_avgiftsfri ? `<button class="sort-btn ${aktivSort === 'diesel_avgiftsfri' ? 'aktiv' : ''}" data-sort="diesel_avgiftsfri">Avg.fri</button>` : ''}
         </div>
-        <label id="vis-gamle-label"><input id="vis-gamle-check" type="checkbox" ${visGamle ? 'checked' : ''}> Vis eldre enn 24 t</label>`;
+        <div id="liste-filter-rad">
+            <label id="vis-gamle-label"><input id="vis-gamle-check" type="checkbox" ${visGamle ? 'checked' : ''}> Vis eldre enn 24 t</label>
+            <button id="vis-favoritter-btn" class="fav-filter-btn${visFavoritter ? ' aktiv' : ''}" aria-pressed="${visFavoritter}">
+                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                Favoritter${favAntall ? ` (${favAntall})` : ''}
+            </button>
+        </div>`;
 
     info.querySelectorAll('.sort-btn').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -54,19 +69,29 @@ export function visListe(stasjoner, onKlikk) {
         localStorage.setItem('liste_vis_gamle', visGamle ? '1' : '0');
         visListe(sisteStasjoner, sisteOnKlikk);
     });
+    info.querySelector('#vis-favoritter-btn').addEventListener('click', () => {
+        visFavoritter = !visFavoritter;
+        visListe(sisteStasjoner, sisteOnKlikk);
+    });
 
+    const grunnlag = visFavoritter ? filtrert.filter(s => favIds.has(s.id)) : filtrert;
     const listeStasjoner = aktivSort === 'avstand'
-        ? filtrert
-        : filtrert.filter(s => aktuellPris(s, aktivSort) != null);
+        ? grunnlag
+        : grunnlag.filter(s => aktuellPris(s, aktivSort) != null);
     const billigste = finnBilligste(listeStasjoner, inn);
     const billigsteId = finnBilligsteId(listeStasjoner, inn, aktivSort);
     const sortert = sorter(listeStasjoner, aktivSort, billigsteId);
-    container.innerHTML = sortert.map(s => kortHtml(s, billigste, s.id === billigsteId)).join('');
+
+    const tomFavoritterHtml = visFavoritter && sortert.length === 0
+        ? `<div class="favoritter-tom">Ingen favoritter i nærheten.<br>Trykk ♥ på en stasjon for å lagre den.</div>`
+        : '';
+
+    container.innerHTML = tomFavoritterHtml + sortert.map(s => kortHtml(s, billigste, s.id === billigsteId)).join('');
 
     container.querySelectorAll('.stasjon-kort').forEach(kort => {
         const id = parseInt(kort.dataset.id, 10);
         const handler = () => {
-            const stasjon = filtrert.find(s => s.id === id);
+            const stasjon = stasjoner.find(s => s.id === id);
             if (stasjon) onKlikk(stasjon);
         };
         kort.addEventListener('click', handler);
@@ -79,8 +104,16 @@ export function visListe(stasjoner, onKlikk) {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             const id = parseInt(btn.dataset.kartId, 10);
-            const stasjon = filtrert.find(s => s.id === id);
+            const stasjon = stasjoner.find(s => s.id === id);
             if (stasjon) document.dispatchEvent(new CustomEvent('vis-pa-kart', { detail: stasjon }));
+        });
+    });
+
+    container.querySelectorAll('.sk-fav-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const id = parseInt(btn.dataset.favId, 10);
+            toggleFavoritt(id);
         });
     });
 }
@@ -95,6 +128,20 @@ export function oppdaterKort(stasjon, onKlikk) {
     nytt.innerHTML = kortHtml(stasjon, billigste, stasjon.id === billigsteId);
     const nyttKort = nytt.firstElementChild;
     nyttKort.addEventListener('click', () => onKlikk(stasjon));
+    const favBtn = nyttKort.querySelector('.sk-fav-btn');
+    if (favBtn) {
+        favBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleFavoritt(stasjon.id);
+        });
+    }
+    const kartBtn = nyttKort.querySelector('.sk-kart-btn');
+    if (kartBtn) {
+        kartBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            document.dispatchEvent(new CustomEvent('vis-pa-kart', { detail: stasjon }));
+        });
+    }
     kort.replaceWith(nyttKort);
 }
 
@@ -239,6 +286,9 @@ function kortHtml(s, billigste = {}, erHovedBilligst = false) {
             ${s.brukeropprettet ? `<a class="sk-gmaps-btn" href="https://www.google.com/maps?q=${s.lat},${s.lon}" target="_blank" rel="noopener" aria-label="Åpne ${s.navn} i Google Maps" onclick="event.stopPropagation()">
                 <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
             </a>` : ''}
+            <button class="sk-fav-btn${erFavoritt(s.id) ? ' aktiv' : ''}" aria-label="${erFavoritt(s.id) ? 'Fjern fra favoritter' : 'Legg til i favoritter'}" aria-pressed="${erFavoritt(s.id)}" data-fav-id="${s.id}">
+                <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+            </button>
             <button class="sk-kart-btn" aria-label="Vis ${s.navn} på kart" data-kart-id="${s.id}">
                 <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
             </button>

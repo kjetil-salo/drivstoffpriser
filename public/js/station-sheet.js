@@ -1,7 +1,8 @@
 import { oppdaterPris, bekreftEnPris, settKjede, endreNavn, settDrivstofftyper, foreslåEndring } from './api.js';
 import { getInnstillinger } from './settings.js';
 import { getKjedeFarge, getKjedeInitials, getKjedeLogo } from './kjede.js';
-import { initOcr, visOcrForRolle, skjulOcrPreview, loggOcrVedLagring } from './ocr.js';
+import { initOcr, visOcrForRolle, skjulOcrPreview, loggOcrVedLagring, loggOcrVedBekreftelse } from './ocr.js';
+import { erFavoritt, toggleFavoritt } from './favoritter.js';
 
 let aktivStasjon = null;
 let onPrisOppdatert = null;
@@ -22,6 +23,7 @@ const tidEl = document.getElementById('sheet-tid');
 const endreBtnEl = document.getElementById('sheet-endre-btn');
 const navigerBtnEl = document.getElementById('sheet-naviger-btn');
 const kartBtnEl = document.getElementById('sheet-kart-btn');
+const favorittBtnEl = document.getElementById('sheet-favoritt-btn');
 const forslagBtnEl = document.getElementById('sheet-forslag-btn');
 
 // Endringsforslag-modal
@@ -75,6 +77,16 @@ export function initSheet(onOppdatert) {
     forslagAvbrytEl.addEventListener('click', lukkForslagModal);
     forslagBackdropEl.addEventListener('click', lukkForslagModal);
     forslagLagreEl.addEventListener('click', sendEndringsforslag);
+    favorittBtnEl.addEventListener('click', () => {
+        if (!aktivStasjon) return;
+        toggleFavoritt(aktivStasjon.id);
+        oppdaterFavorittKnapp(aktivStasjon.id);
+    });
+    document.addEventListener('favoritt-endret', (e) => {
+        if (aktivStasjon && e.detail.id === aktivStasjon.id) {
+            oppdaterFavorittKnapp(aktivStasjon.id);
+        }
+    });
 
     // OCR: kamera-prisgjenkjenning for admin/moderator
     initOcr(
@@ -143,11 +155,19 @@ export function initSheet(onOppdatert) {
     }
 }
 
+function oppdaterFavorittKnapp(id) {
+    const fav = erFavoritt(id);
+    favorittBtnEl.classList.toggle('aktiv', fav);
+    favorittBtnEl.setAttribute('aria-pressed', fav ? 'true' : 'false');
+    favorittBtnEl.setAttribute('aria-label', fav ? 'Fjern fra favoritter' : 'Legg til som favoritt');
+}
+
 export function visStasjonSheet(stasjon) {
     tidligereFokus = document.activeElement;
     aktivStasjon = stasjon;
     fyllVisning(stasjon);
     visVisModus();
+    oppdaterFavorittKnapp(stasjon.id);
     const innlogget = window.__innlogget;
     endreBtnEl.style.display = innlogget ? '' : 'none';
     forslagBtnEl.style.display = innlogget ? '' : 'none';
@@ -330,6 +350,7 @@ async function håndterBekreftKlikk(e) {
         const naa = `${_nd.getFullYear()}-${_p(_nd.getMonth()+1)}-${_p(_nd.getDate())} ${_p(_nd.getHours())}:${_p(_nd.getMinutes())}:${_p(_nd.getSeconds())}`;
 
         const tidspunktFelt = type + '_tidspunkt';
+        loggOcrVedBekreftelse(aktivStasjon.id, type, aktivStasjon[type]);
         aktivStasjon = { ...aktivStasjon, [tidspunktFelt]: naa };
         _bekreftedeTyper.add(type);
         fyllVisning(aktivStasjon);
