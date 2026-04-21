@@ -271,7 +271,10 @@ function kortHtml(s, billigste = {}, erHovedBilligst = false) {
         ${bannerHtml}
         ${badgeHtml}
         <div class="sk-info">
-            <div class="sk-navn">${s.navn}${s.kjede ? ` <span class="sk-kjede-inline">(${s.kjede})</span>` : ''}</div>
+            <div class="sk-navn-rad">
+                <div class="sk-navn">${s.navn}${s.kjede ? ` <span class="sk-kjede-inline">(${s.kjede})</span>` : ''}</div>
+                <span class="sk-avstand">${avstandTekst(s.avstand_m)}</span>
+            </div>
             <div class="sk-priser">
                 ${rader.map(r => `<div class="sk-pris-rad${r.type === aktivSort ? ' sort-aktiv' : ''}">
                     <span class="sk-pris-label">${r.label}</span>
@@ -282,7 +285,6 @@ function kortHtml(s, billigste = {}, erHovedBilligst = false) {
             ${alderTekst ? `<div class="sk-alder ${alderKlasse}">${alderTekst}</div>` : ''}
         </div>
         <div class="sk-hoyre">
-            <span class="sk-avstand">${avstandTekst(s.avstand_m)}</span>
             ${s.brukeropprettet ? `<a class="sk-gmaps-btn" href="https://www.google.com/maps?q=${s.lat},${s.lon}" target="_blank" rel="noopener" aria-label="Åpne ${s.navn} i Google Maps" onclick="event.stopPropagation()">
                 <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
             </a>` : ''}
