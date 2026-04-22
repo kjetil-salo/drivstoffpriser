@@ -2569,26 +2569,29 @@ def admin_ocr_bilder():
     """Vis OCR-forsøk med original/crop-bilder, AI-resultat og fasit."""
     from db import get_conn
     filtre = request.args.get('filter', '')  # 'feil', 'fasit', ''
-    limit = min(int(request.args.get('limit', 50)), 200)
+    side = max(1, int(request.args.get('side', 1)))
+    PAGE_SIZE = 20
+
+    base_select = '''SELECT o.id, COALESCE(b.brukernavn, 'bruker ' || o.bruker_id), o.tidspunkt, o.kilde, o.claude_resultat,
+        o.lagret_priser, o.bilde_original, o.bilde_crop, o.stasjon_id, o.claude_ms
+        FROM ocr_statistikk o LEFT JOIN brukere b ON b.id = o.bruker_id'''
 
     with get_conn() as conn:
         if filtre == 'feil':
-            rows = conn.execute('''SELECT o.id, COALESCE(b.brukernavn, 'bruker ' || o.bruker_id), o.tidspunkt, o.kilde, o.claude_resultat,
-                o.lagret_priser, o.bilde_original, o.bilde_crop, o.stasjon_id, o.claude_ms
-                FROM ocr_statistikk o LEFT JOIN brukere b ON b.id = o.bruker_id
+            # Post-filtrering i Python — hent en større batch uten offset
+            rows = conn.execute(base_select + '''
                 WHERE o.lagret_priser IS NOT NULL AND o.claude_resultat IS NOT NULL
-                ORDER BY o.id DESC LIMIT ?''', (limit * 3,)).fetchall()
+                ORDER BY o.id DESC LIMIT 500''').fetchall()
+            totalt_db = None  # ukjent før filtrering
         elif filtre == 'fasit':
-            rows = conn.execute('''SELECT o.id, COALESCE(b.brukernavn, 'bruker ' || o.bruker_id), o.tidspunkt, o.kilde, o.claude_resultat,
-                o.lagret_priser, o.bilde_original, o.bilde_crop, o.stasjon_id, o.claude_ms
-                FROM ocr_statistikk o LEFT JOIN brukere b ON b.id = o.bruker_id
+            totalt_db = conn.execute('SELECT COUNT(*) FROM ocr_statistikk WHERE lagret_priser IS NOT NULL').fetchone()[0]
+            rows = conn.execute(base_select + '''
                 WHERE o.lagret_priser IS NOT NULL
-                ORDER BY o.id DESC LIMIT ?''', (limit,)).fetchall()
+                ORDER BY o.id DESC LIMIT ? OFFSET ?''', (PAGE_SIZE, (side - 1) * PAGE_SIZE)).fetchall()
         else:
-            rows = conn.execute('''SELECT o.id, COALESCE(b.brukernavn, 'bruker ' || o.bruker_id), o.tidspunkt, o.kilde, o.claude_resultat,
-                o.lagret_priser, o.bilde_original, o.bilde_crop, o.stasjon_id, o.claude_ms
-                FROM ocr_statistikk o LEFT JOIN brukere b ON b.id = o.bruker_id
-                ORDER BY o.id DESC LIMIT ?''', (limit,)).fetchall()
+            totalt_db = conn.execute('SELECT COUNT(*) FROM ocr_statistikk').fetchone()[0]
+            rows = conn.execute(base_select + '''
+                ORDER BY o.id DESC LIMIT ? OFFSET ?''', (PAGE_SIZE, (side - 1) * PAGE_SIZE)).fetchall()
 
     felt_liste = ('bensin', 'diesel', 'bensin98', 'diesel_avgiftsfri')
     kort_html = []
@@ -2637,12 +2640,14 @@ def admin_ocr_bilder():
         if not pris_html:
             pris_html = '<span style="color:#6b7280">Ingen priser</span>'
 
-        # Bilder
+        # Bilder — thumbnail med lightbox
         img_html = ''
         if bilde_orig:
-            img_html += f'<a href="/admin/ocr-bilde/{html.escape(bilde_orig)}" target="_blank"><img src="/admin/ocr-bilde/{html.escape(bilde_orig)}" style="max-width:180px;max-height:140px;border-radius:6px;margin-right:6px" loading="lazy"></a>'
+            src = f'/admin/ocr-bilde/{html.escape(bilde_orig)}'
+            img_html += f'<img src="{src}" class="ocr-thumb" data-full="{src}" loading="lazy" title="Original">'
         if bilde_crop:
-            img_html += f'<a href="/admin/ocr-bilde/{html.escape(bilde_crop)}" target="_blank"><img src="/admin/ocr-bilde/{html.escape(bilde_crop)}" style="max-width:180px;max-height:140px;border-radius:6px" loading="lazy"></a>'
+            src = f'/admin/ocr-bilde/{html.escape(bilde_crop)}'
+            img_html += f'<img src="{src}" class="ocr-thumb" data-full="{src}" loading="lazy" title="Crop">'
         if not img_html:
             img_html = '<span style="color:#6b7280">Ingen bilder</span>'
 
@@ -2651,9 +2656,9 @@ def admin_ocr_bilder():
         if isinstance(ocr_bilde, dict):
             crop_info = f' · {ocr_bilde.get("preprocess", "?")}'
 
-        kort_html.append(f'''<div class="kort" style="margin-bottom:16px">
+        kort_html.append(f'''<div class="kort">
 <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start">
-  <div style="flex:0 0 auto">{img_html}</div>
+  <div class="bilde-gruppe">{img_html}</div>
   <div style="flex:1;min-width:200px">
     <div style="color:#9ca3af;font-size:0.85em">{dato} · {html.escape(str(bruker))} · st.{st_id or "?"} · {html.escape(str(modell))} · {ms or "?"}ms{crop_info}</div>
     <div style="color:#d1d5db;font-size:0.85em">{html.escape(str(kjede or ""))} · confidence: {confidence}</div>
@@ -2661,28 +2666,73 @@ def admin_ocr_bilder():
   </div>
 </div></div>''')
 
+    # Paginering for feil-filter (post-filtrert i Python)
     if filtre == 'feil':
-        kort_html = kort_html[:limit]
+        totalt_db = len(kort_html)
+        start = (side - 1) * PAGE_SIZE
+        kort_html = kort_html[start:start + PAGE_SIZE]
+
+    totalt_sider = max(1, -(-totalt_db // PAGE_SIZE)) if totalt_db else 1
+
+    def side_url(s):
+        f = f'?filter={filtre}&side={s}' if filtre else f'?side={s}'
+        return f'/admin/ocr-bilder{f}'
 
     filter_links = (
-        '<a href="/admin/ocr-bilder" class="btn">Alle</a> '
-        '<a href="/admin/ocr-bilder?filter=fasit" class="btn">Med fasit</a> '
-        '<a href="/admin/ocr-bilder?filter=feil" class="btn">Bare feil</a>'
+        f'<a href="/admin/ocr-bilder" class="btn{"" if filtre else " btn-aktiv"}">Alle</a> '
+        f'<a href="/admin/ocr-bilder?filter=fasit" class="btn{"" if filtre != "fasit" else " btn-aktiv"}">Med fasit</a> '
+        f'<a href="/admin/ocr-bilder?filter=feil" class="btn{"" if filtre != "feil" else " btn-aktiv"}">Bare feil</a>'
     )
+
+    paginering = ''
+    if totalt_sider > 1:
+        pager = []
+        if side > 1:
+            pager.append(f'<a href="{side_url(side - 1)}" class="btn">← Forrige</a>')
+        pager.append(f'<span style="padding:6px 10px;color:#9ca3af">Side {side} av {totalt_sider}</span>')
+        if side < totalt_sider:
+            pager.append(f'<a href="{side_url(side + 1)}" class="btn">Neste →</a>')
+        paginering = f'<div style="margin-top:20px;display:flex;gap:6px;align-items:center">{"".join(pager)}</div>'
+
+    antall_vist = len(kort_html)
+    tittel_antall = f'{antall_vist} (side {side}/{totalt_sider})' if totalt_sider > 1 else str(antall_vist)
 
     return f'''<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
 <title>OCR-bilder</title><style>
   body{{background:#111827;color:#e5e7eb;font-family:system-ui;margin:0;padding:16px}}
   .container{{max-width:900px;margin:0 auto}}
   nav a{{color:#93c5fd;text-decoration:none}}
-  .kort{{background:#1f2937;border-radius:10px;padding:14px}}
+  .kort{{background:#1f2937;border-radius:10px;padding:14px;margin-bottom:12px}}
   .btn{{display:inline-block;padding:6px 14px;background:#374151;color:#e5e7eb;border-radius:6px;text-decoration:none;margin:2px;font-size:0.9em}}
+  .btn-aktiv{{background:#2563eb;color:#fff}}
+  .bilde-gruppe{{display:flex;gap:8px;flex-wrap:wrap}}
+  .ocr-thumb{{max-width:160px;max-height:120px;border-radius:6px;cursor:zoom-in;object-fit:contain;background:#111}}
+  #lb-overlay{{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:1000;align-items:center;justify-content:center;cursor:zoom-out}}
+  #lb-overlay.vis{{display:flex}}
+  #lb-img{{max-width:95vw;max-height:92vh;border-radius:8px;box-shadow:0 0 40px #000}}
+  #lb-lukk{{position:fixed;top:16px;right:20px;font-size:2rem;color:#fff;cursor:pointer;line-height:1;user-select:none}}
 </style></head><body><div class="container">
 <nav><a href="/admin">← Admin</a></nav>
-<h1>OCR-bilder ({len(kort_html)})</h1>
+<h1>OCR-bilder ({tittel_antall})</h1>
 <div style="margin-bottom:16px">{filter_links}</div>
 {"".join(kort_html) or "<p>Ingen OCR-forsøk funnet.</p>"}
-</div></body></html>'''
+{paginering}
+</div>
+
+<div id="lb-overlay"><span id="lb-lukk">✕</span><img id="lb-img" src=""></div>
+<script>
+const overlay = document.getElementById('lb-overlay');
+const lbImg = document.getElementById('lb-img');
+document.querySelectorAll('.ocr-thumb').forEach(img => {{
+  img.addEventListener('click', () => {{
+    lbImg.src = img.dataset.full || img.src;
+    overlay.classList.add('vis');
+  }});
+}});
+overlay.addEventListener('click', () => overlay.classList.remove('vis'));
+document.addEventListener('keydown', e => {{ if(e.key==='Escape') overlay.classList.remove('vis'); }});
+</script>
+</body></html>'''
 
 
 @admin_bp.route('/admin/ocr-bilde/<path:sti>')
