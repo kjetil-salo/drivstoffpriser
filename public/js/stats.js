@@ -24,16 +24,10 @@ function _byggKjedeTabell() {
         return;
     }
 
-    const harBensin98 = _kjedeData.some(k => k.snitt_bensin98);
-    const harAvgiftsfri = _kjedeData.some(k => k.snitt_diesel_avgiftsfri);
-
     const kolonner = [
         { tekst: 'Kjede',    felt: 'kjede',                    num: false },
         { tekst: '95 oktan', felt: 'snitt_bensin',              num: true  },
-        ...(harBensin98   ? [{ tekst: '98 oktan', felt: 'snitt_bensin98',          num: true }] : []),
         { tekst: 'Diesel',   felt: 'snitt_diesel',              num: true  },
-        ...(harAvgiftsfri ? [{ tekst: 'Avg.fri',  felt: 'snitt_diesel_avgiftsfri', num: true }] : []),
-        { tekst: 'Ant.',     felt: 'antall_stasjoner',          num: true  },
     ];
 
     // Sorter data
