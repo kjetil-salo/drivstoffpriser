@@ -349,41 +349,35 @@ def bekreft_pris(stasjon_id, type_navn, bruker_id, min_intervall=300):
 
 def lagre_pris(stasjon_id, bensin, diesel, bensin98=None, bruker_id=None, diesel_avgiftsfri=None, min_intervall=300, kilde=None):
     """Lagrer pris. Oppdaterer siste rad hvis bruker korrigerer innen intervallet, ellers insert.
-    NULL-verdier bevares fra forrige pris slik at en delvis oppdatering ikke sletter eksisterende priser."""
+    Ved UPDATE bevares verdier fra samme rad slik at delvis korreksjon ikke sletter det brukeren nettopp tastet.
+    Ved INSERT lagres kun de oppgitte verdiene — subquery-ene i hent_stasjoner() henter siste verdi per type."""
     with _pris_lock:
         with get_conn() as conn:
-            # Hent forrige verdier så vi ikke overskriver med NULL
-            forrige = conn.execute(
-                "SELECT bensin, diesel, bensin98, diesel_avgiftsfri FROM priser WHERE stasjon_id=? ORDER BY id DESC LIMIT 1",
-                (stasjon_id,)
-            ).fetchone()
-            if forrige:
-                bensin = bensin if bensin is not None else forrige[0]
-                diesel = diesel if diesel is not None else forrige[1]
-                bensin98 = bensin98 if bensin98 is not None else forrige[2]
-                diesel_avgiftsfri = diesel_avgiftsfri if diesel_avgiftsfri is not None else forrige[3]
-
-            bensin = _gyldig_pris_eller_null(bensin)
-            diesel = _gyldig_pris_eller_null(diesel)
-            bensin98 = _gyldig_pris_eller_null(bensin98)
-            diesel_avgiftsfri = _gyldig_pris_eller_null(diesel_avgiftsfri)
-
             if bruker_id is not None:
                 sist = conn.execute(
-                    "SELECT id, tidspunkt FROM priser WHERE bruker_id=? AND stasjon_id=? ORDER BY tidspunkt DESC LIMIT 1",
+                    "SELECT id, tidspunkt, bensin, diesel, bensin98, diesel_avgiftsfri FROM priser WHERE bruker_id=? AND stasjon_id=? ORDER BY tidspunkt DESC LIMIT 1",
                     (bruker_id, stasjon_id)
                 ).fetchone()
                 if sist:
                     sekunder_siden = (datetime.now() - datetime.strptime(sist[1], '%Y-%m-%d %H:%M:%S')).total_seconds()
                     if sekunder_siden < min_intervall:
+                        # Korreksjon innen intervallet: bevar verdier fra samme rad
+                        b = bensin if bensin is not None else sist[2]
+                        d = diesel if diesel is not None else sist[3]
+                        b98 = bensin98 if bensin98 is not None else sist[4]
+                        da = diesel_avgiftsfri if diesel_avgiftsfri is not None else sist[5]
                         conn.execute(
                             'UPDATE priser SET bensin=?, diesel=?, bensin98=?, diesel_avgiftsfri=?, tidspunkt=datetime("now") WHERE id=?',
-                            (bensin, diesel, bensin98, diesel_avgiftsfri, sist[0])
+                            (_gyldig_pris_eller_null(b), _gyldig_pris_eller_null(d),
+                             _gyldig_pris_eller_null(b98), _gyldig_pris_eller_null(da), sist[0])
                         )
                         return True
+
             conn.execute(
                 'INSERT INTO priser (stasjon_id, bensin, diesel, bensin98, bruker_id, diesel_avgiftsfri, kilde) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                (stasjon_id, bensin, diesel, bensin98, bruker_id, diesel_avgiftsfri, kilde)
+                (stasjon_id, _gyldig_pris_eller_null(bensin), _gyldig_pris_eller_null(diesel),
+                 _gyldig_pris_eller_null(bensin98), bruker_id,
+                 _gyldig_pris_eller_null(diesel_avgiftsfri), kilde)
             )
     return True
 
