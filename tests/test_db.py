@@ -119,6 +119,21 @@ class TestPriser:
         assert result[0]['diesel_avgiftsfri'] is None
         assert result[0]['diesel_avgiftsfri_tidspunkt'] is None
 
+    def test_skjuler_priser_for_drivstoff_stasjonen_ikke_har(self):
+        db_mod.lagre_stasjon('Dieselstasjon', 'Test', 60.39, 5.33, 'node/1')
+        stasjoner = db_mod.get_stasjoner_med_priser(60.39, 5.33)
+        sid = stasjoner[0]['id']
+        db_mod.sett_drivstofftyper(sid, False, False, True, True)
+        db_mod.lagre_pris(sid, 23.99, 20.99, bensin98=24.99, diesel_avgiftsfri=19.99)
+
+        result = db_mod.get_stasjoner_med_priser(60.39, 5.33)
+        assert result[0]['bensin'] is None
+        assert result[0]['bensin_tidspunkt'] is None
+        assert result[0]['bensin98'] is None
+        assert result[0]['bensin98_tidspunkt'] is None
+        assert result[0]['diesel'] == 20.99
+        assert result[0]['diesel_avgiftsfri'] == 19.99
+
     def test_antall_stasjoner_med_kun_avgiftsfri(self):
         db_mod.lagre_stasjon('Avg.fri', 'Test', 60.39, 5.33, 'node/1')
         stasjoner = db_mod.get_stasjoner_med_priser(60.39, 5.33)

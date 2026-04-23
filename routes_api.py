@@ -35,7 +35,8 @@ from db import (get_stasjoner_med_priser, lagre_pris, bekreft_pris, logg_visning
                 prisoppdateringer_per_time_24t,
                 prisoppdateringer_rullende_24t_uke,
                 har_rolle, hent_kjede_snitt_24t,
-                sjekk_rate_limit, logg_rate_limit, hent_anonym_bruker_id)
+                sjekk_rate_limit, logg_rate_limit, hent_anonym_bruker_id,
+                mask_stasjon_priser_for_tilganger)
 
 logger = logging.getLogger('drivstoff')
 
@@ -393,7 +394,7 @@ def _rute_stasjoner_i_boks(punkter, margin):
                  AND s.lat BETWEEN ? AND ? AND s.lon BETWEEN ? AND ?''',
             (min_lat, max_lat, min_lon, max_lon),
         ).fetchall()
-    return [dict(r) for r in rows]
+    return [mask_stasjon_priser_for_tilganger(dict(r)) for r in rows]
 
 
 def _finn_billige_langs_rute(rute, drivstoff: str, maks_avvik_km: float, limit: int = 25):

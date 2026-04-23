@@ -311,6 +311,21 @@ def _gyldig_pris_eller_null(pris):
 
 
 _GYLDIGE_PRISTYPER = {'bensin', 'diesel', 'bensin98', 'diesel_avgiftsfri'}
+_PRISTYPER_TIL_FLAGG = {
+    'bensin': 'har_bensin',
+    'bensin98': 'har_bensin98',
+    'diesel': 'har_diesel',
+    'diesel_avgiftsfri': 'har_diesel_avgiftsfri',
+}
+
+
+def mask_stasjon_priser_for_tilganger(stasjon: dict) -> dict:
+    """Skjul priser for drivstofftyper stasjonen ikke tilbyr."""
+    for pristype, flagg in _PRISTYPER_TIL_FLAGG.items():
+        if not stasjon.get(flagg):
+            stasjon[pristype] = None
+            stasjon[f'{pristype}_tidspunkt'] = None
+    return stasjon
 
 
 def bekreft_pris(stasjon_id, type_navn, bruker_id, min_intervall=300):
@@ -1207,7 +1222,7 @@ def get_stasjoner_med_priser(user_lat, user_lon, radius_m=30000, limit=30):
     for row in rows:
         dist = _haversine(user_lat, user_lon, row['lat'], row['lon'])
         if dist <= radius_m:
-            result.append({
+            result.append(mask_stasjon_priser_for_tilganger({
                 'id': row['id'],
                 'navn': row['navn'],
                 'kjede': row['kjede'] or '',
@@ -1227,7 +1242,7 @@ def get_stasjoner_med_priser(user_lat, user_lon, radius_m=30000, limit=30):
                 'har_bensin98': bool(row['har_bensin98']),
                 'har_diesel': bool(row['har_diesel']),
                 'har_diesel_avgiftsfri': bool(row['har_diesel_avgiftsfri']),
-            })
+            }))
 
     result.sort(key=lambda x: x['avstand_m'])
     return result[:limit]
