@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <meta name="theme-color" content="#1a1a2e">
+  <title>Hvorfor hopper bensinprisen som en jojo – mens melken står stille? – Drivstoffprisene</title>
+  <meta name="description" content="Bensinprisen kan hoppe 5 kr på ett minutt. Melkeprisen gjør ikke det. Vi viser hva som skjer – og hva andre land har valgt å gjøre med det.">
+  <link rel="stylesheet" href="/css/tokens.css">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--color-bg);
+      color: var(--color-text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 16px;
+      min-height: 100vh;
+    }
+
+    header {
+      position: sticky;
+      top: 0;
+      background: rgba(15, 23, 42, 0.92);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--border-color);
+      padding: 0 var(--space-lg);
+      height: 48px;
+      display: flex;
+      align-items: center;
+      gap: var(--space-md);
+      z-index: 10;
+    }
+
+    header a { color: var(--color-muted); text-decoration: none; font-size: var(--font-sm); }
+    header a:hover { color: var(--color-text); }
+    header .sep { color: var(--border-color-medium); }
+    header .side-tittel { color: var(--color-text); font-weight: 600; font-size: var(--font-base); }
+
+    main {
+      max-width: 680px;
+      margin: 0 auto;
+      padding: var(--space-lg);
+    }
+
+    .meta {
+      font-size: var(--font-xs);
+      color: var(--color-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: var(--space-sm);
+    }
+
+    h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      line-height: 1.25;
+      margin-bottom: var(--space-lg);
+    }
+
+    h2 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--color-text);
+      margin: var(--space-xl) 0 var(--space-sm);
+    }
+
+    p {
+      font-size: var(--font-base);
+      line-height: 1.75;
+      color: #cbd5e1;
+      margin-bottom: var(--space-md);
+    }
+
+    p:last-child { margin-bottom: 0; }
+
+    .manchet {
+      font-size: 1.05rem;
+      line-height: 1.65;
+      color: #94a3b8;
+      margin-bottom: 2.5rem;
+      border-left: 3px solid var(--color-accent);
+      padding-left: var(--space-md);
+    }
+
+    .graf-bilde {
+      width: 100%;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-color);
+      margin: var(--space-lg) 0 var(--space-sm);
+      display: block;
+    }
+
+    .graf-tekst {
+      font-size: var(--font-xs);
+      color: var(--color-muted);
+      text-align: center;
+      margin-bottom: var(--space-lg);
+    }
+
+    .faktaboks {
+      background: #1c1a10;
+      border: 1px solid #78350f;
+      border-radius: var(--radius-md);
+      padding: var(--space-md) var(--space-lg);
+      margin: var(--space-lg) 0;
+    }
+
+    .faktaboks-tittel {
+      font-size: var(--font-sm);
+      font-weight: 700;
+      color: #fbbf24;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: var(--space-sm);
+    }
+
+    .faktaboks p {
+      margin-bottom: var(--space-sm);
+      color: #e2e8f0;
+    }
+
+    .faktaboks p:last-child { margin-bottom: 0; }
+
+    .faktaboks-blaa {
+      background: #0f1f2e;
+      border: 1px solid #1e4060;
+      border-radius: var(--radius-md);
+      padding: var(--space-md) var(--space-lg);
+      margin: var(--space-lg) 0;
+    }
+
+    .faktaboks-blaa .faktaboks-tittel {
+      color: #38bdf8;
+    }
+
+    .faktaboks-blaa p {
+      margin-bottom: var(--space-sm);
+      color: #e2e8f0;
+    }
+
+    .faktaboks-blaa p:last-child { margin-bottom: 0; }
+
+    .tall-rad {
+      display: flex;
+      gap: var(--space-md);
+      margin: var(--space-lg) 0;
+      flex-wrap: wrap;
+    }
+
+    .tall-kort {
+      flex: 1;
+      min-width: 120px;
+      background: var(--color-card-bg);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: var(--space-md);
+      text-align: center;
+    }
+
+    .tall-verdi {
+      font-size: 1.9rem;
+      font-weight: 700;
+      color: var(--color-success);
+      display: block;
+    }
+
+    .tall-verdi.roed { color: #ef4444; }
+
+    .tall-label {
+      font-size: var(--font-xs);
+      color: var(--color-muted);
+      margin-top: var(--space-xs);
+    }
+
+    .cta {
+      background: var(--color-accent-soft);
+      border: 1px solid var(--color-accent);
+      border-radius: var(--radius-md);
+      padding: var(--space-md) var(--space-lg);
+      margin-top: var(--space-xl);
+    }
+
+    .cta p { margin-bottom: var(--space-sm); }
+    .cta p:last-child { margin-bottom: 0; }
+    .cta a { color: var(--color-accent); font-weight: 600; text-decoration: none; }
+    .cta a:hover { text-decoration: underline; }
+
+    .kilder {
+      margin-top: var(--space-xl);
+      padding-top: var(--space-lg);
+      border-top: 1px solid var(--border-color);
+    }
+
+    .kilder-tittel {
+      font-size: var(--font-xs);
+      color: var(--color-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: var(--space-sm);
+    }
+
+    .kilder ul {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-xs);
+    }
+
+    .kilder li {
+      font-size: var(--font-sm);
+      color: var(--color-muted);
+    }
+
+    .kilder a {
+      color: #38bdf8;
+      text-decoration: none;
+    }
+
+    .kilder a:hover { text-decoration: underline; }
+
+    :focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="/">⛽ Drivstoffprisene</a>
+    <span class="sep">/</span>
+    <a href="/blogg/">Prisanalyse</a>
+    <span class="sep">/</span>
+    <span class="side-tittel">Prisstrategi og prishopp</span>
+  </header>
+
+  <main>
+    <p class="meta">22. april 2026</p>
+    <h1>Hvorfor hopper bensinprisen som en jojo — mens melken står stille?</h1>
+
+    <p class="manchet">
+      Tenk deg at du handler kjøttdeig på Kiwi mandag morgen til 89 kroner. Du er innom igjen på ettermiddagen, og prisen er 127 kroner. Så på kvelden er den 94 kroner igjen. Det ville skapt ramaskrik. Allikevel er dette nøyaktig hva som skjer med bensin — hver eneste uke.
+    </p>
+
+    <h2>Det skjer foran øynene våre</h2>
+
+    <p>
+      Grafen under er laget fra alle prisregistreringene på drivstoffprisene.no — tusenvis av observasjoner fra norske bilister som har logget hva de så på pumpa. Prisen er normalisert: null-linjen er «normal» pris for den aktuelle stasjonen, og kurven viser hvor mye dyrere eller billigere det er å tanke på ulike tidspunkt gjennom uken.
+    </p>
+
+    <img class="graf-bilde" src="/blogg/ukesprofil-normalisert.png" alt="Graf som viser ukentlig prisprofil for bensin 95, normalisert per stasjon. Prisen stiger gradvis gjennom uken med to tydelige topper, og faller natt til fredag.">
+    <p class="graf-tekst">Avvik fra stasjonens eget snitt (kr/liter), 95 oktan, alle registreringer. Grønt = billigere enn normalt. Rødt = dyrere enn normalt.</p>
+
+    <p>
+      Mønsteret er tydelig: prisen stiger mot slutten av uken, faller natt til fredag til lørdag, og det skjer to topper i løpet av en typisk uke. Differansen mellom bunn og topp er over 1,50 kr per liter — for <em>nøyaktig samme bensin, fra nøyaktig samme pumpe</em>.
+    </p>
+
+    <h2>13. april: Da bølgen slo inn</h2>
+
+    <p>
+      Mandag 13. april 2026 fanget vi noe sjeldent: en koordinert prisøkning som rullet over landet i løpet av noen timer.
+    </p>
+
+    <p>
+      Mellom kl. 12 og 17 det ettermiddaget gikk medianprisen på 95 oktan fra <strong>17,34 kr til 21,49 kr</strong> — et hopp på over fire kroner. Det var ikke én kjede som prøvde seg. Fra Romerike i øst til Bergen i vest satte Circle K, Uno-X, St1 og Esso opp prisen innen et par timer av hverandre.
+    </p>
+
+    <div class="tall-rad">
+      <div class="tall-kort">
+        <span class="tall-verdi roed">+4,15</span>
+        <div class="tall-label">kr/liter på 5 timer</div>
+      </div>
+      <div class="tall-kort">
+        <span class="tall-verdi roed">+5,80</span>
+        <div class="tall-label">kr — største enkelthopp</div>
+      </div>
+      <div class="tall-kort">
+        <span class="tall-verdi">~5 t</span>
+        <div class="tall-label">fra Romerike til Bergen</div>
+      </div>
+    </div>
+
+    <p>
+      St1 Bønes i Bergen fikk den bratteste enkeltoppgangen: <strong>+5,80 kr på én gang</strong>, kl. 17:58.
+    </p>
+
+    <p>
+      Selve bensinen i tanken under bakken hadde ikke blitt dyrere den ettermiddagen. Det var det samme produktet som var kjøpt inn til en fastsatt pris. Likevel ble det over 5 kroner dyrere per liter i løpet av noen minutter.
+    </p>
+
+    <h2>Hvorfor skjer ikke dette med melk?</h2>
+
+    <p>
+      Det er et legitimt spørsmål. Dagligvarepriser justeres sjelden mer enn én gang, og butikkene varsler gjerne i forkant. Kiwi setter ikke opp potetprisen fem ganger på en torsdag.
+    </p>
+
+    <p>
+      Noe av forklaringen er teknisk: bensinstasjoner kan endre prisen digitalt på sekunder, uten å flytte en eneste prislapp. Pumpen er koblet til et sentralsystem. Det er i praksis fri flyt.
+    </p>
+
+    <p>
+      Men den viktigste forklaringen er strategisk. Konkurransetilsynet har dokumentert at norske bensinstasjoner har operert med et ukentlig prismønster i over ti år: prisene settes opp, faller gradvis utover uken, og settes opp igjen. Det Konkurransetilsynet kalte «koordinert prisatferd» — ikke nødvendigvis ulovlig samarbeid, men kjeder som følger hverandre nøye og reagerer raskt når én aktør beveger seg.
+    </p>
+
+    <p>
+      I 2020 ble Circle K og YX pålagt å slutte å publisere listepriser på nettsidene sine, fordi tilsynet mente dette fungerte som et koordineringssignal: <em>«nå øker vi»</em>. Men mønsteret med jevnlige prishopp fortsatte.
+    </p>
+
+    <div class="faktaboks">
+      <div class="faktaboks-tittel">Konkurransetilsynet om ukemønsteret</div>
+      <p>
+        Tilsynet dokumenterte allerede for mange år siden at norske bensinpriser følger et fast ukemønster: oppgang mandag, gradvis nedgang, ny oppgang torsdag/fredag. De konkluderte med at dette er «koordinert prisatferd» — ikke nødvendigvis ulovlig, men et resultat av at kjedene overvåker hverandre tett og reagerer raskt.
+      </p>
+      <p>
+        Nyere data tyder på at det klassiske mandagsmønsteret er noe svekket, men prissvingningene innenfor én dag er like store som alltid.
+      </p>
+    </div>
+
+    <h2>Tyskland sa nok — fra 1. april 2026</h2>
+
+    <div class="faktaboks-blaa">
+      <div class="faktaboks-tittel">Tysk lov fra 1. april 2026</div>
+      <p>
+        Bensinstasjoner i Tyskland får kun øke prisen <strong>én gang per dag — kl. 12.00 middag</strong>. Prisreduksjoner er tillatt når som helst. Brudd kan straffes med bøter på inntil <strong>100 000 euro per overtredelse</strong>.
+      </p>
+      <p>
+        Loven er modellert etter Østerrike, som har hatt tilsvarende regler i mange år. Tankegangen: hvis du vet at prisen bare kan gå ned etter kl. 12, vet du at det alltid lønner seg å vente til ettermiddagen.
+      </p>
+    </div>
+
+    <p>
+      Akkurat tolv dager før prishopp-bølgen vi fanget 13. april, innførte Tyskland denne nye loven. Loven gir forbrukerne forutsigbarhet — og reduserer kjedenes mulighet til å «time» prisøkninger på travle tidspunkt.
+    </p>
+
+    <p>
+      Det finnes også en annen modell, brukt i noen land: kjedene må varsle en prisøkning 24 timer i forkant. Resultatet er at prisøkninger skjer saktere, og forbrukere rekker å reagere.
+    </p>
+
+    <p>
+      I Norge har vi ingen av delene.
+    </p>
+
+    <h2>Hva kan du gjøre?</h2>
+
+    <p>
+      Grafen viser at det faktisk finnes mønstre. Noen tommelfingerregler basert på våre data:
+    </p>
+
+    <ul style="list-style: none; display: flex; flex-direction: column; gap: var(--space-sm); margin-bottom: var(--space-md);">
+      <li style="display: flex; gap: var(--space-sm); color: #cbd5e1; font-size: var(--font-base); line-height: 1.6;">
+        <span style="color: #4ade80; flex-shrink: 0; margin-top: 0.15em;">&#10003;</span>
+        <span><strong>Tidlig morgen er nesten alltid billigst</strong> — uansett ukedag</span>
+      </li>
+      <li style="display: flex; gap: var(--space-sm); color: #cbd5e1; font-size: var(--font-base); line-height: 1.6;">
+        <span style="color: #ef4444; flex-shrink: 0; margin-top: 0.15em;">&#10005;</span>
+        <span><strong>Unngå sen ettermiddag og tidlig kveld</strong> — da slår prisøkningene inn</span>
+      </li>
+      <li style="display: flex; gap: var(--space-sm); color: #cbd5e1; font-size: var(--font-base); line-height: 1.6;">
+        <span style="color: #38bdf8; flex-shrink: 0; margin-top: 0.15em;">&#8594;</span>
+        <span><strong>Sjekk appen før du tanker</strong> — på dager med store bevegelser kan du spare 50–100 kroner per tank ved å vente noen timer</span>
+      </li>
+    </ul>
+
+    <p>
+      Den grunnleggende urimeligheten forsvinner ikke av den grunn. Den fysiske bensinen i tanken under bakken endrer ikke verdi fem ganger om dagen. Det gjør bare prislappen over den.
+    </p>
+
+    <h2>En siste tanke</h2>
+
+    <p>
+      Tenk på den som har dårlig økonomi og bruker bilen til jobb. Som planlegger å tanke på vei hjem torsdag ettermiddag fordi det er da lønning er igjen. Som ikke har appen, ikke vet om prissyklusene, og bare tanker når tanken er tom. Den personen betaler kanskje <strong>300 kroner mer for en full tank</strong> enn den som tilfeldigvis passerte samme stasjon fire timer tidligere — ikke fordi de kjøpte et bedre produkt, ikke fordi råvaren ble dyrere, men fordi de var uheldige med timingen.
+    </p>
+
+    <p>
+      En vanlig personbil har tank på 60–70 liter. Med 4–5 kroner i prisforskjell på samme dag er 300 kroner et realistisk tall.
+    </p>
+
+    <p>
+      Det er ikke forbrukervennlig. Og det skjer ikke med noen andre varer vi kjøper regelmessig.
+    </p>
+
+    <p>
+      Kjedene har selvfølgelig rett til å sette prisene sine. Men det burde finnes grenser for hvor ofte og hvor mye de kan endre seg — slik det nå finnes i Tyskland og Østerrike. At norske myndigheter ikke har tatt grep, synes jeg er påfallende.
+    </p>
+
+    <p>
+      At en liter bensin kan koste 5,80 kr mer kl. 18 enn kl. 10 — fra samme pumpe, samme produkt, samme dag — er et resultat av at det er mulig, og at det ikke finnes regler som hindrer det.
+    </p>
+
+    <p>
+      Tyskland og Østerrike har valgt å sette grenser. Norge har valgt å overlate det til markedet. Det markedet har valgt, kan du se i grafen over.
+    </p>
+
+    <div class="cta">
+      <p><strong>Hjelp oss dokumentere prisene.</strong></p>
+      <p>
+        Alle tallene i denne artikkelen er basert på prisregistreringer fra brukere av <a href="/">drivstoffprisene.no</a>. Jo flere som logger hva de ser på pumpa, jo mer nøyaktig blir bildet. Appen er gratis.
+      </p>
+    </div>
+
+    <div class="kilder">
+      <div class="kilder-tittel">Kilder</div>
+      <ul>
+        <li><a href="https://www.cnbc.com/2026/04/01/germany-fuel-gas-price-limit-oil-iran-war.html" target="_blank" rel="noopener">Germany limits gas price rises to once a day — CNBC, april 2026</a></li>
+        <li><a href="https://basic-tutorials.com/news/new-fuel-rule-from-april-1-2026-prices-will-only-rise-once-a-day/" target="_blank" rel="noopener">New fuel rule from April 1, 2026 — basic-tutorials.com</a></li>
+        <li><a href="https://konkurransetilsynet.no/bensin-ukemonsteret-er-brutt-ikke-nodvendigvis-billigst-pa-mandager-lenger/" target="_blank" rel="noopener">Konkurransetilsynet: Bensin – ukemønsteret er brutt</a></li>
+        <li><a href="https://konkurransetilsynet.no/endringer-i-drivstoffmarkedet-prisbevisste-kunder-kan-spare-penger-og-bidra-til-bedre-konkurranse/" target="_blank" rel="noopener">Konkurransetilsynet: Endringer i drivstoffmarkedet</a></li>
+        <li>Prisdata: drivstoffprisene.no (tusenvis av brukerregistreringer, april 2026)</li>
+      </ul>
+    </div>
+  </main>
+<script>fetch('/api/blogg/vis',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug:'prisstrategi-prishopp'})});</script>
+</body>
+</html>
