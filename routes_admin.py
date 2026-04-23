@@ -259,11 +259,7 @@ def admin():
     <div class="tile-tittel">Nyhet</div>
     <div class="tile-info">Splash-melding</div>
   </a>
-  <a href="/admin/endre-stasjon" class="tile">
-    <div class="tile-ikon">&#9998;&#65039;</div>
-    <div class="tile-tittel">Endre stasjon</div>
-    <div class="tile-info">S&#248;k og endre navn</div>
-  </a>
+
   <a href="/admin/innstillinger" class="tile">
     <div class="tile-ikon">&#9881;&#65039;</div>
     <div class="tile-tittel">Innstillinger</div>
@@ -774,104 +770,6 @@ def admin_godkjenn_stasjon():
     if stasjon_id:
         godkjenn_stasjon(stasjon_id)
     return redirect(f'/admin/steder?filter={filter_valg}')
-
-
-@admin_bp.route('/admin/endre-stasjon', methods=['GET', 'POST'])
-@krever_innlogging
-@krever_admin
-def admin_endre_stasjon():
-    melding = ''
-    resultater = []
-    sok = ''
-    if request.method == 'POST':
-        if 'sok' in request.form:
-            sok = request.form.get('sok', '').strip()
-            if sok:
-                resultater = finn_stasjoner_by_navn(sok)
-                if not resultater:
-                    melding = f'Ingen stasjoner funnet for «{sok}».'
-        elif 'stasjon_id' in request.form:
-            stasjon_id = request.form.get('stasjon_id', type=int)
-            nytt_navn = request.form.get('nytt_navn', '').strip()
-            gammelt_navn = request.form.get('gammelt_navn', '').strip()
-            sok = request.form.get('sok', '').strip()
-            if stasjon_id and nytt_navn:
-                ok = endre_navn_stasjon(stasjon_id, nytt_navn)
-                if ok:
-                    melding = f'✓ «{gammelt_navn}» ble omdøpt til «{nytt_navn}».'
-                else:
-                    melding = f'Feil: Fant ikke stasjon med id {stasjon_id}.'
-            else:
-                melding = 'Mangler stasjon-id eller nytt navn.'
-            if sok:
-                resultater = finn_stasjoner_by_navn(sok)
-
-    resultat_rader = ''
-    for s in resultater:
-        kart_url = f'https://www.google.com/maps?q={s["lat"]},{s["lon"]}'
-        kjede_txt = f' ({s["kjede"]})' if s['kjede'] else ''
-        resultat_rader += (
-            f'<tr>'
-            f'<td><a href="{kart_url}" target="_blank" style="color:#93c5fd;text-decoration:none">'
-            f'{s["navn"]}{kjede_txt}</a></td>'
-            f'<td>'
-            f'<form method="post" style="display:flex;gap:6px;align-items:center;margin:0">'
-            f'<input type="hidden" name="stasjon_id" value="{s["id"]}">'
-            f'<input type="hidden" name="gammelt_navn" value="{s["navn"]}">'
-            f'<input type="hidden" name="sok" value="{sok}">'
-            f'<input type="text" name="nytt_navn" value="{s["navn"]}" required '
-            f'style="background:#1f2937;border:1px solid #374151;border-radius:4px;'
-            f'color:#e5e7eb;padding:4px 8px;font-size:0.82rem;flex:1;min-width:160px">'
-            f'<button style="background:transparent;border:1px solid #3b82f6;color:#3b82f6;'
-            f'font-size:0.75rem;padding:4px 10px;border-radius:4px;cursor:pointer;white-space:nowrap">'
-            f'Lagre</button>'
-            f'</form>'
-            f'</td>'
-            f'</tr>'
-        )
-
-    tabell_html = (
-        f'<table><tr><th>Stasjon</th><th>Nytt navn</th></tr>{resultat_rader}</table>'
-        if resultat_rader else ''
-    )
-    melding_html = (
-        f'<p style="margin-bottom:1rem;color:{"#22c55e" if "✓" in melding else "#f59e0b"}">{melding}</p>'
-        if melding else ''
-    )
-
-    return f'''<!DOCTYPE html><html lang="no"><head><meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Endre stasjon – Admin</title>
-<style>
-  *{{box-sizing:border-box;margin:0;padding:0}}
-  body{{font-family:system-ui,sans-serif;background:#0f172a;color:#e5e7eb;padding:2rem 1rem}}
-  .container{{max-width:700px;margin:0 auto}}
-  h1{{font-size:1.3rem;margin-bottom:2rem;color:#f1f5f9}}
-  .kort{{background:#111827;border:1px solid #1f2937;border-radius:10px;padding:1.5rem;margin-bottom:1.5rem}}
-  table{{width:100%;border-collapse:collapse;font-size:0.88rem;margin-top:1rem}}
-  td,th{{padding:8px 10px;border-bottom:1px solid #1f2937;text-align:left}}
-  th{{color:#94a3b8;font-weight:500}}
-  nav{{margin-bottom:1.5rem;font-size:0.85rem}}
-  nav a{{color:#94a3b8}}
-  .sok-rad{{display:flex;gap:8px;align-items:center}}
-  .sok-felt{{background:#1f2937;border:1px solid #374151;border-radius:6px;color:#e5e7eb;
-             padding:8px 12px;font-size:0.9rem;flex:1}}
-  .sok-btn{{background:transparent;border:1px solid #3b82f6;color:#3b82f6;
-            font-size:0.85rem;padding:8px 16px;border-radius:6px;cursor:pointer;white-space:nowrap}}
-</style></head><body><div class="container">
-<nav><a href="/admin">&#8592; Admin</a></nav>
-<h1>Endre stasjonsnavn</h1>
-<div class="kort">
-  <form method="post">
-    <div class="sok-rad">
-      <input class="sok-felt" type="text" name="sok" placeholder="S&#248;k etter stasjonsnavn..." value="{sok}" required>
-      <button class="sok-btn" type="submit">S&#248;k</button>
-    </div>
-  </form>
-  {melding_html}
-  {tabell_html}
-</div>
-</div></body></html>'''
 
 
 @admin_bp.route('/admin/drivstofftyper', methods=['GET', 'POST'])

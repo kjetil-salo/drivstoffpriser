@@ -68,9 +68,6 @@ class TestRollekontrollAdmin:
         resp = moderator_client.post('/admin/invitasjon')
         assert resp.status_code == 403
 
-    def test_endre_stasjon_krever_admin(self, moderator_client):
-        resp = moderator_client.get('/admin/endre-stasjon')
-        assert resp.status_code == 403
 
 
 class TestRollekontrollModerator:
