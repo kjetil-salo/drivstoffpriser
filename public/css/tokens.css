@@ -40,4 +40,14 @@
   --z-overlay: 20;
   --z-modal: 30;
   --z-toast: 40;
+  --z-banner: 1100;
+  --z-fullscreen: 9998;
+  --z-kart-btn: 1000;
+
+  --color-surface: #1e293b;
+  --color-text-secondary: #94a3b8;
+  --color-text-primary: #e5e7eb;
+  --bg-secondary: #1e293b;
+  --font-lg: 1.15rem;
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.55);
 }
