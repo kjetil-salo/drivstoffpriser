@@ -169,7 +169,8 @@ export function visStasjonSheet(stasjon) {
     visVisModus();
     oppdaterFavorittKnapp(stasjon.id);
     const innlogget = window.__innlogget;
-    endreBtnEl.style.display = innlogget ? '' : 'none';
+    const kanLeggeInn = innlogget || window.__anonymTillatt;
+    endreBtnEl.style.display = kanLeggeInn ? '' : 'none';
     forslagBtnEl.style.display = innlogget ? '' : 'none';
 
     if (window.__erAdmin) {

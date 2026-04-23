@@ -228,11 +228,6 @@ def admin():
     if er_admin:
         brukere_antall = antall_brukere()
         stasjoner_antall = antall_stasjoner_med_pris()
-        reg_stoppet = hent_innstilling('registrering_stoppet') == '1'
-        reg_status = 'STOPPET' if reg_stoppet else 'Åpen'
-        reg_farge = '#ef4444' if reg_stoppet else '#22c55e'
-        reg_knapp = 'Stopp registrering' if not reg_stoppet else 'Åpne registrering'
-        reg_verdi = '0' if reg_stoppet else '1'
         admin_tiles = f'''
   <a href="/admin/oversikt" class="tile">
     <div class="tile-ikon">&#128202;</div>
@@ -268,21 +263,14 @@ def admin():
     <div class="tile-ikon">&#9998;&#65039;</div>
     <div class="tile-tittel">Endre stasjon</div>
     <div class="tile-info">S&#248;k og endre navn</div>
+  </a>
+  <a href="/admin/innstillinger" class="tile">
+    <div class="tile-ikon">&#9881;&#65039;</div>
+    <div class="tile-tittel">Innstillinger</div>
+    <div class="tile-info">Toggles og funksjoner</div>
   </a>'''
-        reg_panel = f'''
-<div class="admin-panel" style="margin-top:1.5rem">
-  <h2>Registrering</h2>
-  <div class="admin-rad">
-    <span class="admin-status" style="color:{reg_farge}">&#9679; {reg_status}</span>
-    <form method="post" action="/admin/toggle-registrering" style="margin:0">
-      <input type="hidden" name="verdi" value="{reg_verdi}">
-      <button class="admin-btn {'ok' if reg_stoppet else 'fare'}">{reg_knapp}</button>
-    </form>
-  </div>
-</div>'''
     else:
         admin_tiles = ''
-        reg_panel = ''
     return f'''<!DOCTYPE html><html lang="no"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Admin – Drivstoffpriser</title>
@@ -358,7 +346,6 @@ def admin():
   </a>
 {admin_tiles}
 </div>
-{reg_panel}
 </div></body></html>'''
 
 
@@ -657,7 +644,93 @@ def slett_prislogg_rad(pris_id):
 def toggle_registrering():
     verdi = request.form.get('verdi', '0')
     sett_innstilling('registrering_stoppet', '1' if verdi == '1' else '0')
-    return redirect('/admin')
+    return redirect('/admin/innstillinger')
+
+
+@admin_bp.route('/admin/toggle', methods=['POST'])
+@krever_innlogging
+@krever_admin
+def toggle_innstilling():
+    noekkel = request.form.get('noekkel', '').strip()
+    verdi = request.form.get('verdi', '0')
+    _tillatte = {'registrering_stoppet', 'anonym_innlegging'}
+    if noekkel not in _tillatte:
+        return jsonify({'error': 'Ukjent innstilling'}), 400
+    sett_innstilling(noekkel, '1' if verdi == '1' else '0')
+    return redirect('/admin/innstillinger')
+
+
+@admin_bp.route('/admin/innstillinger')
+@krever_innlogging
+@krever_admin
+def admin_innstillinger():
+    def toggle_panel(noekkel, tittel, beskrivelse, aktiv_tekst, inaktiv_tekst, fare_ved_aktiv=False):
+        pa = hent_innstilling(noekkel) == '1'
+        status_tekst = aktiv_tekst if pa else inaktiv_tekst
+        status_farge = '#ef4444' if (pa and fare_ved_aktiv) else ('#22c55e' if pa else '#94a3b8')
+        knapp_tekst = f'Deaktiver' if pa else 'Aktiver'
+        knapp_klasse = 'fare' if pa else 'ok'
+        ny_verdi = '0' if pa else '1'
+        return f'''
+<div class="innst-panel">
+  <div class="innst-hode">
+    <div>
+      <div class="innst-tittel">{tittel}</div>
+      <div class="innst-besk">{beskrivelse}</div>
+    </div>
+    <div class="innst-hoeyre">
+      <span class="admin-status" style="color:{status_farge}">&#9679; {status_tekst}</span>
+      <form method="post" action="/admin/toggle" style="margin:0">
+        <input type="hidden" name="noekkel" value="{noekkel}">
+        <input type="hidden" name="verdi" value="{ny_verdi}">
+        <button class="admin-btn {knapp_klasse}">{knapp_tekst}</button>
+      </form>
+    </div>
+  </div>
+</div>'''
+
+    paneler = ''
+    paneler += toggle_panel(
+        'registrering_stoppet',
+        'Brukerregistrering',
+        'Tillat nye brukere &#229; registrere seg p&#229; drivstoffprisene.no.',
+        'STOPPET', '&#197;pen', fare_ved_aktiv=True
+    )
+    paneler += toggle_panel(
+        'anonym_innlegging',
+        'Anonym prisinnlegging',
+        'La ikke-innloggede brukere legge inn priser. Maks 10 per time per IP-adresse.',
+        'P&#229;', 'Av', fare_ved_aktiv=False
+    )
+
+    return f'''<!DOCTYPE html><html lang="no"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Innstillinger – Admin</title>
+<style>
+  *{{box-sizing:border-box;margin:0;padding:0}}
+  body{{font-family:system-ui,sans-serif;background:#0f172a;color:#e5e7eb;padding:2rem 1rem}}
+  .container{{max-width:640px;margin:0 auto}}
+  h1{{font-size:1.3rem;margin-bottom:2rem;color:#f1f5f9}}
+  nav{{margin-bottom:1.5rem;font-size:0.85rem}}
+  nav a{{color:#94a3b8}}
+  .innst-panel{{background:#111827;border:1px solid #1f2937;border-radius:12px;padding:1.25rem;margin-bottom:1rem}}
+  .innst-hode{{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem}}
+  .innst-tittel{{font-size:0.95rem;font-weight:600;color:#f1f5f9;margin-bottom:0.25rem}}
+  .innst-besk{{font-size:0.8rem;color:#94a3b8;max-width:340px}}
+  .innst-hoeyre{{display:flex;align-items:center;gap:0.75rem;flex-shrink:0}}
+  .admin-status{{font-size:0.85rem;font-weight:600;white-space:nowrap}}
+  .admin-btn{{background:#1f2937;border:1px solid #374151;border-radius:6px;color:#e5e7eb;
+              font-size:0.82rem;padding:8px 14px;cursor:pointer;transition:background 0.15s;white-space:nowrap}}
+  .admin-btn:hover{{background:#374151}}
+  .admin-btn.fare{{border-color:#ef4444;color:#ef4444}}
+  .admin-btn.fare:hover{{background:rgba(239,68,68,0.15)}}
+  .admin-btn.ok{{border-color:#22c55e;color:#22c55e}}
+  .admin-btn.ok:hover{{background:rgba(34,197,94,0.15)}}
+</style></head><body><div class="container">
+<nav><a href="/admin">&#8592; Admin</a></nav>
+<h1>Innstillinger</h1>
+{paneler}
+</div></body></html>'''
 
 
 @admin_bp.route('/admin/invitasjon', methods=['POST'])

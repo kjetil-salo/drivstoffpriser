@@ -156,6 +156,7 @@ const meg = await fetch('/api/meg').then(r => r.json()).catch(() => ({}));
 window.__innlogget = meg.innlogget || false;
 window.__erAdmin = meg.er_admin || false;
 window.__roller = meg.roller || [];
+window.__anonymTillatt = meg.anonym_innlegging || false;
 
 const authLenke = document.getElementById('auth-lenke');
 
@@ -193,11 +194,18 @@ if (!window.__innlogget && !localStorage.getItem('velkommen_vist')) {
         const erAndroid = /Android/.test(navigator.userAgent);
         const erMobil = erIos || erAndroid;
 
-        document.getElementById('velkommen-tekst').textContent = [
-            'Finn billigste drivstoff nær deg — oppdatert av brukere i sanntid.',
-            'Du kan se alle priser uten å logge inn.',
-            'Vil du hjelpe til? Opprett en gratis bruker og oppdater priser på stasjoner nær deg — det tar bare noen sekunder.',
-        ].join('\n\n');
+        const velkomstTekst = window.__anonymTillatt
+            ? [
+                'Finn billigste drivstoff nær deg — oppdatert av brukere i sanntid.',
+                'Du kan se alle priser og legge inn priser uten å logge inn.',
+                'Vil du følge med på dine egne bidrag? Opprett en gratis bruker.',
+              ].join('\n\n')
+            : [
+                'Finn billigste drivstoff nær deg — oppdatert av brukere i sanntid.',
+                'Du kan se alle priser uten å logge inn.',
+                'Vil du hjelpe til? Opprett en gratis bruker og oppdater priser på stasjoner nær deg — det tar bare noen sekunder.',
+              ].join('\n\n');
+        document.getElementById('velkommen-tekst').textContent = velkomstTekst;
 
         // Vis install-knapp for mobilbrukere som ikke allerede har installert
         const velkomstInstallBtn = document.getElementById('velkommen-hjemskjerm-btn');

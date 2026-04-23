@@ -1004,7 +1004,7 @@ def antall_ubehandlede_endringsforslag() -> int:
 
 
 def hent_toppliste(limit=50) -> list:
-    """Antall prisregistreringer per bruker, ekskluderer partnere."""
+    """Antall prisregistreringer per bruker, ekskluderer partnere og systembrukere."""
     with get_conn() as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
@@ -1012,6 +1012,7 @@ def hent_toppliste(limit=50) -> list:
                FROM priser p
                JOIN brukere b ON b.id = p.bruker_id
                WHERE b.brukernavn NOT LIKE 'partner:%'
+                 AND b.brukernavn NOT LIKE 'system:%'
                GROUP BY p.bruker_id
                ORDER BY antall DESC
                LIMIT ?''',
@@ -1021,7 +1022,7 @@ def hent_toppliste(limit=50) -> list:
 
 
 def hent_toppliste_uke(limit=20) -> list:
-    """Antall prisregistreringer per bruker siste 7 dager, ekskluderer partnere."""
+    """Antall prisregistreringer per bruker siste 7 dager, ekskluderer partnere og systembrukere."""
     with get_conn() as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
@@ -1029,6 +1030,7 @@ def hent_toppliste_uke(limit=20) -> list:
                FROM priser p
                JOIN brukere b ON b.id = p.bruker_id
                WHERE b.brukernavn NOT LIKE 'partner:%'
+                 AND b.brukernavn NOT LIKE 'system:%'
                  AND p.tidspunkt >= datetime('now', '-7 days')
                GROUP BY p.bruker_id
                ORDER BY antall DESC
@@ -1059,6 +1061,7 @@ def hent_min_plassering(bruker_id) -> dict | None:
                    FROM priser p2
                    JOIN brukere b2 ON b2.id = p2.bruker_id
                    WHERE b2.brukernavn NOT LIKE 'partner:%'
+                     AND b2.brukernavn NOT LIKE 'system:%'
                    GROUP BY p2.bruker_id
                    HAVING COUNT(p2.id) > ?
                )''',
@@ -1107,6 +1110,28 @@ def endre_navn_stasjon(stasjon_id: int, nytt_navn: str) -> bool:
             (nytt_navn, stasjon_id)
         )
         return cursor.rowcount > 0
+
+
+_anonym_bruker_id: int | None = None
+
+
+def hent_anonym_bruker_id() -> int:
+    """Hent bruker_id for anonym-brukeren, opprett hvis ikke finnes."""
+    global _anonym_bruker_id
+    if _anonym_bruker_id is not None:
+        return _anonym_bruker_id
+    with get_conn() as conn:
+        row = conn.execute(
+            "SELECT id FROM brukere WHERE brukernavn = 'system:anonym'"
+        ).fetchone()
+        if row:
+            _anonym_bruker_id = row[0]
+            return _anonym_bruker_id
+        cursor = conn.execute(
+            "INSERT INTO brukere (brukernavn, passord_hash, er_admin) VALUES ('system:anonym', '', 0)"
+        )
+        _anonym_bruker_id = cursor.lastrowid
+        return _anonym_bruker_id
 
 
 def hent_eller_opprett_partner(navn: str) -> int:

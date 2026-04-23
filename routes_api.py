@@ -34,7 +34,8 @@ from db import (get_stasjoner_med_priser, lagre_pris, bekreft_pris, logg_visning
                 legg_til_endringsforslag, unike_enheter_per_dag,
                 prisoppdateringer_per_time_24t,
                 prisoppdateringer_rullende_24t_uke,
-                har_rolle, hent_kjede_snitt_24t)
+                har_rolle, hent_kjede_snitt_24t,
+                sjekk_rate_limit, logg_rate_limit, hent_anonym_bruker_id)
 
 logger = logging.getLogger('drivstoff')
 
@@ -152,20 +153,21 @@ def krever_innlogging(f):
 
 @api_bp.route('/api/meg')
 def meg():
+    anonym_tillatt = hent_innstilling('anonym_innlegging') == '1'
     bruker_id = session.get('bruker_id')
     if not bruker_id:
-        return jsonify({'innlogget': False})
+        return jsonify({'innlogget': False, 'anonym_innlegging': anonym_tillatt})
     bruker = finn_bruker_id(bruker_id)
     if not bruker:
         session.clear()
-        return jsonify({'innlogget': False})
+        return jsonify({'innlogget': False, 'anonym_innlegging': anonym_tillatt})
     roller = (bruker.get('roller') or '').split()
     if har_rolle(bruker, 'kamera') and 'kamera' not in roller:
         roller.append('kamera')
     return jsonify({'innlogget': True, 'brukernavn': bruker['brukernavn'],
                     'kallenavn': bruker.get('kallenavn') or '', 'bruker_id': bruker['id'],
                     'er_admin': bool(bruker['er_admin']),
-                    'roller': roller})
+                    'roller': roller, 'anonym_innlegging': anonym_tillatt})
 
 
 @api_bp.route('/api/stasjoner')
@@ -564,9 +566,22 @@ def enheter_per_dag():
     return jsonify(unike_enheter_per_dag(30))
 
 
+_ANONYM_PRIS_MAKS = 10
+_ANONYM_PRIS_VINDU = 3600  # sekunder (1 time)
+
+
 @api_bp.route('/api/pris', methods=['POST'])
-@krever_innlogging
 def oppdater_pris():
+    bruker_id = session.get('bruker_id')
+    anonym = not bruker_id
+    if anonym:
+        if hent_innstilling('anonym_innlegging') != '1':
+            return jsonify({'error': 'Ikke innlogget'}), 401
+        ip = request.remote_addr
+        if sjekk_rate_limit('anonym_pris', ip, _ANONYM_PRIS_MAKS, _ANONYM_PRIS_VINDU):
+            return jsonify({'error': 'For mange innlegginger. Prøv igjen senere.'}), 429
+        bruker_id = hent_anonym_bruker_id()
+
     data = request.get_json(silent=True) or {}
     stasjon_id = data.get('stasjon_id')
 
@@ -601,11 +616,13 @@ def oppdater_pris():
         if pris is not None and not (_PRIS_MIN <= pris <= _PRIS_MAX):
             return jsonify({'error': f'{navn} må være mellom {_PRIS_MIN:g} og {_PRIS_MAX:g} kr'}), 400
 
-    bruker_id = session.get('bruker_id')
     kilde = data.get('kilde') or None
 
-    lagret = lagre_pris(stasjon_id, bensin, diesel, bensin98, bruker_id=bruker_id, diesel_avgiftsfri=diesel_avgiftsfri, min_intervall=_PRIS_MIN_INTERVALL, kilde=kilde)
+    intervall = 0 if anonym else _PRIS_MIN_INTERVALL
+    lagret = lagre_pris(stasjon_id, bensin, diesel, bensin98, bruker_id=bruker_id, diesel_avgiftsfri=diesel_avgiftsfri, min_intervall=intervall, kilde=kilde)
     if lagret:
+        if anonym:
+            logg_rate_limit('anonym_pris', request.remote_addr)
         logger.info(f'Pris lagret: stasjon={stasjon_id} bensin={bensin} diesel={diesel} bensin98={bensin98} diesel_avgiftsfri={diesel_avgiftsfri} bruker={bruker_id} kilde={kilde}')
     else:
         logger.info(f'Pris ignorert (rate limit): stasjon={stasjon_id} bruker={bruker_id}')
