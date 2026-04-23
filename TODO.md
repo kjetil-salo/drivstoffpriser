@@ -45,8 +45,10 @@
 | 20 | **OSM-bidrag** | Bidra nye stasjoner tilbake til OSM. Tung prosess (6-stegs godkjenning), ikke nå |
 | 21 | **Failover Cloudflare Worker deploy** | Siste steg i Pi→Fly.io failover: `npx wrangler deploy` + DNS CNAME |
 | 22 | **Admin logg-side** | `/admin/logg` viser siste linjer fra app.log. Workaround: ssh + docker exec tail |
-| 23 | **logs.efugl.no: vis tilgjengelig minne på Pi** | Dozzle viser allerede CPU-forbruk, men ikke tilgjengelig minne. Legg til enkel Pi-minnestatus i drift/loggvisning. |
-| 24 | **Pentest** | Sikkerhetstest av appen. Utsatt fra 2026-03-31 |
+| 23 | **Pi-overvåking: installer btop** | Anbefalt førstesteg for SSH-feilsøking. Viser CPU, minne, disk, nettverk og prosesser på selve Pi-en, og er trolig verktøyet som var ment (ikke ptop). Temperatur kan allerede sjekkes enkelt med `vcgencmd measure_temp`; måling 2026-04-22 viste ca. 53–55°C, som ser sunt ut for Pi i fri luft. |
+| 24 | **logs.efugl.no: vis tilgjengelig minne på Pi** | Dozzle dekker primært logger/container-visning. Legg til enkel host-status i drift/loggvisning: minne, disk og gjerne temperatur, hentet fra Pi-en uten å være avhengig av interaktiv TUI. |
+| 25 | **Netdata eller Glances som web-overvåking (vurder)** | Hvis behovet blir større enn Dozzle + btop: vurder Netdata som fullverdig web-dashboard med historikk/alarmer, eller Glances som lettere alt-i-ett-løsning for web + terminal. |
+| 26 | **Pentest** | Sikkerhetstest av appen. Utsatt fra 2026-03-31 |
 
 ### 💡 Idéstadiet
 
@@ -81,3 +83,12 @@
 - PWA (installerbar, service worker, offline-støtte)
 - Topplister for bidragsytere (grunnversjon)
 - Trønder Oil som kjede
+
+---
+
+## Driftsnotater
+
+- 2026-04-22: Pi-temperatur målt via `vcgencmd measure_temp` lå rundt 53-55°C.
+- Pi-en er headless, uten kabinett, og henger i fri luft. For dagens last ser dette ut til å gi tilstrekkelig passiv kjøling.
+- Samme sjekk viste lav last (`0.12, 0.06, 0.06`), god minnemargin (`2.8 GiB tilgjengelig`) og god diskmargin på `/` (`23%` brukt).
+- Tailscale + SSH dekker hovedbehovet for driftstilgang. Raspberry Pi Connect vurderes foreløpig ikke som nødvendig for dette oppsettet.
