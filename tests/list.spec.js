@@ -82,7 +82,7 @@ test('liste viser stasjoner med fersk pris', async ({ page }) => {
 test('vis eldre enn 24t viser alle stasjoner', async ({ page }) => {
     await gåTilListe(page);
     await expect(page.locator('.stasjon-kort')).toHaveCount(2);
-    await page.click('#vis-gamle-check');
+    await page.check('#vis-gamle-check');
     // Alle 3 inkl. Shell Gamleveien med gammel pris
     await expect(page.locator('.stasjon-kort')).toHaveCount(3);
     await expect(page.locator('.stasjon-kort').filter({ hasText: 'Shell Gamleveien' })).toHaveCount(1);
@@ -90,7 +90,7 @@ test('vis eldre enn 24t viser alle stasjoner', async ({ page }) => {
 
 test('vis eldre huskes i localStorage', async ({ page }) => {
     await gåTilListe(page);
-    await page.click('#vis-gamle-check');
+    await page.check('#vis-gamle-check');
     await expect(page.locator('.stasjon-kort')).toHaveCount(3);
 
     // Bekreft at verdien er skrevet til localStorage
@@ -98,7 +98,7 @@ test('vis eldre huskes i localStorage', async ({ page }) => {
     expect(lagret).toBe('1');
 
     // Toggle tilbake — verdien skal oppdateres
-    await page.click('#vis-gamle-check');
+    await page.uncheck('#vis-gamle-check');
     const lagret2 = await page.evaluate(() => localStorage.getItem('liste_vis_gamle'));
     expect(lagret2).toBe('0');
 });
