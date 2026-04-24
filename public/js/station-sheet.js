@@ -173,7 +173,8 @@ export function visStasjonSheet(stasjon) {
     endreBtnEl.style.display = kanLeggeInn ? '' : 'none';
     forslagBtnEl.style.display = innlogget ? '' : 'none';
 
-    if (window.__erAdmin) {
+    const erPrivilegedBruker = window.__erAdmin || (window.__roller || []).includes('moderator');
+    if (erPrivilegedBruker) {
         adminBtnEl.removeAttribute('hidden');
         adminPanelEl.setAttribute('hidden', '');
         adminBtnEl.setAttribute('aria-expanded', 'false');
