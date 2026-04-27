@@ -18,6 +18,7 @@ import base64
 import io
 import json
 import re
+import unicodedata
 
 try:
     from PIL import Image, ImageEnhance, ImageFilter
@@ -175,13 +176,15 @@ def meg():
 def stasjoner():
     lat = request.args.get('lat', type=float)
     lon = request.args.get('lon', type=float)
-    radius_km = request.args.get('radius', default=30, type=int)
+    radius_km = request.args.get('radius', default=30, type=float)
     if lat is None or lon is None:
         return jsonify({'error': 'lat og lon er påkrevd'}), 400
     if not er_i_norge(lat, lon):
         return jsonify({'error': 'Kun tilgjengelig i Norge', 'utenfor': True}), 400
 
-    radius_m = max(1000, min(radius_km * 1000, 100_000))
+    if radius_km is None or not math.isfinite(radius_km):
+        radius_km = 30
+    radius_m = max(100, min(round(radius_km * 1000), 100_000))
     limit = 50 if radius_km >= 50 else 30
     data = get_stasjoner_med_priser(lat, lon, radius_m=radius_m, limit=limit)
     return jsonify({'stasjoner': data})
@@ -191,9 +194,40 @@ _stedssok_cache: dict[str, tuple[float, list]] = {}
 _STEDSSOK_TTL = 600  # sekunder
 
 
+def _normaliser_soketekst(tekst: str) -> str:
+    tekst = (tekst or '').strip().lower()
+    erstatninger = {
+        'æ': 'ae',
+        'ø': 'o',
+        'å': 'a',
+    }
+    for gammel, ny in erstatninger.items():
+        tekst = tekst.replace(gammel, ny)
+    tekst = unicodedata.normalize('NFKD', tekst)
+    tekst = ''.join(ch for ch in tekst if not unicodedata.combining(ch))
+    tekst = re.sub(r'[^a-z0-9]+', ' ', tekst)
+    return ' '.join(tekst.split())
+
+
+def _matcher_stasjonssok(query: str, navn: str, kjede: str) -> bool:
+    query_norm = _normaliser_soketekst(query)
+    if len(query_norm) < 2:
+        return False
+
+    haystack = _normaliser_soketekst(f'{navn} {kjede}')
+    if not haystack:
+        return False
+    if query_norm in haystack:
+        return True
+
+    tokens = [token for token in query_norm.split() if len(token) >= 2]
+    return bool(tokens) and all(token in haystack for token in tokens)
+
+
 @api_bp.route('/api/stedssok')
 def stedssok():
-    q = request.args.get('q', '').strip().lower()
+    q_raw = request.args.get('q', '').strip()
+    q = _normaliser_soketekst(q_raw)
     if len(q) < 2:
         return jsonify([])
 
@@ -205,16 +239,15 @@ def stedssok():
     # Søk i egne stasjoner
     stasjons_treff = []
     try:
-        conn = get_conn()
-        rader = conn.execute(
-            '''SELECT id, navn, kjede, lat, lon FROM stasjoner
-               WHERE godkjent = 1 AND (land IS NULL OR land = 'NO')
-               LIMIT 2000''',
-        ).fetchall()
+        with get_conn() as conn:
+            conn.row_factory = sqlite3.Row
+            rader = conn.execute(
+                '''SELECT id, navn, kjede, lat, lon FROM stasjoner
+                   WHERE godkjent = 1 AND (land IS NULL OR land = 'NO')
+                ''',
+            ).fetchall()
         for r in rader:
-            navn_l = (r['navn'] or '').lower()
-            kjede_l = (r['kjede'] or '').lower()
-            if q not in navn_l and q not in kjede_l:
+            if not _matcher_stasjonssok(q_raw, r['navn'] or '', r['kjede'] or ''):
                 continue
             visningsnavn = f"{r['navn']}" + (f" ({r['kjede']})" if r['kjede'] else "")
             stasjons_treff.append({
@@ -620,11 +653,22 @@ def oppdater_pris():
     kilde = data.get('kilde') or None
 
     intervall = 0 if anonym else _PRIS_MIN_INTERVALL
-    lagret = lagre_pris(stasjon_id, bensin, diesel, bensin98, bruker_id=bruker_id, diesel_avgiftsfri=diesel_avgiftsfri, min_intervall=intervall, kilde=kilde)
+    antall_oppgitte = sum(p is not None for p in (bensin, diesel, bensin98, diesel_avgiftsfri))
+    tillat_korreksjon = not (kilde == 'bidrag' and antall_oppgitte == 1)
+    lagret = lagre_pris(
+        stasjon_id, bensin, diesel, bensin98,
+        bruker_id=bruker_id,
+        diesel_avgiftsfri=diesel_avgiftsfri,
+        min_intervall=intervall,
+        kilde=kilde,
+        tillat_korreksjon=tillat_korreksjon,
+    )
     if lagret:
         if anonym:
             logg_rate_limit('anonym_pris', request.remote_addr)
         logger.info(f'Pris lagret: stasjon={stasjon_id} bensin={bensin} diesel={diesel} bensin98={bensin98} diesel_avgiftsfri={diesel_avgiftsfri} bruker={bruker_id} kilde={kilde}')
+        if bruker_id == 4494:
+            logger.warning(f'system:anonym pris lagret: stasjon={stasjon_id} ip={request.remote_addr}')
     else:
         logger.info(f'Pris ignorert (rate limit): stasjon={stasjon_id} bruker={bruker_id}')
     return jsonify({'ok': True})
