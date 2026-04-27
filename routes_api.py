@@ -5,6 +5,7 @@ import math
 import os
 import sqlite3
 import tempfile
+import threading
 import uuid
 from datetime import datetime, timedelta, timezone
 from functools import wraps
@@ -602,6 +603,59 @@ def enheter_per_dag():
 
 _ANONYM_PRIS_MAKS = 10
 _ANONYM_PRIS_VINDU = 3600  # sekunder (1 time)
+_AVVIK_GRENSE_ADVARSEL = 0.30   # advarsel i frontend + epost til admin
+_AVVIK_GRENSE_ANONYM   = 0.40   # hard avvisning for anonyme
+
+
+def _sjekk_prisavvik(stasjon_id, bensin, diesel, bensin98, diesel_avgiftsfri, grense):
+    """Returnerer liste med avvik-strenger hvis noen pris avviker mer enn grensen, ellers tom liste."""
+    with get_conn() as conn:
+        rad = conn.execute(
+            '''SELECT bensin, diesel, bensin98, diesel_avgiftsfri FROM priser
+               WHERE stasjon_id = ? ORDER BY tidspunkt DESC LIMIT 1''',
+            (stasjon_id,)
+        ).fetchone()
+    if not rad:
+        return []
+    par = [
+        ('95 oktan',       bensin,            rad[0]),
+        ('Diesel',         diesel,            rad[1]),
+        ('98 oktan',       bensin98,          rad[2]),
+        ('Avg.fri diesel', diesel_avgiftsfri, rad[3]),
+    ]
+    avvik = []
+    for label, ny, gammel in par:
+        if ny is not None and gammel is not None and gammel > 0:
+            pst = abs(ny - gammel) / gammel
+            if pst > grense:
+                avvik.append(f'{label}: {gammel:.2f} → {ny:.2f} kr ({round(pst * 100)}%)')
+    return avvik
+
+
+def _varsle_prisavvik(stasjon_id, bruker_id, avvik_info, ip):
+    """Send epost til admin om at noen har passert advarselvinduet med stor prisendring."""
+    try:
+        import resend
+        with get_conn() as conn:
+            navn_rad = conn.execute('SELECT navn FROM stasjoner WHERE id = ?', (stasjon_id,)).fetchone()
+            stasjon_navn = navn_rad[0] if navn_rad else f'stasjon {stasjon_id}'
+            bruker_rad = conn.execute('SELECT brukernavn FROM brukere WHERE id = ?', (bruker_id,)).fetchone()
+            bruker_navn = bruker_rad[0] if bruker_rad else f'bruker_id={bruker_id}'
+        linjer = ''.join(f'<li>{a}</li>' for a in avvik_info)
+        resend.Emails.send({
+            'from': 'Drivstoffpriser <noreply@ksalo.no>',
+            'to': 'kjetil@vikebo.com',
+            'subject': f'Prisavvik: {stasjon_navn}',
+            'html': (
+                f'<p>En bruker passerte advarselvinduet med stor prisendring.</p>'
+                f'<p><strong>Stasjon:</strong> {stasjon_navn} (id={stasjon_id})<br>'
+                f'<strong>Bruker:</strong> {bruker_navn}<br>'
+                f'<strong>IP:</strong> {ip}</p>'
+                f'<ul>{linjer}</ul>'
+            ),
+        })
+    except Exception as e:
+        logger.error(f'Varsling om prisavvik feilet: {e}')
 
 
 @api_bp.route('/api/pris', methods=['POST'])
@@ -651,6 +705,24 @@ def oppdater_pris():
             return jsonify({'error': f'{navn} må være mellom {_PRIS_MIN:g} og {_PRIS_MAX:g} kr'}), 400
 
     kilde = data.get('kilde') or None
+
+    # Avvikssjekk mot siste kjente pris for stasjonen
+    if anonym:
+        avvik_anonym = _sjekk_prisavvik(stasjon_id, bensin, diesel, bensin98, diesel_avgiftsfri, _AVVIK_GRENSE_ANONYM)
+        if avvik_anonym:
+            logger.warning(
+                f'Anonym prisinnlegging avvist (stort avvik): stasjon={stasjon_id} '
+                f'ip={request.remote_addr} avvik={avvik_anonym}'
+            )
+            return jsonify({'error': 'Prisen avviker for mye fra siste kjente pris. Logg inn for å legge inn store prisendringer.'}), 400
+    else:
+        avvik_info = _sjekk_prisavvik(stasjon_id, bensin, diesel, bensin98, diesel_avgiftsfri, _AVVIK_GRENSE_ADVARSEL)
+        if avvik_info:
+            threading.Thread(
+                target=_varsle_prisavvik,
+                args=(stasjon_id, bruker_id, avvik_info, request.remote_addr),
+                daemon=True,
+            ).start()
 
     intervall = 0 if anonym else _PRIS_MIN_INTERVALL
     antall_oppgitte = sum(p is not None for p in (bensin, diesel, bensin98, diesel_avgiftsfri))
