@@ -78,14 +78,11 @@ class TestHarRolle:
         bruker = db_mod.finn_bruker_id(bruker['id'])
         assert db_mod.har_rolle(bruker, 'kamera') is True
 
-    def test_kamera_under_grense_uten_eksplisitt_rolle(self):
+    def test_kamera_alle_innloggede_har_tilgang(self):
+        # KAMERA_PRISANTALL_GRENSE=0: alle innloggede brukere har kamera-rollen automatisk
         db_mod.opprett_bruker('a@t.no', generate_password_hash('x'))
-        bruker = db_mod.finn_bruker('a@t.no')
-        stasjon_id, _ = db_mod.opprett_stasjon('Test', None, 60.0, 10.0, bruker['id'])
-        for _ in range(19):
-            db_mod.lagre_pris(stasjon_id, bruker['id'], 20.0, None, None, None)
-        bruker = db_mod.finn_bruker_id(bruker['id'])
-        assert db_mod.har_rolle(bruker, 'kamera') is False
+        bruker = db_mod.finn_bruker_id(db_mod.finn_bruker('a@t.no')['id'])
+        assert db_mod.har_rolle(bruker, 'kamera') is True
 
     def test_kamera_eksplisitt_rolle_uten_priser(self):
         db_mod.opprett_bruker('a@t.no', generate_password_hash('x'))
