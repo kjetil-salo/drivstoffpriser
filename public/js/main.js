@@ -277,8 +277,12 @@ cameraBtn.addEventListener('click', () => {
 });
 
 // ── Init kart med siste kjente posisjon ───────────
+const _qp = new URLSearchParams(window.location.search);
+const _qLat = parseFloat(_qp.get('lat'));
+const _qLon = parseFloat(_qp.get('lon'));
+const _fraAdmin = !isNaN(_qLat) && !isNaN(_qLon);
 const lagretPos = hentLagretPos();
-initMap('map', lagretPos);
+initMap('map', _fraAdmin ? { lat: _qLat, lon: _qLon } : lagretPos);
 
 initRuteplanlegger({
     getStartPos: () => userPos || hentLagretPos() || getKartSenter(),
@@ -288,7 +292,7 @@ initRuteplanlegger({
 });
 
 // ── Velkomst-overlay ──────────────────────────────
-if (!lagretPos) {
+if (!lagretPos && !_fraAdmin) {
     velkomst.removeAttribute('hidden');
     document.getElementById('velkomst-posisjon-btn').addEventListener('click', () => {
         velkomst.setAttribute('hidden', '');
@@ -353,10 +357,12 @@ initSearch(async (sted) => {
     }
 });
 
-// Last stasjoner for siste posisjon ved oppstart
-if (lagretPos) {
+// Last stasjoner ved oppstart — fra URL-params (admin-lenke) eller lagret posisjon
+const _oppstartPos = _fraAdmin ? { lat: _qLat, lon: _qLon } : lagretPos;
+if (_oppstartPos) {
+    if (_fraAdmin) sentrerKart(_qLat, _qLon, 16);
     locStatus.textContent = 'Henter stasjoner …';
-    hentStasjoner(lagretPos.lat, lagretPos.lon).then(s => {
+    hentStasjoner(_oppstartPos.lat, _oppstartPos.lon).then(s => {
         stasjoner = s;
         locStatus.textContent = '';
         visStasjoner(stasjoner, visStasjonSheet);
