@@ -32,23 +32,24 @@
 | 12 | **Fjern LNG/CNG/gass-stasjoner** | OSM-import kan ha tatt inn Gasum/CNG/LNG-stasjoner som ikke er relevante for appen. Filtrer dem bort fra import/søk og rydd eksisterende treff |
 | 13 | **Delta-sync til Fly.io** | I dag sendes full DB (~28MB) hvert 6. time. Bytt til kun nye rader siden siste sync |
 | 14 | **Kamera: fiks tidspunkt i OCR-statistikk** | `ocr_statistikk.tidspunkt` blir ikke lagret i dag, så kamerabruk kan ikke analyseres per dag/siste 24t. Trengs for å måle Gemini/Haiku-treff over tid |
+| 15 | **Slett `kart2`-siden** | `/kart2` ser ut til å være en eldre/alternativ variant av forsiden som ikke er i aktiv bruk. Bør fjernes sammen med route og eventuell død kode for å unngå forvirring og feilretting i feil fil |
 
 ### 🟢 Lav prioritet / når tid tillater
 
 | # | Oppgave | Begrunnelse |
 |---|---------|-------------|
-| 15 | **SSD-migrering på Pi** ⬅️ neste | Planlagt 2026-04-06. Fase 1: flytt kun DB-volum til T5, ingen reboot. Test staging først. |
-| 16 | **DB-ytelse: indekser og cache_size** | SSD hjelper litt, men flaskehalsen er trolig manglende indekser + Flask single-thread. Profiler med EXPLAIN QUERY PLAN og vurder PRAGMA cache_size. |
-| 17 | **Zero-downtime deploy (Caddy + blue/green)** | ~5–30 sek nedetid per deploy. Ikke kritisk ennå, men vokser med trafikk |
-| 18 | **Følg-bilen kart-modus** | Kartet følger posisjonen mens du kjører. Ikke etterspurt ennå, drenerer batteri |
-| 19 | **Statistikk-cron (forhåndsberegning)** | Periodisk beregning av prissnitt, billigst per region etc. Kobling til blogg-analyse |
-| 20 | **OSM-bidrag** | Bidra nye stasjoner tilbake til OSM. Tung prosess (6-stegs godkjenning), ikke nå |
-| 21 | **Failover Cloudflare Worker deploy** | Siste steg i Pi→Fly.io failover: `npx wrangler deploy` + DNS CNAME |
-| 22 | **Admin logg-side** | `/admin/logg` viser siste linjer fra app.log. Workaround: ssh + docker exec tail |
-| 23 | **Pi-overvåking: installer btop** | Anbefalt førstesteg for SSH-feilsøking. Viser CPU, minne, disk, nettverk og prosesser på selve Pi-en, og er trolig verktøyet som var ment (ikke ptop). Temperatur kan allerede sjekkes enkelt med `vcgencmd measure_temp`; måling 2026-04-22 viste ca. 53–55°C, som ser sunt ut for Pi i fri luft. |
-| 24 | **logs.efugl.no: vis tilgjengelig minne på Pi** | Dozzle dekker primært logger/container-visning. Legg til enkel host-status i drift/loggvisning: minne, disk og gjerne temperatur, hentet fra Pi-en uten å være avhengig av interaktiv TUI. |
-| 25 | **Netdata eller Glances som web-overvåking (vurder)** | Hvis behovet blir større enn Dozzle + btop: vurder Netdata som fullverdig web-dashboard med historikk/alarmer, eller Glances som lettere alt-i-ett-løsning for web + terminal. |
-| 26 | **Pentest** | Sikkerhetstest av appen. Utsatt fra 2026-03-31 |
+| 16 | **SSD-migrering på Pi** ⬅️ neste | Planlagt 2026-04-06. Fase 1: flytt kun DB-volum til T5, ingen reboot. Test staging først. |
+| 17 | **DB-ytelse: indekser og cache_size** | SSD hjelper litt, men flaskehalsen er trolig manglende indekser + Flask single-thread. Profiler med EXPLAIN QUERY PLAN og vurder PRAGMA cache_size. |
+| 18 | **Zero-downtime deploy (Caddy + blue/green)** | ~5–30 sek nedetid per deploy. Ikke kritisk ennå, men vokser med trafikk |
+| 19 | **Følg-bilen kart-modus** | Kartet følger posisjonen mens du kjører. Ikke etterspurt ennå, drenerer batteri |
+| 20 | **Statistikk-cron (forhåndsberegning)** | Periodisk beregning av prissnitt, billigst per region etc. Kobling til blogg-analyse |
+| 21 | **OSM-bidrag** | Bidra nye stasjoner tilbake til OSM. Tung prosess (6-stegs godkjenning), ikke nå |
+| 22 | **Failover Cloudflare Worker deploy** | Siste steg i Pi→Fly.io failover: `npx wrangler deploy` + DNS CNAME |
+| 23 | **Admin logg-side** | `/admin/logg` viser siste linjer fra app.log. Workaround: ssh + docker exec tail |
+| 24 | **Pi-overvåking: installer btop** | Anbefalt førstesteg for SSH-feilsøking. Viser CPU, minne, disk, nettverk og prosesser på selve Pi-en, og er trolig verktøyet som var ment (ikke ptop). Temperatur kan allerede sjekkes enkelt med `vcgencmd measure_temp`; måling 2026-04-22 viste ca. 53–55°C, som ser sunt ut for Pi i fri luft. |
+| 25 | **logs.efugl.no: vis tilgjengelig minne på Pi** | Dozzle dekker primært logger/container-visning. Legg til enkel host-status i drift/loggvisning: minne, disk og gjerne temperatur, hentet fra Pi-en uten å være avhengig av interaktiv TUI. |
+| 26 | **Netdata eller Glances som web-overvåking (vurder)** | Hvis behovet blir større enn Dozzle + btop: vurder Netdata som fullverdig web-dashboard med historikk/alarmer, eller Glances som lettere alt-i-ett-løsning for web + terminal. |
+| 27 | **Pentest** | Sikkerhetstest av appen. Utsatt fra 2026-03-31 |
 
 ### 💡 Idéstadiet
 
