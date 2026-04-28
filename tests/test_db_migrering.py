@@ -120,6 +120,21 @@ class TestIdempotens:
             result = conn.execute("PRAGMA integrity_check").fetchone()[0]
         assert result == 'ok'
 
+    def test_migrer_normaliserer_eksisterende_kjede_casing(self, test_db):
+        with db_mod.get_conn() as conn:
+            conn.execute(
+                'INSERT INTO stasjoner (navn, kjede, lat, lon, osm_id) VALUES (?, ?, ?, ?, ?)',
+                ('Bunker legacy', 'Bunker oil', 60.0, 5.0, 'node/bunker-legacy')
+            )
+
+        db_mod._migrer_db()
+
+        with db_mod.get_conn() as conn:
+            kjede = conn.execute(
+                "SELECT kjede FROM stasjoner WHERE osm_id = 'node/bunker-legacy'"
+            ).fetchone()[0]
+        assert kjede == 'Bunker Oil'
+
 
 class TestInnkallUtenfor__main__:
     """Verifiser at init_db og _migrer_db kalles fra modulnivå i server.py,

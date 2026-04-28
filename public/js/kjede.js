@@ -1,4 +1,4 @@
-export const KJEDE_NAVN = ['Best', 'Bunker Oil', 'Circle K', 'Din-X', 'Driv', 'Esso', 'Haltbakk Express', 'Haslestad Energi', 'Knapphus', 'MH24', 'Oljeleverandøren', 'Preem', 'Shell', 'St1', 'Tanken', 'Trønder Oil', 'Uno-X', 'YX'];
+export const KJEDE_NAVN = ['Best', 'Bunker Oil', 'Circle K', 'Din-X', 'Driv', 'Esso', 'Haltbakk Express', 'Haslestad Energi', 'Knapphus', 'MH24', 'Oljeleverandøren', 'Preem', 'Shell', 'St1', 'TANK', 'Tanken', 'Trønder Oil', 'Uno-X', 'YX'];
 
 const KJEDE_DOMENER = [
     { match: ['circle k', 'circlek'],          logo: 'circlek',              farge: '#f97316' },
@@ -11,6 +11,7 @@ const KJEDE_DOMENER = [
     { match: ['st1', 'st 1'],                   logo: 'st1',                  farge: '#f5c400' },
     { match: ['best'],                          logo: 'best',                 farge: '#0284c7' },
     { match: ['oljeleverandøren', 'oljeleverandoren'], logo: 'oljeleverandoren', farge: '#c87010' },
+    { exact: ['tank'],                         logo: 'tank',                 farge: '#971741' },
     { match: ['tanken'],                        logo: 'tanken',               farge: '#e11d48' },
     { match: ['driv'],                          logo: 'driv.svg',             farge: '#cf1130' },
     { match: ['haltbakk'],                      logo: 'haltbakk.webp',        farge: '#b91c1c' },
@@ -22,8 +23,12 @@ const KJEDE_DOMENER = [
 ];
 
 function _finn(kjede) {
-    const k = (kjede || '').toLowerCase();
-    return KJEDE_DOMENER.find(e => e.match.some(m => k.includes(m))) || null;
+    const k = (kjede || '').trim().toLowerCase();
+    return KJEDE_DOMENER.find(e => {
+        if (e.exact?.some(m => k === m)) return true;
+        if (e.match?.some(m => k.includes(m))) return true;
+        return false;
+    }) || null;
 }
 
 export function getKjedeFarge(kjede) {

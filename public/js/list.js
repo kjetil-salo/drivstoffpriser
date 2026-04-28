@@ -225,12 +225,23 @@ function prisAlderTekst(tidspunkt) {
     const diffMs = Date.now() - d.getTime();
     const min = Math.floor(diffMs / 60000);
     const timer = Math.floor(diffMs / 3600000);
-    const dager = Math.floor(diffMs / 86400000);
     if (min < 1) return 'akkurat nå';
     if (min < 60) return `${min} min siden`;
     if (timer < 3) { const restMin = min - timer * 60; return `${timer} t${restMin > 0 ? ` ${restMin} min` : ''} siden`; }
     if (timer < 24) return `${timer} t siden`;
     return 'over 24 t';
+}
+
+function prisAlderTekstKort(tidspunkt) {
+    if (!tidspunkt) return null;
+    const d = new Date(tidspunkt.replace(' ', 'T') + 'Z');
+    const diffMs = Date.now() - d.getTime();
+    const min = Math.floor(diffMs / 60000);
+    const timer = Math.floor(diffMs / 3600000);
+    if (min < 1) return 'nå';
+    if (min < 60) return `${min} min`;
+    if (timer < 24) return `${timer} t`;
+    return `>${Math.floor(timer / 24)}d`;
 }
 
 function prisAlderKlasse(tidspunkt) {
@@ -258,13 +269,6 @@ function kortHtml(s, billigste = {}, erHovedBilligst = false) {
         `<span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#fff">${initials}</span>` +
         (logoUrl ? `<img src="${logoUrl}" alt="${s.kjede || ''}" style="position:relative;width:28px;height:28px;object-fit:contain;background:#fff;border-radius:6px;padding:2px" onerror="this.style.display='none'">` : '') +
         `</div>`;
-    // Nyeste oppdatering blant synlige priser → for alderTekst
-    const synligeTidspunkt = rader.filter(r => r.v && r.ts).map(r => r.ts);
-    const nyesteTidspunkt = synligeTidspunkt.length
-        ? synligeTidspunkt.reduce((a, b) => a > b ? a : b)
-        : null;
-    const alderTekst = prisAlderTekst(nyesteTidspunkt);
-    const alderKlasse = prisAlderKlasse(nyesteTidspunkt);
     const kortKlasse = erHovedBilligst ? ' billigst-kort' : '';
     const bannerHtml = erHovedBilligst ? '<div class="sk-billigst-banner">★ billigste stasjon</div>' : '';
     return `<div class="stasjon-kort${kortKlasse}" role="listitem" tabindex="0" aria-label="${s.navn}${s.kjede ? ', ' + s.kjede : ''}" data-id="${s.id}">
@@ -279,10 +283,9 @@ function kortHtml(s, billigste = {}, erHovedBilligst = false) {
                 ${rader.map(r => `<div class="sk-pris-rad${r.type === aktivSort ? ' sort-aktiv' : ''}">
                     <span class="sk-pris-label">${r.label}</span>
                     <span class="sk-pris-verdi ${r.v ? (r.billigst ? 'billigst' : '') : 'ingen'}">${r.v ?? '–'}</span>
-                    ${r.v ? `<span class="pris-alder-dot ${prisAlderKlasse(r.ts)}" title="${r.ts ? prisAlderTekst(r.ts) : 'ukjent alder'}"></span>` : ''}
+                    ${r.v && r.ts ? `<span class="pris-alder-tekst ${prisAlderKlasse(r.ts)}" title="${prisAlderTekst(r.ts)}">${prisAlderTekstKort(r.ts)}</span>` : ''}
                 </div>`).join('')}
             </div>
-            ${alderTekst ? `<div class="sk-alder ${alderKlasse}">${alderTekst}</div>` : ''}
         </div>
         <div class="sk-hoyre">
             ${s.brukeropprettet ? `<a class="sk-gmaps-btn" href="https://www.google.com/maps?q=${s.lat},${s.lon}" target="_blank" rel="noopener" aria-label="Åpne ${s.navn} i Google Maps" onclick="event.stopPropagation()">

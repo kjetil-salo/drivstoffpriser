@@ -53,6 +53,18 @@ class TestStasjoner:
         result = db_mod.get_stasjoner_med_priser(60.39, 5.33)
         assert result[0]['kjede'] == ''
 
+    def test_lagre_stasjon_normaliserer_kjede_casing(self):
+        db_mod.lagre_stasjon('Bunker test', ' Bunker oil ', 60.39, 5.33, 'node/bunker')
+        result = db_mod.get_stasjoner_med_priser(60.39, 5.33)
+        assert result[0]['kjede'] == 'Bunker Oil'
+
+    def test_sett_kjede_for_stasjon_normaliserer_kjede_casing(self):
+        db_mod.lagre_stasjon('Ukjent', None, 60.39, 5.33, 'node/2')
+        stasjon = db_mod.get_stasjoner_med_priser(60.39, 5.33)[0]
+        db_mod.sett_kjede_for_stasjon(stasjon['id'], 'bunker oil')
+        result = db_mod.get_stasjoner_med_priser(60.39, 5.33)
+        assert result[0]['kjede'] == 'Bunker Oil'
+
 
 class TestPriser:
     def test_lagre_og_hent_pris(self):
@@ -118,6 +130,40 @@ class TestPriser:
         result = db_mod.get_stasjoner_med_priser(60.39, 5.33)
         assert result[0]['diesel_avgiftsfri'] is None
         assert result[0]['diesel_avgiftsfri_tidspunkt'] is None
+
+
+class TestKjedeSnitt:
+    def test_kjede_snitt_slaar_sammen_legacy_casing(self):
+        with db_mod.get_conn() as conn:
+            conn.execute(
+                "INSERT INTO stasjoner (navn, kjede, lat, lon, godkjent) VALUES (?, ?, ?, ?, 1)",
+                ('Bunker Nord', 'Bunker Oil', 60.39, 5.33)
+            )
+            conn.execute(
+                "INSERT INTO stasjoner (navn, kjede, lat, lon, godkjent) VALUES (?, ?, ?, ?, 1)",
+                ('Bunker Sør', 'Bunker oil', 60.40, 5.34)
+            )
+            stasjoner = conn.execute(
+                "SELECT id FROM stasjoner WHERE navn IN ('Bunker Nord', 'Bunker Sør') ORDER BY id"
+            ).fetchall()
+            for stasjon_id, bensin, diesel in (
+                (stasjoner[0][0], 20.0, 19.0),
+                (stasjoner[1][0], 22.0, 21.0),
+            ):
+                conn.execute(
+                    "INSERT INTO priser (stasjon_id, bensin, diesel, tidspunkt) VALUES (?, ?, ?, datetime('now'))",
+                    (stasjon_id, bensin, diesel)
+                )
+
+        resultat = db_mod.hent_kjede_snitt_24t()
+        assert resultat == [{
+            'kjede': 'Bunker Oil',
+            'snitt_bensin': 21.0,
+            'snitt_bensin98': None,
+            'snitt_diesel': 20.0,
+            'snitt_diesel_avgiftsfri': None,
+            'antall_stasjoner': 2,
+        }]
 
     def test_skjuler_priser_for_drivstoff_stasjonen_ikke_har(self):
         db_mod.lagre_stasjon('Dieselstasjon', 'Test', 60.39, 5.33, 'node/1')
@@ -265,6 +311,6 @@ class TestVisninger:
         assert 'prisendringer' in stats
         assert 'totalt' in stats
         assert 'unike_enheter' in stats
-        assert 'trend_30d' in stats
+        assert 'trend_14d' in stats
         assert 'besok_per_time' in stats
-        assert len(stats['trend_30d']) == 30
+        assert len(stats['trend_14d']) == 14

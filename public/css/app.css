@@ -870,18 +870,15 @@ html, body {
 .alder-utdatert { color: var(--color-muted); }
 .alder-ingen { color: var(--color-muted); }
 
-.pris-alder-dot {
-  display: block;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: currentColor;
-  margin-top: 2px;
+.pris-alder-tekst {
+  font-size: 0.6rem;
+  margin-top: 1px;
+  line-height: 1;
 }
-.pris-alder-dot.alder-fersk { color: var(--color-success); }
-.pris-alder-dot.alder-gammel { color: var(--color-fuel); }
-.pris-alder-dot.alder-utdatert { color: var(--color-muted); }
-.pris-alder-dot.alder-ingen { display: none; }
+.pris-alder-tekst.alder-fersk { color: var(--color-success); }
+.pris-alder-tekst.alder-gammel { color: var(--color-fuel); }
+.pris-alder-tekst.alder-utdatert { color: var(--color-muted); }
+.pris-alder-tekst.alder-ingen { display: none; }
 
 .sk-endre-btn {
   background: transparent;

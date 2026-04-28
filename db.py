@@ -8,6 +8,55 @@ from datetime import datetime
 _default_db = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'drivstoff.db')
 DB_PATH = os.environ.get('DB_PATH', _default_db)
 
+_KJEDE_ALIASES = {
+    'best': 'Best',
+    'bunker oil': 'Bunker Oil',
+    'circle k': 'Circle K',
+    'din x': 'Din-X',
+    'din-x': 'Din-X',
+    'driv': 'Driv',
+    'esso': 'Esso',
+    'haltbakk express': 'Haltbakk Express',
+    'haslestad energi': 'Haslestad Energi',
+    'knapphus': 'Knapphus',
+    'mh24': 'MH24',
+    'oljeleverandoren': 'Oljeleverandøren',
+    'oljeleverandøren': 'Oljeleverandøren',
+    'preem': 'Preem',
+    'shell': 'Shell',
+    'st 1': 'St1',
+    'st1': 'St1',
+    'tank': 'TANK',
+    'tanken': 'Tanken',
+    'tronder oil': 'Trønder Oil',
+    'trønder oil': 'Trønder Oil',
+    'uno x': 'Uno-X',
+    'uno-x': 'Uno-X',
+    'yx': 'YX',
+}
+
+
+def normaliser_kjede_navn(kjede: str | None) -> str | None:
+    if kjede is None:
+        return None
+    verdi = ' '.join(str(kjede).strip().split())
+    if not verdi:
+        return None
+    return _KJEDE_ALIASES.get(verdi.casefold(), verdi)
+
+
+def _normaliser_eksisterende_kjeder(conn):
+    for alias, kanonisk in _KJEDE_ALIASES.items():
+        conn.execute(
+            '''UPDATE stasjoner
+               SET kjede = ?
+               WHERE kjede IS NOT NULL
+                 AND trim(kjede) != ''
+                 AND lower(trim(kjede)) = ?
+                 AND kjede != ?''',
+            (kanonisk, alias, kanonisk)
+        )
+
 
 @contextmanager
 def get_conn():
@@ -220,6 +269,7 @@ def _migrer_db():
                 tesseract_feil     TEXT,
                 claude_feil        TEXT
             )''')
+        _normaliser_eksisterende_kjeder(conn)
         ocr_kolonner = [r[1] for r in conn.execute("PRAGMA table_info(ocr_statistikk)").fetchall()]
         if 'bilde_original' not in ocr_kolonner:
             conn.execute("ALTER TABLE ocr_statistikk ADD COLUMN bilde_original TEXT")
@@ -285,6 +335,7 @@ def _haversine(lat1, lon1, lat2, lon2):
 
 
 def lagre_stasjon(navn, kjede, lat, lon, osm_id, land=None):
+    kjede = normaliser_kjede_navn(kjede)
     with get_conn() as conn:
         conn.execute(
             '''INSERT INTO stasjoner (navn, kjede, lat, lon, osm_id, land)
@@ -362,13 +413,13 @@ def bekreft_pris(stasjon_id, type_navn, bruker_id, min_intervall=300):
     return True
 
 
-def lagre_pris(stasjon_id, bensin, diesel, bensin98=None, bruker_id=None, diesel_avgiftsfri=None, min_intervall=300, kilde=None):
+def lagre_pris(stasjon_id, bensin, diesel, bensin98=None, bruker_id=None, diesel_avgiftsfri=None, min_intervall=300, kilde=None, tillat_korreksjon=True):
     """Lagrer pris. Oppdaterer siste rad hvis bruker korrigerer innen intervallet, ellers insert.
     Ved UPDATE bevares verdier fra samme rad slik at delvis korreksjon ikke sletter det brukeren nettopp tastet.
     Ved INSERT lagres kun de oppgitte verdiene — subquery-ene i hent_stasjoner() henter siste verdi per type."""
     with _pris_lock:
         with get_conn() as conn:
-            if bruker_id is not None:
+            if bruker_id is not None and tillat_korreksjon:
                 sist = conn.execute(
                     "SELECT id, tidspunkt, bensin, diesel, bensin98, diesel_avgiftsfri FROM priser WHERE bruker_id=? AND stasjon_id=? ORDER BY tidspunkt DESC LIMIT 1",
                     (bruker_id, stasjon_id)
@@ -420,7 +471,7 @@ def slett_pris(pris_id: int) -> bool:
         return cur.rowcount > 0
 
 
-def unike_enheter_per_dag(dager: int = 30) -> list[dict]:
+def unike_enheter_per_dag(dager: int = 14) -> list[dict]:
     from datetime import date, timedelta
     with get_conn() as conn:
         conn.row_factory = sqlite3.Row
@@ -439,6 +490,7 @@ def unike_enheter_per_dag(dager: int = 30) -> list[dict]:
 
 def get_statistikk() -> dict:
     from datetime import date, timedelta
+    vindu_dager = 14
     with get_conn() as conn:
         conn.row_factory = sqlite3.Row
         prisendringer = conn.execute("SELECT COUNT(*) FROM priser").fetchone()[0]
@@ -447,10 +499,14 @@ def get_statistikk() -> dict:
             "SELECT COUNT(DISTINCT device_id) FROM visninger WHERE device_id != ''"
         ).fetchone()[0]
         today = date.today()
-        trend_map = {(today - timedelta(days=i)).isoformat(): 0 for i in range(29, -1, -1)}
+        trend_map = {
+            (today - timedelta(days=i)).isoformat(): 0
+            for i in range(vindu_dager - 1, -1, -1)
+        }
         for row in conn.execute(
             "SELECT DATE(ts) as dato, COUNT(*) as cnt FROM visninger "
-            "WHERE ts >= DATE('now', '-29 days') GROUP BY dato"
+            "WHERE ts >= DATE('now', ?) GROUP BY dato",
+            (f'-{vindu_dager - 1} days',)
         ).fetchall():
             if row['dato'] in trend_map:
                 trend_map[row['dato']] = row['cnt']
@@ -475,7 +531,7 @@ def get_statistikk() -> dict:
         'prisendringer': prisendringer,
         'totalt': totalt,
         'unike_enheter': unike_enheter,
-        'trend_30d': list(trend_map.items()),
+        'trend_14d': list(trend_map.items()),
         'besok_per_time': list(timer_map.items()),
     }
 
@@ -507,10 +563,32 @@ def hent_billigste_priser_24t() -> list:
 
 def hent_kjede_snitt_24t() -> list:
     """Gjennomsnittspriser per kjede basert på siste registrerte pris per stasjon siste 24 timer."""
+    kjede_expr = (
+        "CASE "
+        "WHEN lower(trim(s.kjede)) = 'bunker oil' THEN 'Bunker Oil' "
+        "WHEN lower(trim(s.kjede)) = 'circle k' THEN 'Circle K' "
+        "WHEN lower(trim(s.kjede)) IN ('din x', 'din-x') THEN 'Din-X' "
+        "WHEN lower(trim(s.kjede)) = 'driv' THEN 'Driv' "
+        "WHEN lower(trim(s.kjede)) = 'esso' THEN 'Esso' "
+        "WHEN lower(trim(s.kjede)) = 'haltbakk express' THEN 'Haltbakk Express' "
+        "WHEN lower(trim(s.kjede)) = 'haslestad energi' THEN 'Haslestad Energi' "
+        "WHEN lower(trim(s.kjede)) = 'knapphus' THEN 'Knapphus' "
+        "WHEN lower(trim(s.kjede)) = 'mh24' THEN 'MH24' "
+        "WHEN lower(trim(s.kjede)) IN ('oljeleverandoren', 'oljeleverandøren') THEN 'Oljeleverandøren' "
+        "WHEN lower(trim(s.kjede)) = 'preem' THEN 'Preem' "
+        "WHEN lower(trim(s.kjede)) = 'shell' THEN 'Shell' "
+        "WHEN lower(trim(s.kjede)) IN ('st1', 'st 1') THEN 'St1' "
+        "WHEN lower(trim(s.kjede)) = 'tank' THEN 'TANK' "
+        "WHEN lower(trim(s.kjede)) = 'tanken' THEN 'Tanken' "
+        "WHEN lower(trim(s.kjede)) IN ('tronder oil', 'trønder oil') THEN 'Trønder Oil' "
+        "WHEN lower(trim(s.kjede)) IN ('uno x', 'uno-x') THEN 'Uno-X' "
+        "WHEN lower(trim(s.kjede)) = 'yx' THEN 'YX' "
+        "ELSE trim(s.kjede) END"
+    )
     with get_conn() as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
-            '''SELECT s.kjede,
+            f'''SELECT {kjede_expr} AS kjede,
                       ROUND(AVG(CASE WHEN p.bensin > 0 THEN p.bensin END), 2)          AS snitt_bensin,
                       ROUND(AVG(CASE WHEN p.bensin98 > 0 THEN p.bensin98 END), 2)      AS snitt_bensin98,
                       ROUND(AVG(CASE WHEN p.diesel > 0 THEN p.diesel END), 2)           AS snitt_diesel,
@@ -525,7 +603,7 @@ def hent_kjede_snitt_24t() -> list:
                  AND p.id IN (SELECT MAX(p2.id) FROM priser p2
                               WHERE p2.tidspunkt > datetime('now', '-24 hours')
                               GROUP BY p2.stasjon_id)
-               GROUP BY s.kjede
+               GROUP BY {kjede_expr}
                HAVING antall_stasjoner >= 2
                ORDER BY snitt_diesel'''
         ).fetchall()
@@ -790,6 +868,7 @@ def sett_kallenavn(bruker_id: int, kallenavn: str):
 
 
 def sett_kjede_for_stasjon(stasjon_id: int, kjede: str):
+    kjede = normaliser_kjede_navn(kjede)
     with get_conn() as conn:
         conn.execute("UPDATE stasjoner SET kjede = ?, kjede_låst = 1 WHERE id = ?",
                      (kjede or None, stasjon_id))
@@ -839,6 +918,7 @@ def finn_naer_stasjon(lat, lon, maks_avstand_m=50):
 
 
 def opprett_stasjon(navn, kjede, lat, lon, bruker_id):
+    kjede = normaliser_kjede_navn(kjede)
     naer = finn_naer_stasjon(lat, lon)
     if naer:
         return None, naer
