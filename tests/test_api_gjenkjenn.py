@@ -187,6 +187,7 @@ class TestBekreftPris:
         })
         assert resp.status_code == 200
         assert resp.get_json()['ok'] is True
+        assert resp.get_json()['lagret'] is True
 
     def test_bekreft_stasjon_uten_pris_gir_ok(self, innlogget_client):
         """Bekreftelse av en stasjon uten pris skal returnere ok men ikke feile."""
@@ -198,6 +199,7 @@ class TestBekreftPris:
         assert resp.status_code == 200
         # lagret=False siden ingen pris eksisterer, men respons er alltid ok
         assert resp.get_json()['ok'] is True
+        assert resp.get_json()['lagret'] is False
 
     def test_bekreft_oppdaterer_tidspunkt(self, innlogget_client):
         stasjon = lag_stasjon()
@@ -223,6 +225,42 @@ class TestBekreftPris:
             'type': 'ulovlig_type',
         })
         assert resp.status_code == 200
+
+    def test_bekreft_to_ulike_typar_kan_lagres_etter_hverandre(self, innlogget_client):
+        stasjon = lag_stasjon()
+        db_mod.lagre_pris(stasjon['id'], 21.35, 20.50)
+
+        resp1 = innlogget_client.post('/api/bekreft-pris', json={
+            'stasjon_id': stasjon['id'],
+            'type': 'bensin',
+        })
+        resp2 = innlogget_client.post('/api/bekreft-pris', json={
+            'stasjon_id': stasjon['id'],
+            'type': 'diesel',
+        })
+
+        assert resp1.status_code == 200
+        assert resp2.status_code == 200
+        assert resp1.get_json()['lagret'] is True
+        assert resp2.get_json()['lagret'] is True
+
+    def test_bekreft_samme_type_to_ganger_gir_lagret_false(self, innlogget_client):
+        stasjon = lag_stasjon()
+        db_mod.lagre_pris(stasjon['id'], 21.35, 20.50)
+
+        resp1 = innlogget_client.post('/api/bekreft-pris', json={
+            'stasjon_id': stasjon['id'],
+            'type': 'bensin',
+        })
+        resp2 = innlogget_client.post('/api/bekreft-pris', json={
+            'stasjon_id': stasjon['id'],
+            'type': 'bensin',
+        })
+
+        assert resp1.status_code == 200
+        assert resp2.status_code == 200
+        assert resp1.get_json()['lagret'] is True
+        assert resp2.get_json()['lagret'] is False
 
 
 # ── /api/foreslaa-endring ─────────────────────────────────────────────────────

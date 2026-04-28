@@ -30,6 +30,7 @@ class TestAdminDashboard:
         assert 'Statistikk' in html
         assert 'Prislogg' in html
         assert 'Kart' in html
+        assert 'API-nøkler' in html
 
     def test_rutepris_er_adminside(self, admin_client):
         resp = admin_client.get('/admin/rutepris')
@@ -58,6 +59,73 @@ class TestAdminBrukere:
         data = resp.get_json()
         assert 'url' in data
         assert 'invitasjon?token=' in data['url']
+
+
+class TestAdminApiNokler:
+    def test_viser_api_nokler_side(self, admin_client):
+        resp = admin_client.get('/admin/api-nokler')
+        assert resp.status_code == 200
+        assert 'API-nøkler' in resp.data.decode()
+
+    def test_oppretter_api_nokkel(self, admin_client):
+        resp = admin_client.post('/admin/api-nokler/opprett', data={
+            'partner': 'Testpartner',
+        }, follow_redirects=False)
+
+        assert resp.status_code == 302
+        assert 'melding=opprettet' in resp.headers['Location']
+
+        with db_mod.get_conn() as conn:
+            row = conn.execute(
+                'SELECT partner, nøkkel, aktiv FROM api_nøkler WHERE partner = ?',
+                ('Testpartner',)
+            ).fetchone()
+
+        assert row[0] == 'Testpartner'
+        assert row[1]
+        assert row[2] == 1
+
+    def test_deaktiverer_api_nokkel(self, admin_client):
+        with db_mod.get_conn() as conn:
+            cur = conn.execute(
+                'INSERT INTO api_nøkler (partner, nøkkel, aktiv) VALUES (?, ?, 1)',
+                ('Testpartner', 'abc123')
+            )
+            nøkkel_id = cur.lastrowid
+
+        resp = admin_client.post('/admin/api-nokler/sett-aktiv', data={
+            'nokkel_id': nøkkel_id,
+            'aktiv': '0',
+        }, follow_redirects=False)
+
+        assert resp.status_code == 302
+        assert 'melding=deaktivert' in resp.headers['Location']
+
+        with db_mod.get_conn() as conn:
+            row = conn.execute('SELECT aktiv FROM api_nøkler WHERE id = ?', (nøkkel_id,)).fetchone()
+
+        assert row[0] == 0
+
+    def test_aktiverer_api_nokkel(self, admin_client):
+        with db_mod.get_conn() as conn:
+            cur = conn.execute(
+                'INSERT INTO api_nøkler (partner, nøkkel, aktiv) VALUES (?, ?, 0)',
+                ('Testpartner', 'abc123')
+            )
+            nøkkel_id = cur.lastrowid
+
+        resp = admin_client.post('/admin/api-nokler/sett-aktiv', data={
+            'nokkel_id': nøkkel_id,
+            'aktiv': '1',
+        }, follow_redirects=False)
+
+        assert resp.status_code == 302
+        assert 'melding=aktivert' in resp.headers['Location']
+
+        with db_mod.get_conn() as conn:
+            row = conn.execute('SELECT aktiv FROM api_nøkler WHERE id = ?', (nøkkel_id,)).fetchone()
+
+        assert row[0] == 1
 
 
 class TestPrislogg:

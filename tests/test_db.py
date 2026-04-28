@@ -131,6 +131,26 @@ class TestPriser:
         assert result[0]['diesel_avgiftsfri'] is None
         assert result[0]['diesel_avgiftsfri_tidspunkt'] is None
 
+    def test_bekreft_to_ulike_drivstofftyper_innenfor_intervall(self):
+        db_mod.opprett_bruker('bekreft@test.no', generate_password_hash('x'))
+        bruker = db_mod.finn_bruker('bekreft@test.no')
+        db_mod.lagre_stasjon('Test', 'Test', 60.39, 5.33, 'node/1')
+        sid = db_mod.get_stasjoner_med_priser(60.39, 5.33)[0]['id']
+        db_mod.lagre_pris(sid, 21.35, 20.50)
+
+        assert db_mod.bekreft_pris(sid, 'bensin', bruker['id'], min_intervall=300) is True
+        assert db_mod.bekreft_pris(sid, 'diesel', bruker['id'], min_intervall=300) is True
+
+    def test_bekreft_samme_drivstofftype_blokkeres_innenfor_intervall(self):
+        db_mod.opprett_bruker('bekreft2@test.no', generate_password_hash('x'))
+        bruker = db_mod.finn_bruker('bekreft2@test.no')
+        db_mod.lagre_stasjon('Test', 'Test', 60.39, 5.33, 'node/1')
+        sid = db_mod.get_stasjoner_med_priser(60.39, 5.33)[0]['id']
+        db_mod.lagre_pris(sid, 21.35, 20.50)
+
+        assert db_mod.bekreft_pris(sid, 'bensin', bruker['id'], min_intervall=300) is True
+        assert db_mod.bekreft_pris(sid, 'bensin', bruker['id'], min_intervall=300) is False
+
 
 class TestKjedeSnitt:
     def test_kjede_snitt_slaar_sammen_legacy_casing(self):

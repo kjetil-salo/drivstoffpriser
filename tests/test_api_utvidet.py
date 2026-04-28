@@ -83,6 +83,48 @@ class TestSyncDb:
         assert resp.status_code == 403
 
 
+# ── /api/v1/stasjoner ─────────────────────────────
+
+class TestEksporterStasjoner:
+    def test_gyldig_partnernokkel_gir_stasjoner(self, client):
+        lag_stasjon(osm_id='node/test-eksport')
+
+        with db_mod.get_conn() as conn:
+            conn.execute(
+                'INSERT INTO api_nøkler (partner, nøkkel, aktiv) VALUES (?, ?, 1)',
+                ('Testpartner', 'gyldig-nokkel'),
+            )
+            conn.commit()
+
+        resp = client.get('/api/v1/stasjoner', headers={'X-API-Key': 'gyldig-nokkel'})
+
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert len(data) == 1
+        assert data[0]['osm_id'] == 'node/test-eksport'
+
+    def test_deaktivert_partnernokkel_avvises(self, client):
+        with db_mod.get_conn() as conn:
+            conn.execute(
+                'INSERT INTO api_nøkler (partner, nøkkel, aktiv) VALUES (?, ?, 0)',
+                ('Testpartner', 'deaktivert-nokkel'),
+            )
+            conn.commit()
+
+        resp = client.get('/api/v1/stasjoner', headers={'X-API-Key': 'deaktivert-nokkel'})
+
+        assert resp.status_code == 403
+        assert 'API-nøkkel' in resp.get_json()['error']
+
+    def test_stations_api_key_fallback_stottes(self, client):
+        lag_stasjon()
+        os.environ['STATIONS_API_KEY'] = 'legacy-nokkel'
+
+        resp = client.get('/api/v1/stasjoner', headers={'X-API-Key': 'legacy-nokkel'})
+
+        assert resp.status_code == 200
+
+
 # ── /api/stasjon (POST) ────────────────────────────
 
 class TestNyStasjonAPI:
