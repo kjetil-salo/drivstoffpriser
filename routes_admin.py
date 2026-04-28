@@ -999,7 +999,7 @@ def admin_endringsforslag():
     rader = []
     for f in forslag:
         naavarende = f['navn'] + (f' ({f["kjede"]})' if f['kjede'] else '')
-        kart_url = f'/kart2?lat={f["lat"]}&lon={f["lon"]}'
+        kart_url = f'/?lat={f["lat"]}&lon={f["lon"]}&stasjon={f["stasjon_id"]}'
         dato = f['tidspunkt'][:10] if f['tidspunkt'] else '–'
         foreslatt_kjede = f['foreslatt_kjede'] or '–'
         foreslatt_navn = f['foreslatt_navn'] or '–'
