@@ -69,11 +69,11 @@ def tving_https():
 
 _CSP = (
     "default-src 'self'; "
-    "script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net; "
-    "style-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net; "
+    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+    "style-src 'self' 'unsafe-inline'; "
     "img-src 'self' data: blob: https://cdnjs.cloudflare.com https://raw.githubusercontent.com "
     "https://*.openstreetmap.org https://www.google.com; "
-    "connect-src 'self' https://unpkg.com https://cdn.jsdelivr.net https://tessdata.projectnaptha.com; "
+    "connect-src 'self' https://cdn.jsdelivr.net https://tessdata.projectnaptha.com https://*.openstreetmap.org; "
     "font-src 'self'; "
     "worker-src 'self' blob: https://cdn.jsdelivr.net; "
     "frame-ancestors 'none'; "

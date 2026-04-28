@@ -49,11 +49,7 @@ async function gåTilListe(page) {
             watchPosition: (ok) => { setTimeout(() => ok(pos), 60); return 1; },
             clearWatch: () => {},
         };
-        try {
-            Object.defineProperty(navigator, 'geolocation', { value: mock, configurable: true });
-        } catch {
-            navigator.__proto__.geolocation = mock;
-        }
+        Object.defineProperty(Navigator.prototype, 'geolocation', { get: () => mock, configurable: true });
     });
     await page.route('/api/stasjoner*', route =>
         route.fulfill({ json: { stasjoner: MOCK_STASJONER } })

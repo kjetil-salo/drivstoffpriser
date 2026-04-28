@@ -616,7 +616,7 @@ def prislogg():
         bruker = p['brukernavn'] or '<ukjent>'
         stasjon_tekst = p['navn'] + (f' ({p["kjede"]})' if p['kjede'] else '')
         if p.get('lat') and p.get('lon'):
-            stasjon = f'<a href="/kart2?lat={p["lat"]}&lon={p["lon"]}" target="_blank" rel="noopener" style="color:#e5e7eb">{stasjon_tekst}</a>'
+            stasjon = f'<a href="/?lat={p["lat"]}&lon={p["lon"]}&stasjon={p["stasjon_id"]}" target="_blank" rel="noopener" style="color:#e5e7eb">{stasjon_tekst}</a>'
         else:
             stasjon = stasjon_tekst
         rader.append(

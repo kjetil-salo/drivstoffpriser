@@ -8,6 +8,7 @@ let refreshTimer = null;
 let dagTeller = parseInt(sessionStorage.getItem('bidrag_dag') || '0');
 
 const radiusEl = document.getElementById('b-radius');
+const radiusEgenEl = document.getElementById('b-radius-egen');
 const gpsEl   = document.getElementById('b-gps');
 const listeEl = document.getElementById('b-liste');
 const rangEl  = document.getElementById('b-rang');
@@ -19,10 +20,50 @@ if (!meg.innlogget) {
 }
 
 // ── Radius ────────────────────────────────────────
-radiusEl.value = localStorage.getItem('bidrag_radius') || '5';
-radiusEl.addEventListener('change', () => {
+const standardRadius = [...radiusEl.options]
+    .map(opt => opt.value)
+    .filter(value => value !== 'egen');
+
+function formaterRadius(value) {
+    const n = Number.parseFloat(String(value).replace(',', '.'));
+    if (!Number.isFinite(n)) return '5';
+    return String(Math.min(100, Math.max(0.1, n)));
+}
+
+function aktivRadius() {
+    return radiusEl.value === 'egen'
+        ? formaterRadius(radiusEgenEl.value || localStorage.getItem('bidrag_radius_egen') || '5')
+        : radiusEl.value;
+}
+
+function lagreRadiusOgHent() {
+    if (radiusEl.value === 'egen') {
+        radiusEgenEl.value = formaterRadius(radiusEgenEl.value);
+        localStorage.setItem('bidrag_radius_egen', radiusEgenEl.value);
+    }
     localStorage.setItem('bidrag_radius', radiusEl.value);
     if (posisjon) hentOgVis();
+}
+
+const lagretRadius = localStorage.getItem('bidrag_radius') || '5';
+if (standardRadius.includes(lagretRadius) || lagretRadius === 'egen') {
+    radiusEl.value = lagretRadius;
+} else {
+    radiusEl.value = 'egen';
+    radiusEgenEl.value = formaterRadius(lagretRadius);
+    localStorage.setItem('bidrag_radius_egen', radiusEgenEl.value);
+}
+radiusEgenEl.value = radiusEgenEl.value || formaterRadius(localStorage.getItem('bidrag_radius_egen') || '5');
+radiusEgenEl.hidden = radiusEl.value !== 'egen';
+
+radiusEl.addEventListener('change', () => {
+    radiusEgenEl.hidden = radiusEl.value !== 'egen';
+    if (radiusEl.value === 'egen') radiusEgenEl.focus();
+    lagreRadiusOgHent();
+});
+radiusEgenEl.addEventListener('change', lagreRadiusOgHent);
+radiusEgenEl.addEventListener('keydown', e => {
+    if (e.key === 'Enter') radiusEgenEl.blur();
 });
 
 // ── Rang ──────────────────────────────────────────
@@ -99,7 +140,7 @@ aktiverWakeLock();
 // ── Hent og vis ───────────────────────────────────
 async function hentOgVis() {
     clearTimeout(refreshTimer);
-    const r = parseInt(radiusEl.value);
+    const r = aktivRadius();
     try {
         const resp = await fetch(`/api/stasjoner?lat=${posisjon.lat}&lon=${posisjon.lon}&radius=${r}`);
         if (!resp.ok) return;
@@ -195,7 +236,7 @@ function lagKort(s) {
             : `<span>${esc(initials)}</span>`}
         </div>
         <div class="b-info">
-          <div class="b-navn">${esc(s.navn)}</div>
+          <a class="b-navn" href="/?stasjon=${s.id}&lat=${s.lat}&lon=${s.lon}">${esc(s.navn)}</a>
           <div class="b-meta">${avstandTekst}${alderTekst
             ? ` · <span class="${gammel ? 'b-gammel' : ''}">${alderTekst}</span>`
             : ' · <em>Ingen priser</em>'}</div>
@@ -226,15 +267,26 @@ function lagRader(s) {
         const dot = alder < 6 ? 'b-dot-fersk' : alder < 24 ? 'b-dot-ok' : 'b-dot-gammel';
         const pris = v != null ? v.toFixed(2) : '–';
         const harPrisRad = v != null;
+        const tidTekst = ts ? formaterAlder(ts) : 'Ingen pris ennå';
+        const tidKlasse = ts && alder >= 24 ? ' b-gammel' : '';
         return `<div class="b-rad" data-type="${type}">
           <span class="b-dot ${dot}"></span>
           <span class="b-rad-label">${label}</span>
-          <span class="b-rad-pris">${pris}</span>
+          <div class="b-rad-hoyre">
+            <span class="b-rad-pris">${pris}</span>
+            <span class="b-rad-tid${tidKlasse}">${tidTekst}</span>
+          </div>
           ${harPrisRad
             ? `<button class="b-rad-bekreft" data-type="${type}" aria-label="Bekreft ${label}">✓</button>`
             : `<span class="b-rad-bekreft-placeholder"></span>`}
         </div>`;
     }).join('');
+}
+
+function oppdaterKort(kortEl, stasjon) {
+    const nyttKort = lagKort(stasjon);
+    kortEl.replaceWith(nyttKort);
+    return nyttKort;
 }
 
 // ── Inline edit (pris-span → input på plass) ──────
@@ -287,7 +339,7 @@ function lukkEdit(suksess = false) {
 
 async function lagrePris() {
     if (!redigerer) return;
-    const { kortEl, stasjon, type, input, prisSpan } = redigerer;
+    const { kortEl, stasjon, type, input } = redigerer;
 
     const verdi = input.value.trim().replace(',', '.');
     const pris  = parseFloat(verdi);
@@ -304,10 +356,10 @@ async function lagrePris() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 stasjon_id:        stasjon.id,
-                bensin:            type === 'bensin'            ? pris : stasjon.bensin,
-                bensin98:          type === 'bensin98'          ? pris : stasjon.bensin98,
-                diesel:            type === 'diesel'            ? pris : stasjon.diesel,
-                diesel_avgiftsfri: type === 'diesel_avgiftsfri' ? pris : stasjon.diesel_avgiftsfri,
+                bensin:            type === 'bensin'            ? pris : null,
+                bensin98:          type === 'bensin98'          ? pris : null,
+                diesel:            type === 'diesel'            ? pris : null,
+                diesel_avgiftsfri: type === 'diesel_avgiftsfri' ? pris : null,
                 kilde:             'bidrag',
             }),
         });
@@ -317,12 +369,8 @@ async function lagrePris() {
         const naa = new Date().toISOString().replace('T', ' ').slice(0, 19);
         stasjon[type] = pris;
         stasjon[`${type}_tidspunkt`] = naa;
-
-        prisSpan.textContent = pris.toFixed(2);
-        const rad = kortEl.querySelector(`.b-rad[data-type="${type}"]`);
-        if (rad) rad.querySelector('.b-dot').className = 'b-dot b-dot-fersk';
-
         lukkEdit(true);
+        oppdaterKort(kortEl, stasjon);
 
         dagTeller++;
         sessionStorage.setItem('bidrag_dag', dagTeller);
@@ -347,16 +395,12 @@ async function bekreftType(kortEl, stasjon, type) {
     btn.textContent = '…';
 
     try {
-        const resp = await fetch('/api/pris', {
+        const resp = await fetch('/api/bekreft-pris', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 stasjon_id:        stasjon.id,
-                bensin:            stasjon.bensin,
-                bensin98:          stasjon.bensin98,
-                diesel:            stasjon.diesel,
-                diesel_avgiftsfri: stasjon.diesel_avgiftsfri,
-                kilde:             'bidrag',
+                type,
             }),
         });
         if (resp.status === 401) { window.location.href = '/auth/logg-inn?neste=/bidrag'; return; }
@@ -364,9 +408,8 @@ async function bekreftType(kortEl, stasjon, type) {
 
         const naa = new Date().toISOString().replace('T', ' ').slice(0, 19);
         stasjon[`${type}_tidspunkt`] = naa;
-
-        const rad = kortEl.querySelector(`.b-rad[data-type="${type}"]`);
-        if (rad) rad.querySelector('.b-dot').className = 'b-dot b-dot-fersk';
+        const nyttKort = oppdaterKort(kortEl, stasjon);
+        const rad = nyttKort.querySelector(`.b-rad[data-type="${type}"]`);
         rad?.classList.add('b-rad-suksess');
 
         dagTeller++;

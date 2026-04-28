@@ -32,12 +32,7 @@ test.beforeEach(async ({ page }) => {
             watchPosition: (ok) => { setTimeout(() => ok(pos), 60); return 1; },
             clearWatch: () => {},
         };
-        // navigator.geolocation er en getter på prototype – må bruke defineProperty
-        try {
-            Object.defineProperty(navigator, 'geolocation', { value: mock, configurable: true });
-        } catch {
-            navigator.__proto__.geolocation = mock;
-        }
+        Object.defineProperty(Navigator.prototype, 'geolocation', { get: () => mock, configurable: true });
     });
 
     await page.route('/api/stasjoner*', route =>

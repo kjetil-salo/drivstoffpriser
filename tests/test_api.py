@@ -36,6 +36,16 @@ class TestStasjonerAPI:
         resp = client.get('/api/stasjoner?lat=57.5&lon=7.0')
         assert resp.status_code == 200
 
+    def test_desimalradius_stotter_fingranulert_sok(self, client):
+        db_mod.lagre_stasjon('Naer', 'Shell', 60.39, 5.33, 'node/1')
+        db_mod.lagre_stasjon('Litt unna', 'Shell', 60.39, 5.34, 'node/2')
+
+        resp = client.get('/api/stasjoner?lat=60.39&lon=5.33&radius=0.3')
+
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert [s['navn'] for s in data['stasjoner']] == ['Naer']
+
 
 # ── /api/pris ──────────────────────────────────────
 
@@ -116,6 +126,33 @@ class TestPrisAPI:
         result = db_mod.get_stasjoner_med_priser(60.39, 5.33)
         assert result[0]['diesel_avgiftsfri'] == 14.50
 
+    def test_bidrag_lagrer_kun_endret_pristype(self, innlogget_client):
+        db_mod.lagre_stasjon('S', 'T', 60.39, 5.33, 'node/1')
+        sid = db_mod.get_stasjoner_med_priser(60.39, 5.33)[0]['id']
+        db_mod.lagre_pris(sid, 21.00, 20.00, bensin98=22.00)
+
+        resp = innlogget_client.post('/api/pris', json={
+            'stasjon_id': sid,
+            'bensin': 21.35,
+            'kilde': 'bidrag',
+        })
+        assert resp.status_code == 200
+
+        with db_mod.get_conn() as conn:
+            row = conn.execute(
+                '''SELECT bensin, diesel, bensin98, diesel_avgiftsfri
+                   FROM priser
+                   WHERE stasjon_id = ?
+                   ORDER BY id DESC
+                   LIMIT 1''',
+                (sid,),
+            ).fetchone()
+
+        assert row[0] == 21.35
+        assert row[1] is None
+        assert row[2] is None
+        assert row[3] is None
+
     def test_statistikk_inkluderer_diesel_avgiftsfri(self, client):
         db_mod.lagre_stasjon('S', 'T', 60.39, 5.33, 'node/1')
         stasjoner = db_mod.get_stasjoner_med_priser(60.39, 5.33)
@@ -190,6 +227,66 @@ class TestStedssok:
     def test_tomt_sok(self, client):
         resp = client.get('/api/stedssok?q=')
         assert resp.get_json() == []
+
+    def test_finner_stasjon_via_kjede_og_flerordsok(self, client, monkeypatch):
+        import routes_api
+
+        routes_api._stedssok_cache.clear()
+        db_mod.lagre_stasjon('Bjorli Automat', 'Lesja Innkjøpslag', 62.25, 8.20, 'node/100')
+
+        class Resp:
+            def json(self):
+                return {'features': []}
+
+        monkeypatch.setattr(routes_api.httpx, 'get', lambda *args, **kwargs: Resp())
+
+        resp = client.get('/api/stedssok?q=lesja innkjopslag')
+
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert len(data) == 1
+        assert data[0]['type'] == 'stasjon'
+        assert data[0]['navn'] == 'Bjorli Automat (Lesja Innkjøpslag)'
+
+    def test_finner_stasjon_med_norske_tegn_normalisert(self, client, monkeypatch):
+        import routes_api
+
+        routes_api._stedssok_cache.clear()
+        db_mod.lagre_stasjon('Dombas Syd', 'Lesja Innkjøpslag', 62.07, 9.12, 'node/101')
+
+        class Resp:
+            def json(self):
+                return {'features': []}
+
+        monkeypatch.setattr(routes_api.httpx, 'get', lambda *args, **kwargs: Resp())
+
+        resp = client.get('/api/stedssok?q=innkjøpslag')
+
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert len(data) == 1
+        assert data[0]['type'] == 'stasjon'
+        assert data[0]['navn'] == 'Dombas Syd (Lesja Innkjøpslag)'
+
+    def test_finner_stasjon_med_innkjopslag_i_navn(self, client, monkeypatch):
+        import routes_api
+
+        routes_api._stedssok_cache.clear()
+        db_mod.lagre_stasjon('Lesja Innkjøpslag Sentrum', None, 62.118, 8.865, 'node/1418041')
+
+        class Resp:
+            def json(self):
+                return {'features': []}
+
+        monkeypatch.setattr(routes_api.httpx, 'get', lambda *args, **kwargs: Resp())
+
+        for q in ['lesja innkjøpslag', 'Lesja Innkjøpslag', 'LESJA INNKJØPSLAG']:
+            routes_api._stedssok_cache.clear()
+            resp = client.get(f'/api/stedssok?q={q}')
+            assert resp.status_code == 200
+            data = resp.get_json()
+            assert any(r['navn'] == 'Lesja Innkjøpslag Sentrum' for r in data), \
+                f'Forventet Lesja Innkjøpslag Sentrum i resultater for søk "{q}", fikk: {[r["navn"] for r in data]}'
 
 
 # ── /api/rutepris ──────────────────────────────────

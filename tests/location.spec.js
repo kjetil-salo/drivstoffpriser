@@ -41,11 +41,7 @@ test('vellykket GPS-posisjon viser markør på kartet', async ({ page }) => {
             watchPosition: (ok) => { setTimeout(() => ok(pos), 60); return 1; },
             clearWatch: () => {},
         };
-        try {
-            Object.defineProperty(navigator, 'geolocation', { value: mock, configurable: true });
-        } catch {
-            navigator.__proto__.geolocation = mock;
-        }
+        Object.defineProperty(Navigator.prototype, 'geolocation', { get: () => mock, configurable: true });
     });
     await baseMock(page);
     await page.goto('/');
@@ -66,11 +62,7 @@ test('GPS nektet viser feilmelding og knappen er ikke låst', async ({ page }) =
             },
             clearWatch: () => {},
         };
-        try {
-            Object.defineProperty(navigator, 'geolocation', { value: mock, configurable: true });
-        } catch {
-            navigator.__proto__.geolocation = mock;
-        }
+        Object.defineProperty(Navigator.prototype, 'geolocation', { get: () => mock, configurable: true });
     });
     await baseMock(page);
     await page.goto('/');
@@ -95,11 +87,7 @@ test('GPS timeout (lav nøyaktighet) gir posisjon etter 10 sekunder', async ({ p
             },
             clearWatch: (id) => clearInterval(id),
         };
-        try {
-            Object.defineProperty(navigator, 'geolocation', { value: mock, configurable: true });
-        } catch {
-            navigator.__proto__.geolocation = mock;
-        }
+        Object.defineProperty(Navigator.prototype, 'geolocation', { get: () => mock, configurable: true });
     });
     await baseMock(page);
     await page.goto('/');
@@ -121,11 +109,7 @@ test('cachet posisjon i localStorage brukes for umiddelbar kartvisning', async (
             watchPosition: (ok) => { setTimeout(() => ok(pos), 60); return 1; },
             clearWatch: () => {},
         };
-        try {
-            Object.defineProperty(navigator, 'geolocation', { value: mock, configurable: true });
-        } catch {
-            navigator.__proto__.geolocation = mock;
-        }
+        Object.defineProperty(Navigator.prototype, 'geolocation', { get: () => mock, configurable: true });
     });
     await baseMock(page);
     await page.goto('/');

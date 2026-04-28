@@ -281,6 +281,7 @@ const _qp = new URLSearchParams(window.location.search);
 const _qLat = parseFloat(_qp.get('lat'));
 const _qLon = parseFloat(_qp.get('lon'));
 const _fraAdmin = !isNaN(_qLat) && !isNaN(_qLon);
+const _stasjonId = _qp.get('stasjon') ? parseInt(_qp.get('stasjon')) : null;
 const lagretPos = hentLagretPos();
 initMap('map', _fraAdmin ? { lat: _qLat, lon: _qLon } : lagretPos);
 
@@ -367,6 +368,10 @@ if (_oppstartPos) {
         locStatus.textContent = '';
         visStasjoner(stasjoner, visStasjonSheet);
         if (viewListe.style.display !== 'none') visListe(stasjoner, visStasjonSheet);
+        if (_stasjonId) {
+            const stasjon = stasjoner.find(st => st.id === _stasjonId);
+            if (stasjon) visStasjonSheet(stasjon);
+        }
     }).catch(() => { locStatus.textContent = ''; });
 }
 

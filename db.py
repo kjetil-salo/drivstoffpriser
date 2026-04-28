@@ -453,7 +453,7 @@ def hent_siste_prisoppdateringer(limit=100) -> list:
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
             '''SELECT p.id, p.bensin, p.diesel, p.bensin98, p.diesel_avgiftsfri, p.tidspunkt,
-                      s.navn, s.kjede, s.lat, s.lon,
+                      s.id AS stasjon_id, s.navn, s.kjede, s.lat, s.lon,
                       b.brukernavn
                FROM priser p
                JOIN stasjoner s ON s.id = p.stasjon_id
