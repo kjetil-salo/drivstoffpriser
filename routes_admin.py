@@ -32,7 +32,8 @@ from db import (finn_bruker_id, hent_alle_brukere, slett_bruker, har_rolle, sett
                 hent_blogg_stats, finn_stasjoner_by_navn, endre_navn_stasjon,
                 hent_endringsforslag, slett_endringsforslag, antall_ubehandlede_endringsforslag,
                 hent_ventende_stasjoner, antall_ventende_stasjoner, godkjenn_stasjon,
-                unike_enheter_per_dag, sett_drivstofftyper)
+                unike_enheter_per_dag, sett_drivstofftyper, hent_api_nøkler,
+                opprett_api_nøkkel, sett_api_nøkkel_aktiv)
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -300,6 +301,11 @@ def admin():
     <div class="tile-tittel">Import</div>
     <div class="tile-info">Partnerdata</div>
   </a>
+  <a href="/admin/api-nokler" class="tile">
+    <div class="tile-ikon">&#128273;</div>
+    <div class="tile-tittel">API-nøkler</div>
+    <div class="tile-info">Partnere og tilgang</div>
+  </a>
   <a href="/admin/brukere" class="tile">
     <div class="tile-ikon">&#128101;</div>
     <div class="tile-tittel">Brukere</div>
@@ -513,6 +519,126 @@ document.querySelector('form[action="/admin/invitasjon"]').addEventListener('sub
 }});
 </script>
 </body></html>'''
+
+
+@admin_bp.route('/admin/api-nokler')
+@krever_innlogging
+@krever_admin
+def admin_api_nokler():
+    meldingskode = request.args.get('melding', '')
+    meldinger = {
+        'opprettet': ('melding-ok', 'Ny API-nøkkel opprettet.'),
+        'aktivert': ('melding-ok', 'API-nøkkelen er aktivert.'),
+        'deaktivert': ('melding-ok', 'API-nøkkelen er deaktivert.'),
+        'mangler-partner': ('melding-feil', 'Partnernavn mangler.'),
+        'finnes-fra-for': ('melding-feil', 'Klarte ikke å opprette nøkkel. Navn eller nøkkel finnes fra før.'),
+        'ukjent': ('melding-feil', 'Ukjent API-nøkkel.'),
+    }
+    melding_html = ''
+    if meldingskode in meldinger:
+        css_klasse, tekst = meldinger[meldingskode]
+        melding_html = f'<div class="melding {css_klasse}">{tekst}</div>'
+
+    rader = []
+    for nøkkel in hent_api_nøkler():
+        partner = html.escape(nøkkel['partner'])
+        verdi = html.escape(nøkkel['nøkkel'])
+        opprettet = (nøkkel.get('opprettet') or '–')[:19].replace('T', ' ')
+        aktiv = bool(nøkkel['aktiv'])
+        status = 'Aktiv' if aktiv else 'Deaktivert'
+        status_farge = '#22c55e' if aktiv else '#f59e0b'
+        neste_aktiv = '0' if aktiv else '1'
+        knappetekst = 'Deaktiver' if aktiv else 'Aktiver'
+        knappestil = '#ef4444' if aktiv else '#22c55e'
+        rader.append(
+            '<tr>'
+            f'<td>{partner}</td>'
+            f'<td><code style="font-size:0.8rem;word-break:break-all">{verdi}</code></td>'
+            f'<td style="color:{status_farge};font-weight:600">{status}</td>'
+            f'<td style="color:#94a3b8;font-size:0.8rem">{opprettet}</td>'
+            '<td>'
+            f'<form method="post" action="/admin/api-nokler/sett-aktiv" style="margin:0">'
+            f'<input type="hidden" name="nokkel_id" value="{nøkkel["id"]}">'
+            f'<input type="hidden" name="aktiv" value="{neste_aktiv}">'
+            f'<button style="background:transparent;border:1px solid {knappestil};color:{knappestil};'
+            'font-size:0.75rem;padding:6px 10px;border-radius:6px;cursor:pointer">'
+            f'{knappetekst}</button></form>'
+            '</td>'
+            '</tr>'
+        )
+    rader_html = ''.join(rader) or '<tr><td colspan="5" style="color:#94a3b8">Ingen API-nøkler registrert</td></tr>'
+
+    return f'''<!DOCTYPE html><html lang="no"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>API-nøkler – Admin</title>
+<style>
+  *{{box-sizing:border-box;margin:0;padding:0}}
+  body{{font-family:system-ui,sans-serif;background:#0f172a;color:#e5e7eb;padding:2rem 1rem}}
+  .container{{max-width:1100px;margin:0 auto}}
+  h1{{font-size:1.3rem;margin-bottom:0.5rem;color:#f1f5f9}}
+  p.info{{font-size:0.9rem;color:#94a3b8;margin-bottom:1.25rem}}
+  nav{{margin-bottom:1.5rem;font-size:0.85rem}}
+  nav a{{color:#94a3b8}}
+  .kort{{background:#111827;border:1px solid #1f2937;border-radius:12px;padding:1.25rem;margin-bottom:1rem;overflow:auto}}
+  .melding{{border-radius:10px;padding:0.9rem 1rem;margin-bottom:1rem;font-size:0.9rem}}
+  .melding-ok{{background:rgba(34,197,94,0.15);border:1px solid rgba(34,197,94,0.3);color:#22c55e}}
+  .melding-feil{{background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);color:#ef4444}}
+  form.opprett{{display:grid;grid-template-columns:minmax(220px,1fr) auto;gap:0.75rem;align-items:end}}
+  label{{display:block;font-size:0.85rem;color:#cbd5e1;margin-bottom:0.35rem}}
+  input[type=text]{{width:100%;padding:0.7rem 0.8rem;border-radius:8px;border:1px solid #334155;background:#020617;color:#e5e7eb}}
+  button.primar{{background:#2563eb;border:1px solid #2563eb;color:white;border-radius:8px;padding:0.75rem 1rem;cursor:pointer}}
+  table{{width:100%;border-collapse:collapse;font-size:0.9rem}}
+  td,th{{padding:10px;border-bottom:1px solid #1f2937;text-align:left;vertical-align:top}}
+  th{{color:#94a3b8;font-weight:500}}
+  code{{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}}
+  @media (max-width:700px){{form.opprett{{grid-template-columns:1fr}} table{{font-size:0.82rem}} td,th{{padding:8px}}}}
+</style></head><body><div class="container">
+<nav><a href="/admin">← Admin</a></nav>
+<h1>API-nøkler</h1>
+<p class="info">Opprett og administrer partnernøkler for eksport og deling av data.</p>
+{melding_html}
+<div class="kort">
+  <form class="opprett" method="post" action="/admin/api-nokler/opprett">
+    <div>
+      <label for="partner">Partnernavn</label>
+      <input id="partner" name="partner" type="text" maxlength="100" placeholder="F.eks. drivstoffnorge" required>
+    </div>
+    <button class="primar" type="submit">Opprett nøkkel</button>
+  </form>
+</div>
+<div class="kort">
+  <table>
+    <tr><th>Partner</th><th>Nøkkel</th><th>Status</th><th>Opprettet</th><th></th></tr>
+    {rader_html}
+  </table>
+</div>
+</div></body></html>'''
+
+
+@admin_bp.route('/admin/api-nokler/opprett', methods=['POST'])
+@krever_innlogging
+@krever_admin
+def admin_api_nokler_opprett():
+    partner = ' '.join((request.form.get('partner') or '').split())
+    if not partner:
+        return redirect('/admin/api-nokler?melding=mangler-partner')
+    try:
+        opprett_api_nøkkel(partner, secrets.token_urlsafe(24))
+    except Exception:
+        return redirect('/admin/api-nokler?melding=finnes-fra-for')
+    return redirect('/admin/api-nokler?melding=opprettet')
+
+
+@admin_bp.route('/admin/api-nokler/sett-aktiv', methods=['POST'])
+@krever_innlogging
+@krever_admin
+def admin_api_nokler_sett_aktiv():
+    nøkkel_id = request.form.get('nokkel_id', type=int)
+    aktiv = request.form.get('aktiv') == '1'
+    if not nøkkel_id or not sett_api_nøkkel_aktiv(nøkkel_id, aktiv):
+        return redirect('/admin/api-nokler?melding=ukjent')
+    melding = 'aktivert' if aktiv else 'deaktivert'
+    return redirect(f'/admin/api-nokler?melding={melding}')
 
 
 @admin_bp.route('/admin/steder')
@@ -1740,7 +1866,7 @@ def admin_kart():
     return f'''<!DOCTYPE html><html lang="no"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Priskart – Admin</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="/css/leaflet.css">
 <style>
   *{{box-sizing:border-box;margin:0;padding:0}}
   body{{font-family:system-ui,sans-serif;background:#0f172a;color:#e5e7eb}}
@@ -1785,7 +1911,7 @@ def admin_kart():
   <h3>Priser siste 24t per region</h3>
   <table>{''.join(f"<tr><td><span class='reg-dot' style='background:{farge}'></span>{navn}</td><td>{region_tell_24t.get(navn,0)}</td></tr>" for navn, farge, *_ in REGIONER_RECT + [("Møre og Romsdal", "#FFC107")] if region_tell_24t.get(navn, 0) > 0)}</table>
 </div>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/js/vendor/leaflet.js"></script>
 <script>
 const stasjoner = {json.dumps(stasjoner, ensure_ascii=False)};
 const regioner = {json.dumps(regioner_js, ensure_ascii=False)};
@@ -1968,7 +2094,7 @@ def admin_rutepris():
     return f'''<!DOCTYPE html><html lang="no"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Billigst på vei – Admin</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="/css/leaflet.css">
 <style>
   *{{box-sizing:border-box;margin:0;padding:0}}
   body{{font-family:system-ui,sans-serif;background:#0f172a;color:#e5e7eb;padding:2rem 1rem}}
@@ -2026,7 +2152,7 @@ def admin_rutepris():
   <div id="map"></div>
 </div>
 </div>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/js/vendor/leaflet.js"></script>
 <script>
 const data = {json.dumps(kartdata, ensure_ascii=False)};
 const map = L.map('map').setView([63.4, 10.4], 5);
@@ -2161,7 +2287,7 @@ def admin_kart2():
     return f'''<!DOCTYPE html><html lang="no"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Priskart grønn – Admin</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="/css/leaflet.css">
 <style>
   *{{box-sizing:border-box;margin:0;padding:0}}
   body{{font-family:system-ui,sans-serif;background:#0f172a;color:#e5e7eb}}
@@ -2176,7 +2302,7 @@ def admin_kart2():
 <h1>Stasjoner med registrerte priser</h1>
 <div class="info">{len(stasjoner)} stasjoner</div>
 <div id="map"></div>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="/js/vendor/leaflet.js"></script>
 <script>
 const stasjoner = {json.dumps(stasjoner, ensure_ascii=False)};
 const map = L.map('map').setView([63.4, 10.4], 5);
