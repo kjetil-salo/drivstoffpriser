@@ -1,4 +1,5 @@
 const SETTINGS_KEY = 'drivstoff_innstillinger';
+const STANDARD_RADIUS = ['5', '10', '20', '30', '50', '100'];
 
 let deferredInstallPrompt = null;
 window.addEventListener('beforeinstallprompt', (e) => {
@@ -28,13 +29,39 @@ function visToast(tekst) {
     toastTimer = setTimeout(() => el.classList.remove('toast-vis'), 2200);
 }
 
-const STANDARD = { bensin: true, bensin98: true, diesel: true, diesel_avgiftsfri: false, radius: 30, kartvisning: 'kompakt' };
+const STANDARD = {
+    bensin: true,
+    bensin98: true,
+    diesel: true,
+    diesel_avgiftsfri: false,
+    radius: 30,
+    radiusValg: '30',
+    radiusEgen: '5',
+    kartvisning: 'kompakt',
+};
+
+function formaterRadius(value) {
+    const n = Number.parseFloat(String(value).replace(',', '.'));
+    if (!Number.isFinite(n)) return '5';
+    return String(Math.min(100, Math.max(0.1, n)));
+}
+
+function normaliserInnstillinger(stored = {}) {
+    const base = { ...STANDARD, ...stored };
+    const lagretRadius = String(base.radius ?? STANDARD.radius);
+    const radiusValg = base.radiusValg === 'egen' || STANDARD_RADIUS.includes(String(base.radiusValg))
+        ? String(base.radiusValg)
+        : (STANDARD_RADIUS.includes(lagretRadius) ? lagretRadius : 'egen');
+    const radiusEgen = formaterRadius(base.radiusEgen ?? (radiusValg === 'egen' ? lagretRadius : STANDARD.radiusEgen));
+    const radius = radiusValg === 'egen' ? Number.parseFloat(radiusEgen) : Number.parseFloat(radiusValg);
+    return { ...base, radiusValg, radiusEgen, radius };
+}
 
 export function getInnstillinger() {
     try {
         const stored = JSON.parse(localStorage.getItem(SETTINGS_KEY));
-        return { ...STANDARD, ...stored };
-    } catch { return { ...STANDARD }; }
+        return normaliserInnstillinger(stored || {});
+    } catch { return normaliserInnstillinger(); }
 }
 
 export function initInnstillinger(onChange) {
@@ -45,6 +72,7 @@ export function initInnstillinger(onChange) {
     const cbDiesel = document.getElementById('sett-diesel');
     const cbDieselAvgiftsfri = document.getElementById('sett-diesel-avgiftsfri');
     const radiusSelect = document.getElementById('sett-radius');
+    const radiusEgen = document.getElementById('sett-radius-egen');
     const radVanlig = document.getElementById('sett-kartvisning-vanlig');
     const radKompakt = document.getElementById('sett-kartvisning-kompakt');
 
@@ -53,7 +81,9 @@ export function initInnstillinger(onChange) {
     cbBensin98.checked = s.bensin98;
     cbDiesel.checked = s.diesel;
     cbDieselAvgiftsfri.checked = s.diesel_avgiftsfri;
-    radiusSelect.value = String(s.radius);
+    radiusSelect.value = s.radiusValg;
+    radiusEgen.value = s.radiusEgen;
+    radiusEgen.hidden = s.radiusValg !== 'egen';
     if (s.kartvisning === 'kompakt') radKompakt.checked = true;
     else radVanlig.checked = true;
 
@@ -81,12 +111,15 @@ export function initInnstillinger(onChange) {
 
     function lagre() {
         const kartvisning = document.querySelector('input[name="sett-kartvisning"]:checked')?.value || 'kompakt';
-        const ny = {
+        const radiusValg = radiusSelect.value;
+        if (radiusValg === 'egen') radiusEgen.value = formaterRadius(radiusEgen.value);
+        const ny = normaliserInnstillinger({
             bensin: cbBensin.checked, bensin98: cbBensin98.checked, diesel: cbDiesel.checked,
             diesel_avgiftsfri: cbDieselAvgiftsfri.checked,
-            radius: parseInt(radiusSelect.value, 10),
+            radiusValg,
+            radiusEgen: radiusEgen.value,
             kartvisning,
-        };
+        });
         localStorage.setItem(SETTINGS_KEY, JSON.stringify(ny));
         if (onChange) onChange(ny);
     }
@@ -95,7 +128,15 @@ export function initInnstillinger(onChange) {
     cbBensin98.addEventListener('change', function () { oppdater(this); });
     cbDiesel.addEventListener('change', function () { oppdater(this); });
     cbDieselAvgiftsfri.addEventListener('change', function () { oppdater(this); });
-    radiusSelect.addEventListener('change', lagre);
+    radiusSelect.addEventListener('change', () => {
+        radiusEgen.hidden = radiusSelect.value !== 'egen';
+        if (radiusSelect.value === 'egen') radiusEgen.focus();
+        lagre();
+    });
+    radiusEgen.addEventListener('change', lagre);
+    radiusEgen.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') radiusEgen.blur();
+    });
     radVanlig.addEventListener('change', lagre);
     radKompakt.addEventListener('change', lagre);
 

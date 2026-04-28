@@ -210,7 +210,8 @@ html, body {
   cursor: pointer;
 }
 
-#sett-radius {
+#sett-radius,
+#sett-radius-egen {
   flex: 1;
   background: var(--color-bg);
   color: var(--color-text);
@@ -218,6 +219,15 @@ html, body {
   border-radius: var(--radius-sm);
   padding: 4px 8px;
   font-size: var(--font-sm);
+}
+
+#sett-radius-egen {
+  max-width: 84px;
+  font-variant-numeric: tabular-nums;
+}
+
+#sett-radius-egen[hidden] {
+  display: none;
 }
 
 #totalt-info {
