@@ -36,6 +36,57 @@ from db import (finn_bruker_id, hent_alle_brukere, slett_bruker, har_rolle, sett
 
 admin_bp = Blueprint('admin', __name__)
 
+# ── Regiondefinisjoner for analysekart ──────────────────────────────────────
+REGIONER_RECT = [
+    ("Bergen",              "#2196F3", 60.10, 60.88, 4.70, 5.75),
+    ("Haugalandet",         "#9C27B0", 59.08, 59.65, 5.05, 5.60),
+    ("Stavanger",           "#E91E63", 58.75, 59.15, 5.40, 6.05),
+    ("Grenland",            "#FF5722", 58.95, 59.40, 9.35, 9.90),
+    ("Kongsberg",           "#795548", 59.55, 59.80, 9.50, 9.85),
+    ("Drammen",             "#607D8B", 59.55, 59.85, 10.00, 10.40),
+    ("Oslo",                "#F44336", 59.75, 60.05, 10.35, 11.00),
+    ("Romerike/Akershus",   "#FF9800", 59.85, 60.20, 10.80, 11.20),
+    ("Fredrikstad/Østfold", "#4CAF50", 59.05, 59.45, 10.80, 11.35),
+    ("Vestfold",            "#00BCD4", 59.10, 59.55, 10.15, 10.55),
+    ("Kristiansand",        "#8BC34A", 57.95, 58.25, 7.75, 8.20),
+    ("Trondheim",           "#3F51B5", 63.25, 63.55, 10.10, 10.70),
+    ("Bodø/Nordland",       "#009688", 67.10, 67.45, 14.25, 14.70),
+    ("Tromsø/Troms",        "#673AB7", 69.45, 69.80, 18.70, 19.30),
+]
+
+MORE_POLYGON = [
+    [62.05, 5.05], [62.20, 5.20], [62.47, 5.55], [62.60, 6.00],
+    [62.85, 6.60], [63.08, 7.75], [63.12, 8.05], [63.20, 8.80],
+    [63.00, 9.10], [62.75, 9.40], [62.45, 9.20], [62.20, 9.00],
+    [62.00, 8.40], [62.00, 7.20], [61.90, 6.50], [61.95, 5.80],
+    [62.05, 5.05],
+]
+
+
+def _punkt_i_polygon(lat, lon, polygon):
+    """Ray casting – avgjør om (lat, lon) er innenfor polygon [[lat,lon],...]."""
+    n = len(polygon)
+    inni = False
+    j = n - 1
+    for i in range(n):
+        yi, xi = polygon[i]
+        yj, xj = polygon[j]
+        if ((yi > lat) != (yj > lat)) and (lon < (xj - xi) * (lat - yi) / (yj - yi) + xi):
+            inni = not inni
+        j = i
+    return inni
+
+
+def _region_for(lat, lon):
+    if lat is None or lon is None:
+        return "Ukjent"
+    for navn, _, lat_min, lat_max, lon_min, lon_max in REGIONER_RECT:
+        if lat_min <= lat <= lat_max and lon_min <= lon <= lon_max:
+            return navn
+    if _punkt_i_polygon(lat, lon, MORE_POLYGON):
+        return "Møre og Romsdal"
+    return "Annet"
+
 
 def _send_forslag_svar(epost: str, brukernavn: str, stasjonsnavn: str, godkjent: bool, ekstra: str = ''):
     """Send svar til bruker om endringsforslag er godkjent eller avvist."""
@@ -565,7 +616,7 @@ def prislogg():
         bruker = p['brukernavn'] or '<ukjent>'
         stasjon_tekst = p['navn'] + (f' ({p["kjede"]})' if p['kjede'] else '')
         if p.get('lat') and p.get('lon'):
-            stasjon = f'<a href="https://www.google.com/maps?q={p["lat"]},{p["lon"]}" target="_blank" rel="noopener" style="color:#e5e7eb">{stasjon_tekst}</a>'
+            stasjon = f'<a href="/kart2?lat={p["lat"]}&lon={p["lon"]}" target="_blank" rel="noopener" style="color:#e5e7eb">{stasjon_tekst}</a>'
         else:
             stasjon = stasjon_tekst
         rader.append(
@@ -948,7 +999,7 @@ def admin_endringsforslag():
     rader = []
     for f in forslag:
         naavarende = f['navn'] + (f' ({f["kjede"]})' if f['kjede'] else '')
-        kart_url = f'https://www.google.com/maps?q={f["lat"]},{f["lon"]}'
+        kart_url = f'/kart2?lat={f["lat"]}&lon={f["lon"]}'
         dato = f['tidspunkt'][:10] if f['tidspunkt'] else '–'
         foreslatt_kjede = f['foreslatt_kjede'] or '–'
         foreslatt_navn = f['foreslatt_navn'] or '–'
@@ -1350,9 +1401,9 @@ def oversikt():
     brukere = antall_brukere()
     blogg_stats = hent_blogg_stats()
     blogg_totalt = sum(r['antall'] for r in blogg_stats)
-    labels = [d for d, _ in stats['trend_30d']]
-    values = [c for _, c in stats['trend_30d']]
-    enheter_dag = unike_enheter_per_dag(30)
+    labels = [d for d, _ in stats['trend_14d']]
+    values = [c for _, c in stats['trend_14d']]
+    enheter_dag = unike_enheter_per_dag(14)
     enheter_labels = [r['dato'] for r in enheter_dag]
     enheter_values = [r['antall'] for r in enheter_dag]
     _oslo = ZoneInfo('Europe/Oslo')
@@ -1432,11 +1483,11 @@ def oversikt():
     <div class="kort"><div class="kort-tal">{blogg_totalt}</div><div class="kort-label">Bloggvisninger totalt</div></div>
   </div>
   <div class="seksjon">
-    <h2>Sidevisninger siste 30 dager</h2>
+    <h2>Sidevisninger siste 14 dager</h2>
     <canvas id="graf" style="width:100%;max-height:240px"></canvas>
   </div>
   <div class="seksjon">
-    <h2>Unike enheter per dag – siste 30 dager</h2>
+    <h2>Unike enheter per dag – siste 14 dager</h2>
     <canvas id="enhetergraf" style="width:100%;max-height:240px"></canvas>
   </div>
   <div class="seksjon">
@@ -1642,6 +1693,7 @@ def admin_kart():
     stasjoner = stasjoner_med_pris_koordinater()
     nå = datetime.now(timezone.utc)
     tell = {'fersk': 0, 'dagsgammel': 0, 'ny': 0, 'gammel': 0, 'gammel7': 0}
+    region_tell_24t = {}
     for s in stasjoner:
         t = s.get('tidspunkt')
         if not t:
@@ -1663,6 +1715,28 @@ def admin_kart():
             tell['gammel'] += 1
         else:
             tell['gammel7'] += 1
+        if timer < 24:
+            reg = _region_for(s.get('lat'), s.get('lon'))
+            region_tell_24t[reg] = region_tell_24t.get(reg, 0) + 1
+    regioner_js = []
+    for navn, farge, lat_min, lat_max, lon_min, lon_max in REGIONER_RECT:
+        regioner_js.append({
+            'navn': navn, 'farge': farge,
+            'type': 'rect',
+            'bounds': [[lat_min, lon_min], [lat_max, lon_max]],
+            'antall24t': region_tell_24t.get(navn, 0),
+        })
+    regioner_js.append({
+        'navn': 'Møre og Romsdal', 'farge': '#FFC107',
+        'type': 'polygon',
+        'coords': MORE_POLYGON,
+        'antall24t': region_tell_24t.get('Møre og Romsdal', 0),
+    })
+    region_tell_sorted = sorted(
+        [(k, v) for k, v in region_tell_24t.items() if k not in ('Ukjent', 'Annet')],
+        key=lambda x: -x[1]
+    )
+
     return f'''<!DOCTYPE html><html lang="no"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Priskart – Admin</title>
@@ -1673,32 +1747,80 @@ def admin_kart():
   nav{{padding:1rem;font-size:0.85rem}}
   nav a{{color:#94a3b8}}
   h1{{font-size:1.3rem;padding:0 1rem 1rem;color:#f1f5f9}}
-  #map{{height:calc(100vh - 100px);width:100%;border-radius:10px;margin:0 auto;max-width:1200px}}
-  .info{{background:#111827;border:1px solid #1f2937;border-radius:8px;padding:0.75rem 1rem;
-         margin:0 1rem 1rem;font-size:0.85rem;color:#94a3b8;display:inline-block}}
-  .legend{{display:inline-block;margin-left:1rem;background:#111827;border:1px solid #1f2937;border-radius:8px;padding:0.75rem 1rem;font-size:0.85rem;color:#94a3b8}}
-  .legend span{{display:inline-flex;align-items:center;margin-right:1rem;cursor:pointer;user-select:none}}
+  #map{{height:calc(100vh - 160px);width:100%;border-radius:10px}}
+  .toolbar{{padding:0 1rem 0.75rem;display:flex;flex-wrap:wrap;gap:0.5rem;align-items:center}}
+  .info{{background:#111827;border:1px solid #1f2937;border-radius:8px;padding:0.5rem 0.9rem;
+         font-size:0.85rem;color:#94a3b8}}
+  .legend{{background:#111827;border:1px solid #1f2937;border-radius:8px;padding:0.5rem 0.9rem;font-size:0.85rem;color:#94a3b8}}
+  .legend span{{display:inline-flex;align-items:center;margin-right:0.9rem;cursor:pointer;user-select:none}}
   .legend span.inaktiv{{opacity:0.3;text-decoration:line-through}}
   .legend .dot{{width:12px;height:12px;border-radius:50%;display:inline-block;margin-right:0.4rem}}
+  .toggle-btn{{background:#1f2937;border:1px solid #374151;border-radius:6px;color:#e5e7eb;
+               padding:0.4rem 0.8rem;cursor:pointer;font-size:0.8rem}}
+  .toggle-btn.aktiv{{border-color:#60a5fa;color:#60a5fa}}
+  #regionpanel{{position:absolute;top:120px;right:16px;z-index:1000;background:#111827ee;
+                border:1px solid #1f2937;border-radius:10px;padding:0.75rem;
+                font-size:0.8rem;color:#e5e7eb;min-width:190px;display:none}}
+  #regionpanel h3{{font-size:0.85rem;color:#f1f5f9;margin-bottom:0.5rem}}
+  #regionpanel table{{width:100%;border-collapse:collapse}}
+  #regionpanel td{{padding:2px 6px}}
+  #regionpanel td:last-child{{text-align:right;font-weight:600}}
+  .reg-dot{{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:5px}}
 </style></head><body>
 <nav><a href="/admin">← Admin</a></nav>
 <h1>Registrerte priser i Norge</h1>
-<div class="info">{len(stasjoner)} stasjoner med pris</div>
-<div class="legend">
-  <span data-kat="fersk"><span class="dot" style="background:#22c55e"></span>&lt; 8 timer ({tell['fersk']})</span>
-  <span data-kat="dagsgammel"><span class="dot" style="background:#a3e635"></span>8–24 timer ({tell['dagsgammel']})</span>
-  <span data-kat="ny"><span class="dot" style="background:#facc15"></span>24–48 timer ({tell['ny']})</span>
-  <span data-kat="gammel"><span class="dot" style="background:#4b5563"></span>2–7 dager ({tell['gammel']})</span>
-  <span data-kat="gammel7"><span class="dot" style="background:#9ca3af"></span>&gt; 7 dager ({tell['gammel7']})</span>
+<div class="toolbar">
+  <div class="info">{len(stasjoner)} stasjoner med pris</div>
+  <div class="legend">
+    <span data-kat="fersk"><span class="dot" style="background:#22c55e"></span>&lt; 8t ({tell['fersk']})</span>
+    <span data-kat="dagsgammel"><span class="dot" style="background:#a3e635"></span>8–24t ({tell['dagsgammel']})</span>
+    <span data-kat="ny"><span class="dot" style="background:#facc15"></span>24–48t ({tell['ny']})</span>
+    <span data-kat="gammel"><span class="dot" style="background:#4b5563"></span>2–7d ({tell['gammel']})</span>
+    <span data-kat="gammel7"><span class="dot" style="background:#9ca3af"></span>&gt;7d ({tell['gammel7']})</span>
+  </div>
+  <button class="toggle-btn" id="btnRegioner" onclick="toggleRegioner()">Vis regioner</button>
 </div>
 <div id="map"></div>
+<div id="regionpanel">
+  <h3>Priser siste 24t per region</h3>
+  <table>{''.join(f"<tr><td><span class='reg-dot' style='background:{farge}'></span>{navn}</td><td>{region_tell_24t.get(navn,0)}</td></tr>" for navn, farge, *_ in REGIONER_RECT + [("Møre og Romsdal", "#FFC107")] if region_tell_24t.get(navn, 0) > 0)}</table>
+</div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 const stasjoner = {json.dumps(stasjoner, ensure_ascii=False)};
+const regioner = {json.dumps(regioner_js, ensure_ascii=False)};
 const map = L.map('map').setView([63.4, 10.4], 5);
 L.tileLayer('https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png', {{
   attribution: '© OpenStreetMap'
 }}).addTo(map);
+
+// Region-lag
+const regionLag = [];
+regioner.forEach(r => {{
+  let shape;
+  const opts = {{color: r.farge, fill: true, fillOpacity: 0.15, weight: 2,
+                 interactive: true}};
+  if (r.type === 'rect') {{
+    shape = L.rectangle(r.bounds, opts);
+  }} else {{
+    shape = L.polygon(r.coords, opts);
+  }}
+  shape.bindTooltip(`<b>${{r.navn}}</b><br>${{r.antall24t}} oppdateringer siste 24t`,
+    {{sticky: true, className: 'leaflet-tooltip-dark'}});
+  regionLag.push(shape);
+}});
+
+let regionerVises = false;
+function toggleRegioner() {{
+  regionerVises = !regionerVises;
+  const btn = document.getElementById('btnRegioner');
+  const panel = document.getElementById('regionpanel');
+  btn.classList.toggle('aktiv', regionerVises);
+  btn.textContent = regionerVises ? 'Skjul regioner' : 'Vis regioner';
+  panel.style.display = regionerVises ? 'block' : 'none';
+  regionLag.forEach(l => regionerVises ? l.addTo(map) : map.removeLayer(l));
+}}
+
 function prisFarge(tidspunkt) {{
   if (!tidspunkt) return '#9ca3af';
   const timer = (Date.now() - new Date(tidspunkt.replace(' ', 'T')).getTime()) / 3600000;
