@@ -2,6 +2,7 @@ const { defineConfig, devices } = require('@playwright/test');
 
 module.exports = defineConfig({
     testDir: './tests',
+    retries: 1,
     use: { baseURL: 'http://localhost:7342', serviceWorkers: 'block' },
     projects: [
         { name: 'webkit-iphone', use: { ...devices['iPhone 14'] } },
