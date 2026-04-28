@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v100';
+const CACHE_VERSION = 'v101';
 const STATIC_CACHE = `drivstoff-static-${CACHE_VERSION}`;
 const DATA_CACHE = `drivstoff-data-${CACHE_VERSION}`;
 
@@ -58,8 +58,6 @@ self.addEventListener('activate', (e) => {
           .map(k => caches.delete(k))
       )
     ).then(() => self.clients.claim())
-      .then(() => self.clients.matchAll({ type: 'window' }))
-      .then(clients => clients.forEach(client => client.navigate(client.url)))
   );
 });
 
