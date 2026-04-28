@@ -2314,10 +2314,14 @@ html, body {
 }
 
 .stat-radius-velger {
-  display: flex;
+  display: none;
   align-items: center;
   gap: var(--space-sm);
   margin-bottom: var(--space-sm);
+}
+
+.stat-radius-velger:not([hidden]) {
+  display: flex;
 }
 
 .stat-radius-select {
