@@ -73,7 +73,7 @@ _CSP = (
     "style-src 'self' 'unsafe-inline' https://unpkg.com https://cdn.jsdelivr.net; "
     "img-src 'self' data: blob: https://cdnjs.cloudflare.com https://raw.githubusercontent.com "
     "https://*.openstreetmap.org https://www.google.com; "
-    "connect-src 'self' https://cdn.jsdelivr.net https://tessdata.projectnaptha.com; "
+    "connect-src 'self' https://unpkg.com https://cdn.jsdelivr.net https://tessdata.projectnaptha.com; "
     "font-src 'self'; "
     "worker-src 'self' blob: https://cdn.jsdelivr.net; "
     "frame-ancestors 'none'; "

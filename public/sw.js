@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v101';
+const CACHE_VERSION = 'v102';
 const STATIC_CACHE = `drivstoff-static-${CACHE_VERSION}`;
 const DATA_CACHE = `drivstoff-data-${CACHE_VERSION}`;
 
@@ -35,8 +35,6 @@ const STATIC_ASSETS = [
   '/img/kjeder/tank.png',
   '/img/kjeder/tanken.png',
   '/img/kjeder/bunker-oil.svg',
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
 ];
 
 // ── Install: precache statiske ressurser ──────────
