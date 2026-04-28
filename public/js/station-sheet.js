@@ -348,6 +348,11 @@ async function håndterBekreftKlikk(e) {
             knapp.textContent = '✓';
             return;
         }
+        if (resultat?.lagret === false) {
+            knapp.disabled = false;
+            knapp.textContent = '✓';
+            return;
+        }
         const _nd = new Date(), _p = n => String(n).padStart(2, '0');
         const naa = `${_nd.getFullYear()}-${_p(_nd.getMonth()+1)}-${_p(_nd.getDate())} ${_p(_nd.getHours())}:${_p(_nd.getMinutes())}:${_p(_nd.getSeconds())}`;
 

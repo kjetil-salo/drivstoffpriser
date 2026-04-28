@@ -184,8 +184,21 @@ def _kjede_til_brand(kjede):
 
 @api_bp.route('/api/v1/stasjoner')
 def eksporter_stasjoner():
-    api_key = os.environ.get('STATIONS_API_KEY', '')
-    if not api_key or request.headers.get('X-Api-Key') != api_key:
+    nøkkel = request.headers.get('X-API-Key', '')
+    if not nøkkel:
+        return jsonify({'error': 'Ugyldig eller manglende API-nøkkel'}), 403
+
+    gyldig_partnernøkkel = False
+    with get_conn() as conn:
+        partner = conn.execute(
+            'SELECT 1 FROM api_nøkler WHERE nøkkel = ? AND aktiv = 1',
+            (nøkkel,)
+        ).fetchone()
+        gyldig_partnernøkkel = partner is not None
+
+    # Behold støtte for eldre intern integrasjon som fortsatt bruker env-nøkkel.
+    stations_api_key = os.environ.get('STATIONS_API_KEY', '')
+    if not gyldig_partnernøkkel and (not stations_api_key or nøkkel != stations_api_key):
         return jsonify({'error': 'Ugyldig eller manglende API-nøkkel'}), 403
 
     with get_conn() as conn:
@@ -847,7 +860,7 @@ def bekreft_en_pris():
     lagret = bekreft_pris(stasjon_id, type_navn, bruker_id, min_intervall=_PRIS_MIN_INTERVALL)
     if lagret:
         logger.info(f'Pris bekreftet: stasjon={stasjon_id} type={type_navn} bruker={bruker_id}')
-    return jsonify({'ok': True})
+    return jsonify({'ok': True, 'lagret': lagret})
 
 
 @api_bp.route('/api/stasjon', methods=['POST'])

@@ -405,6 +405,12 @@ async function bekreftType(kortEl, stasjon, type) {
         });
         if (resp.status === 401) { window.location.href = '/auth/logg-inn?neste=/bidrag'; return; }
         if (!resp.ok) throw new Error();
+        const data = await resp.json();
+        if (data?.lagret === false) {
+            btn.disabled = false;
+            btn.textContent = '✓';
+            return;
+        }
 
         const naa = new Date().toISOString().replace('T', ' ').slice(0, 19);
         stasjon[`${type}_tidspunkt`] = naa;

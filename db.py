@@ -3,7 +3,7 @@ import math
 import os
 import threading
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import UTC, datetime
 
 _default_db = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'drivstoff.db')
 DB_PATH = os.environ.get('DB_PATH', _default_db)
@@ -70,6 +70,12 @@ def get_conn():
         raise
     finally:
         conn.close()
+
+
+def _sekunder_siden_db_tidspunkt(ts_str: str) -> float:
+    # SQLite datetime('now') lagres i UTC uten tz-info.
+    ts = datetime.strptime(ts_str, '%Y-%m-%d %H:%M:%S').replace(tzinfo=UTC)
+    return (datetime.now(UTC) - ts).total_seconds()
 
 
 def init_db():
@@ -397,11 +403,15 @@ def bekreft_pris(stasjon_id, type_navn, bruker_id, min_intervall=300):
 
             if bruker_id is not None:
                 sist = conn.execute(
-                    "SELECT id, tidspunkt FROM priser WHERE bruker_id=? AND stasjon_id=? ORDER BY tidspunkt DESC LIMIT 1",
-                    (bruker_id, stasjon_id)
+                    f"""SELECT id, tidspunkt
+                        FROM priser
+                        WHERE bruker_id=? AND stasjon_id=?
+                          AND {type_navn} IS NOT NULL
+                        ORDER BY id DESC LIMIT 1""",
+                    (bruker_id, stasjon_id),
                 ).fetchone()
                 if sist:
-                    sekunder_siden = (datetime.now() - datetime.strptime(sist[1], '%Y-%m-%d %H:%M:%S')).total_seconds()
+                    sekunder_siden = _sekunder_siden_db_tidspunkt(sist[1])
                     if sekunder_siden < min_intervall:
                         return False
 
@@ -425,7 +435,7 @@ def lagre_pris(stasjon_id, bensin, diesel, bensin98=None, bruker_id=None, diesel
                     (bruker_id, stasjon_id)
                 ).fetchone()
                 if sist:
-                    sekunder_siden = (datetime.now() - datetime.strptime(sist[1], '%Y-%m-%d %H:%M:%S')).total_seconds()
+                    sekunder_siden = _sekunder_siden_db_tidspunkt(sist[1])
                     if sekunder_siden < min_intervall:
                         # Korreksjon innen intervallet: bevar verdier fra samme rad
                         b = bensin if bensin is not None else sist[2]
@@ -1243,6 +1253,35 @@ def hent_eller_opprett_partner(navn: str) -> int:
             (brukernavn,)
         )
         return cursor.lastrowid
+
+
+def hent_api_nøkler() -> list:
+    with get_conn() as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            '''SELECT id, partner, nøkkel, aktiv, opprettet
+               FROM api_nøkler
+               ORDER BY partner COLLATE NOCASE, id DESC'''
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+
+def opprett_api_nøkkel(partner: str, nøkkel: str) -> int:
+    with get_conn() as conn:
+        cursor = conn.execute(
+            'INSERT INTO api_nøkler (partner, nøkkel, aktiv) VALUES (?, ?, 1)',
+            (partner, nøkkel)
+        )
+        return cursor.lastrowid
+
+
+def sett_api_nøkkel_aktiv(nøkkel_id: int, aktiv: bool) -> bool:
+    with get_conn() as conn:
+        cursor = conn.execute(
+            'UPDATE api_nøkler SET aktiv = ? WHERE id = ?',
+            (1 if aktiv else 0, nøkkel_id)
+        )
+        return cursor.rowcount > 0
 
 
 def finn_stasjoner_by_osm_ids(osm_ids: list) -> dict:
