@@ -140,6 +140,93 @@ def sync_db():
             os.unlink(tmp_path)
 
 
+_STASJONER_EXPORT_NS = uuid.UUID('b3d9e4a1-7c2f-4e8b-a6d1-0f5c3e2b1a9d')
+
+_KJEDE_TIL_BRAND = {
+    'best': 'BEST',
+    'bondetanken': 'BONDETANKEN',
+    'bunker oil': 'BUNKER_OIL',
+    'buskerud olje': 'BUSKERUD_OLJE',
+    'circle k': 'CIRCLE_K',
+    'coop': 'COOP',
+    'dalholen bensin': 'DALHOLEN_BENSIN',
+    'driv': 'DRIV',
+    'esso': 'ESSO',
+    'fina': 'FINA',
+    'fuel4u': 'FUEL4U',
+    'haltbakk express': 'HALTBAKK_EXPRESS',
+    'haugaland olje': 'HAUGALAND_OLJE',
+    'helgeland oljeservice': 'HELGELAND_OLJESERVICE',
+    'knapphus': 'KNAPPHUS',
+    'lyse': 'LYSE',
+    'max': 'MAX',
+    'mh24': 'MH24',
+    'minol': 'MINOL',
+    'narbutikken': 'NARBUTIKKEN',
+    'oljeleverandøren': 'OLJELEVERANDOREN',
+    'oljeleverandoren': 'OLJELEVERANDOREN',
+    'preem': 'PREEM',
+    'st1': 'ST1',
+    'tank': 'TANK',
+    'tanken': 'TANKEN',
+    'trønder oil': 'TRONDER_OIL',
+    'tronder oil': 'TRONDER_OIL',
+    'uno-x': 'UNO_X',
+    'yx': 'YX',
+}
+
+
+def _kjede_til_brand(kjede):
+    if not kjede:
+        return 'INDEPENDENT'
+    return _KJEDE_TIL_BRAND.get(kjede.strip().lower(), 'INDEPENDENT')
+
+
+@api_bp.route('/api/v1/stasjoner')
+def eksporter_stasjoner():
+    api_key = os.environ.get('STATIONS_API_KEY', '')
+    if not api_key or request.headers.get('X-Api-Key') != api_key:
+        return jsonify({'error': 'Ugyldig eller manglende API-nøkkel'}), 403
+
+    with get_conn() as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            '''SELECT id, navn, kjede, lat, lon, osm_id,
+                      har_bensin, har_bensin98, har_diesel, har_diesel_avgiftsfri
+               FROM stasjoner
+               WHERE godkjent = 1
+                 AND (land IS NULL OR land = 'NO')
+               ORDER BY id'''
+        ).fetchall()
+
+    stasjoner = []
+    for r in rows:
+        fuel_types = []
+        if r['har_bensin']:
+            fuel_types.append('GASOLINE_95')
+        if r['har_bensin98']:
+            fuel_types.append('GASOLINE_98')
+        if r['har_diesel']:
+            fuel_types.append('DIESEL')
+        if r['har_diesel_avgiftsfri']:
+            fuel_types.append('COLORED_DIESEL')
+        if not fuel_types:
+            fuel_types = ['GASOLINE_95', 'DIESEL']
+
+        stasjoner.append({
+            'id': str(uuid.uuid5(_STASJONER_EXPORT_NS, str(r['id']))),
+            'osm_id': r['osm_id'],
+            'brand': _kjede_til_brand(r['kjede']),
+            'location': r['navn'],
+            'address': '',
+            'lat': r['lat'],
+            'lon': r['lon'],
+            'fuel_types': fuel_types,
+        })
+
+    return jsonify(stasjoner)
+
+
 def er_i_norge(lat, lon):
     return (NORGE_BBOX['lat_min'] <= lat <= NORGE_BBOX['lat_max'] and
             NORGE_BBOX['lon_min'] <= lon <= NORGE_BBOX['lon_max'])

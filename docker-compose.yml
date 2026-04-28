@@ -19,6 +19,7 @@ services:
       GEMINI_API_KEY: "${GEMINI_API_KEY:-}"
       GEMINI_MODELL: "${GEMINI_MODELL:-gemini-2.5-flash-lite}"
       GEMINI_MODELLER: "${GEMINI_MODELLER:-gemini-2.5-flash-lite,gemini-flash-lite-latest}"
+      STATIONS_API_KEY: "${STATIONS_API_KEY:-}"
       GRAPHHOPPER_API_KEY: "${GRAPHHOPPER_API_KEY:-}"
       RUTE_MOTOR: "${RUTE_MOTOR:-graphhopper}"
       OCR_LAGRE_BILDER: "1"
