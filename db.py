@@ -546,12 +546,28 @@ def get_statistikk() -> dict:
     }
 
 
-def hent_billigste_priser_24t() -> list:
-    """Hent de billigste prisene registrert siste 24 timer, per drivstofftype."""
+def hent_billigste_priser_24t(lat=None, lon=None, radius_km=None) -> list:
+    """Hent de billigste prisene registrert siste 24 timer, per drivstofftype.
+
+    Valgfri radius-filtrering: hvis lat/lon/radius_km er oppgitt, begrenses
+    resultatet til stasjoner innenfor en bounding box rundt koordinatene.
+    """
+    import math
+    params = []
+    bbox_filter = ''
+    if lat is not None and lon is not None and radius_km:
+        lat_delta = radius_km / 111.0
+        lon_delta = radius_km / (111.0 * max(math.cos(math.radians(lat)), 0.01))
+        bbox_filter = (
+            ' AND s.lat BETWEEN ? AND ?'
+            ' AND s.lon BETWEEN ? AND ?'
+        )
+        params = [lat - lat_delta, lat + lat_delta, lon - lon_delta, lon + lon_delta]
+
     with get_conn() as conn:
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
-            '''SELECT p.bensin, p.diesel, p.bensin98, p.diesel_avgiftsfri, p.tidspunkt,
+            f'''SELECT p.bensin, p.diesel, p.bensin98, p.diesel_avgiftsfri, p.tidspunkt,
                       s.id, s.navn, s.kjede, s.lat, s.lon
                FROM priser p
                JOIN stasjoner s ON s.id = p.stasjon_id
@@ -561,14 +577,12 @@ def hent_billigste_priser_24t() -> list:
                  AND p.id IN (SELECT MAX(p2.id) FROM priser p2
                               WHERE p2.tidspunkt > datetime('now', '-24 hours')
                               GROUP BY p2.stasjon_id)
-               ORDER BY p.tidspunkt DESC'''
+                 {bbox_filter}
+               ORDER BY p.tidspunkt DESC''',
+            params
         ).fetchall()
 
-        resultater = []
-        for r in rows:
-            d = dict(r)
-            resultater.append(d)
-        return resultater
+        return [dict(r) for r in rows]
 
 
 def hent_kjede_snitt_24t() -> list:

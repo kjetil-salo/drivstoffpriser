@@ -650,7 +650,10 @@ def totalt_med_pris():
 
 @api_bp.route('/api/statistikk')
 def statistikk():
-    priser_24t = hent_billigste_priser_24t()
+    lat = request.args.get('lat', type=float)
+    lon = request.args.get('lon', type=float)
+    radius = request.args.get('radius', type=float)
+    priser_24t = hent_billigste_priser_24t(lat=lat, lon=lon, radius_km=radius)
     antall_oppdateringer = antall_prisoppdateringer_24t()
 
     billigst = {'bensin': None, 'diesel': None, 'bensin98': None, 'diesel_avgiftsfri': None}

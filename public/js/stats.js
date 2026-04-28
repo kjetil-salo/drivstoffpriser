@@ -9,6 +9,84 @@ let _kjedeData = [];
 let _kjedeSortKol = 'snitt_diesel';
 let _kjedeSortAsc = true;
 
+// Radius-filter
+let _radiusModus = false;      // false = Norge, true = nærhet
+let _gpsPos = null;            // { lat, lon } — caches siste kjente posisjon
+let _henterGps = false;
+let _toggleInitiert = false;
+
+function _settGpsStatus(tekst) {
+    const el = document.getElementById('stat-gps-status');
+    if (el) el.textContent = tekst;
+}
+
+function _hentGps() {
+    return new Promise((resolve, reject) => {
+        if (_gpsPos) { resolve(_gpsPos); return; }
+        if (!navigator.geolocation) { reject('Geolokasjon støttes ikke'); return; }
+        _henterGps = true;
+        _settGpsStatus('Henter posisjon …');
+        navigator.geolocation.getCurrentPosition(
+            pos => {
+                _henterGps = false;
+                _gpsPos = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+                _settGpsStatus('');
+                resolve(_gpsPos);
+            },
+            () => {
+                _henterGps = false;
+                _settGpsStatus('Ingen posisjon');
+                reject('Ingen posisjon');
+            },
+            { timeout: 10000, maximumAge: 120000 }
+        );
+    });
+}
+
+function _initOmradeToggle() {
+    if (_toggleInitiert) return;
+    const knappNorge = document.getElementById('stat-toggle-norge');
+    const knappNaerhet = document.getElementById('stat-toggle-naerhet');
+    const radiusVelger = document.getElementById('stat-radius-velger');
+    const radiusSelect = document.getElementById('stat-radius-select');
+    if (!knappNorge || !knappNaerhet) return;
+    _toggleInitiert = true;
+
+    knappNorge.addEventListener('click', () => {
+        _radiusModus = false;
+        _gpsPos = null;
+        knappNorge.classList.add('aktiv');
+        knappNorge.setAttribute('aria-pressed', 'true');
+        knappNaerhet.classList.remove('aktiv');
+        knappNaerhet.setAttribute('aria-pressed', 'false');
+        if (radiusVelger) radiusVelger.hidden = true;
+        _settGpsStatus('');
+        sistLastet = 0;
+        lastStatistikk({ force: true });
+    });
+
+    knappNaerhet.addEventListener('click', async () => {
+        _radiusModus = true;
+        knappNaerhet.classList.add('aktiv');
+        knappNaerhet.setAttribute('aria-pressed', 'true');
+        knappNorge.classList.remove('aktiv');
+        knappNorge.setAttribute('aria-pressed', 'false');
+        if (radiusVelger) radiusVelger.hidden = false;
+        sistLastet = 0;
+        try {
+            await _hentGps();
+        } catch (_) { /* status satt i _hentGps */ }
+        lastStatistikk({ force: true });
+    });
+
+    if (radiusSelect) {
+        radiusSelect.addEventListener('change', () => {
+            sistLastet = 0;
+            lastStatistikk({ force: true });
+        });
+    }
+}
+
 function visKjedeSnitt(kjedeData) {
     _kjedeData = kjedeData || [];
     _kjedeSortKol = 'snitt_diesel';
@@ -260,6 +338,7 @@ function startAutoOppdatering() {
 
 export async function lastStatistikk({ force = false } = {}) {
     startAutoOppdatering();
+    _initOmradeToggle();
 
     const naa = Date.now();
     if (laster) return;
@@ -267,8 +346,14 @@ export async function lastStatistikk({ force = false } = {}) {
 
     laster = true;
     try {
+        let statUrl = '/api/statistikk';
+        if (_radiusModus && _gpsPos) {
+            const radius = document.getElementById('stat-radius-select')?.value || '25';
+            statUrl += `?lat=${_gpsPos.lat}&lon=${_gpsPos.lon}&radius=${radius}`;
+        }
+
         const [respStat, respTopp, respKjede] = await Promise.all([
-            fetch('/api/statistikk', { cache: 'no-store' }),
+            fetch(statUrl, { cache: 'no-store' }),
             fetch('/api/toppliste', { cache: 'no-store' }),
             fetch('/api/kjede-snitt', { cache: 'no-store' }),
         ]);
