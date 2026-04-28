@@ -616,7 +616,7 @@ def prislogg():
         bruker = p['brukernavn'] or '<ukjent>'
         stasjon_tekst = p['navn'] + (f' ({p["kjede"]})' if p['kjede'] else '')
         if p.get('lat') and p.get('lon'):
-            stasjon = f'<a href="/kart2?lat={p["lat"]}&lon={p["lon"]}" target="_blank" rel="noopener" style="color:#e5e7eb">{stasjon_tekst}</a>'
+            stasjon = f'<a href="https://www.openstreetmap.org/?mlat={p["lat"]}&mlon={p["lon"]}&zoom=17" target="_blank" rel="noopener" style="color:#e5e7eb">{stasjon_tekst}</a>'
         else:
             stasjon = stasjon_tekst
         rader.append(
@@ -999,7 +999,7 @@ def admin_endringsforslag():
     rader = []
     for f in forslag:
         naavarende = f['navn'] + (f' ({f["kjede"]})' if f['kjede'] else '')
-        kart_url = f'/kart2?lat={f["lat"]}&lon={f["lon"]}'
+        kart_url = f'https://www.openstreetmap.org/?mlat={f["lat"]}&mlon={f["lon"]}&zoom=17'
         dato = f['tidspunkt'][:10] if f['tidspunkt'] else '–'
         foreslatt_kjede = f['foreslatt_kjede'] or '–'
         foreslatt_navn = f['foreslatt_navn'] or '–'

@@ -277,13 +277,8 @@ cameraBtn.addEventListener('click', () => {
 });
 
 // ── Init kart med siste kjente posisjon ───────────
-const _urlParams = new URLSearchParams(window.location.search);
-const _urlLat = parseFloat(_urlParams.get('lat'));
-const _urlLon = parseFloat(_urlParams.get('lon'));
-const _urlStartPos = (!isNaN(_urlLat) && !isNaN(_urlLon)) ? { lat: _urlLat, lon: _urlLon } : null;
 const lagretPos = hentLagretPos();
-initMap('map', _urlStartPos || lagretPos);
-if (_urlStartPos) sentrerKart(_urlLat, _urlLon, 16);
+initMap('map', lagretPos);
 
 initRuteplanlegger({
     getStartPos: () => userPos || hentLagretPos() || getKartSenter(),
@@ -293,7 +288,7 @@ initRuteplanlegger({
 });
 
 // ── Velkomst-overlay ──────────────────────────────
-if (!lagretPos && !_urlStartPos) {
+if (!lagretPos) {
     velkomst.removeAttribute('hidden');
     document.getElementById('velkomst-posisjon-btn').addEventListener('click', () => {
         velkomst.setAttribute('hidden', '');
@@ -358,11 +353,10 @@ initSearch(async (sted) => {
     }
 });
 
-// Last stasjoner for siste posisjon ved oppstart (eller URL-koordinater fra admin-lenke)
-const _oppstartPos = _urlStartPos || lagretPos;
-if (_oppstartPos) {
+// Last stasjoner for siste posisjon ved oppstart
+if (lagretPos) {
     locStatus.textContent = 'Henter stasjoner …';
-    hentStasjoner(_oppstartPos.lat, _oppstartPos.lon).then(s => {
+    hentStasjoner(lagretPos.lat, lagretPos.lon).then(s => {
         stasjoner = s;
         locStatus.textContent = '';
         visStasjoner(stasjoner, visStasjonSheet);
