@@ -33,7 +33,7 @@ from db import (get_stasjoner_med_priser, lagre_pris, bekreft_pris, logg_visning
                 antall_prisoppdateringer_24t, meld_stasjon_nedlagt,
                 get_conn, hent_innstilling, hent_toppliste, hent_toppliste_uke,
                 hent_min_plassering, logg_blogg_visning,
-                legg_til_endringsforslag, unike_enheter_per_dag,
+                legg_til_endringsforslag, unike_enheter_per_dag, unike_brukere_per_dag,
                 prisoppdateringer_per_time_24t,
                 prisoppdateringer_rullende_24t_uke,
                 har_rolle, hent_kjede_snitt_24t,
@@ -702,6 +702,11 @@ def prisregistreringer_uke():
 @api_bp.route('/api/enheter-per-dag')
 def enheter_per_dag():
     return jsonify(unike_enheter_per_dag(30))
+
+
+@api_bp.route('/api/brukere-per-dag')
+def brukere_per_dag():
+    return jsonify(unike_brukere_per_dag(30))
 
 
 _ANONYM_PRIS_MAKS = 10

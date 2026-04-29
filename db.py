@@ -498,6 +498,26 @@ def unike_enheter_per_dag(dager: int = 14) -> list[dict]:
         return [{'dato': d, 'antall': n} for d, n in dato_map.items()]
 
 
+def unike_brukere_per_dag(dager: int = 30) -> list[dict]:
+    from datetime import date, timedelta
+    with get_conn() as conn:
+        conn.row_factory = sqlite3.Row
+        today = date.today()
+        dato_map = {(today - timedelta(days=i)).isoformat(): 0 for i in range(dager - 1, -1, -1)}
+        for row in conn.execute(
+            "SELECT DATE(tidspunkt) AS dato, COUNT(DISTINCT bruker_id) AS antall "
+            "FROM priser "
+            "WHERE bruker_id IS NOT NULL "
+            "AND bruker_id NOT IN (5, 2422, 3998) "
+            "AND tidspunkt >= DATE('now', ?) "
+            "GROUP BY dato",
+            (f'-{dager - 1} days',)
+        ).fetchall():
+            if row['dato'] in dato_map:
+                dato_map[row['dato']] = row['antall']
+        return [{'dato': d, 'antall': n} for d, n in dato_map.items()]
+
+
 def get_statistikk() -> dict:
     from datetime import date, timedelta
     vindu_dager = 14
