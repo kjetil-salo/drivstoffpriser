@@ -809,6 +809,160 @@ def prognose_daglig() -> dict:
     }
 
 
+def _beregn_fraaksjonsprofil(rader_oslo: list[tuple[str, int]]) -> dict:
+    """Hjelpefunksjon: beregn gjennomsnittlig kumulativ fraaksjonsprofil per time.
+
+    rader_oslo: liste av (dato, time) tupler i Oslo-tid.
+    Returnerer dict med 'avg_fraaksjon_per_time', 'antall_dager' og fraaksjoner.
+    """
+    fra_dag: dict[str, dict[int, int]] = {}
+    for dato, time in rader_oslo:
+        if dato not in fra_dag:
+            fra_dag[dato] = {}
+        fra_dag[dato][time] = fra_dag[dato].get(time, 0) + 1
+
+    fraaksjoner: dict[int, list[float]] = {h: [] for h in range(24)}
+    for timer in fra_dag.values():
+        total = sum(timer.values())
+        if total == 0:
+            continue
+        kumulativ = 0
+        for h in range(24):
+            kumulativ += timer.get(h, 0)
+            fraaksjoner[h].append(kumulativ / total)
+
+    return {
+        'antall_dager': len(fra_dag),
+        'avg_fraaksjon': {
+            h: (sum(v) / len(v)) if v else None
+            for h, v in fraaksjoner.items()
+        },
+    }
+
+
+def prognose_daglig_brukere() -> dict:
+    """Prognose for dagens antall unike bidragsytere (alle brukere inkl. Kjetil)."""
+    from zoneinfo import ZoneInfo
+    _oslo = ZoneInfo('Europe/Oslo')
+    now = datetime.now(_oslo)
+    current_hour = now.hour
+
+    with get_conn() as conn:
+        rader = conn.execute(
+            "SELECT tidspunkt, bruker_id FROM priser "
+            "WHERE bruker_id IS NOT NULL "
+            "AND tidspunkt >= datetime('now', '-32 days') "
+            "AND date(tidspunkt) < date('now')"
+        ).fetchall()
+        i_dag_rader = conn.execute(
+            "SELECT DISTINCT bruker_id FROM priser "
+            "WHERE bruker_id IS NOT NULL AND date(tidspunkt) = date('now')"
+        ).fetchall()
+
+    i_dag = len(i_dag_rader)
+
+    # Konverter til Oslo-tid og tell unike brukere per dag per time
+    fra_dag: dict[str, dict[int, set]] = {}
+    for ts, bruker_id in rader:
+        try:
+            lokal = datetime.fromisoformat(ts).replace(tzinfo=UTC).astimezone(_oslo)
+        except Exception:
+            continue
+        dato = lokal.strftime('%Y-%m-%d')
+        time = lokal.hour
+        if dato not in fra_dag:
+            fra_dag[dato] = {}
+        if time not in fra_dag[dato]:
+            fra_dag[dato][time] = set()
+        fra_dag[dato][time].add(bruker_id)
+
+    # Beregn kumulativ fraaksjon per time per dag (unike brukere)
+    fraaksjoner: dict[int, list[float]] = {h: [] for h in range(24)}
+    for timer in fra_dag.values():
+        sett_kumulativ: set = set()
+        totalt_dag = len(set().union(*timer.values()) if timer else set())
+        if totalt_dag == 0:
+            continue
+        for h in range(24):
+            sett_kumulativ |= timer.get(h, set())
+            fraaksjoner[h].append(len(sett_kumulativ) / totalt_dag)
+
+    avg_fraaksjon = {
+        h: (sum(v) / len(v)) if v else None
+        for h, v in fraaksjoner.items()
+    }
+    fraaksjon = avg_fraaksjon.get(current_hour)
+    prognose = round(i_dag / fraaksjon) if fraaksjon and fraaksjon > 0.01 else None
+
+    return {
+        'i_dag': i_dag,
+        'prognose': prognose,
+        'fraaksjon': round(fraaksjon, 3) if fraaksjon is not None else None,
+        'time': current_hour,
+        'antall_dager': len(fra_dag),
+    }
+
+
+def prognose_daglig_enheter() -> dict:
+    """Prognose for dagens antall unike enheter (device_id fra visninger)."""
+    from zoneinfo import ZoneInfo
+    _oslo = ZoneInfo('Europe/Oslo')
+    now = datetime.now(_oslo)
+    current_hour = now.hour
+
+    with get_conn() as conn:
+        rader = conn.execute(
+            "SELECT ts, device_id FROM visninger "
+            "WHERE device_id != '' "
+            "AND ts >= datetime('now', '-32 days') "
+            "AND date(ts) < date('now')"
+        ).fetchall()
+        i_dag = conn.execute(
+            "SELECT COUNT(DISTINCT device_id) FROM visninger "
+            "WHERE device_id != '' AND date(ts) = date('now')"
+        ).fetchone()[0]
+
+    # Kumulativ fraaksjon per time per dag (unike enheter)
+    fra_dag: dict[str, dict[int, set]] = {}
+    for ts, device_id in rader:
+        try:
+            lokal = datetime.fromisoformat(ts).replace(tzinfo=UTC).astimezone(_oslo)
+        except Exception:
+            continue
+        dato = lokal.strftime('%Y-%m-%d')
+        time = lokal.hour
+        if dato not in fra_dag:
+            fra_dag[dato] = {}
+        if time not in fra_dag[dato]:
+            fra_dag[dato][time] = set()
+        fra_dag[dato][time].add(device_id)
+
+    fraaksjoner: dict[int, list[float]] = {h: [] for h in range(24)}
+    for timer in fra_dag.values():
+        sett_kumulativ: set = set()
+        totalt_dag = len(set().union(*timer.values()) if timer else set())
+        if totalt_dag == 0:
+            continue
+        for h in range(24):
+            sett_kumulativ |= timer.get(h, set())
+            fraaksjoner[h].append(len(sett_kumulativ) / totalt_dag)
+
+    avg_fraaksjon = {
+        h: (sum(v) / len(v)) if v else None
+        for h, v in fraaksjoner.items()
+    }
+    fraaksjon = avg_fraaksjon.get(current_hour)
+    prognose = round(i_dag / fraaksjon) if fraaksjon and fraaksjon > 0.01 else None
+
+    return {
+        'i_dag': i_dag,
+        'prognose': prognose,
+        'fraaksjon': round(fraaksjon, 3) if fraaksjon is not None else None,
+        'time': current_hour,
+        'antall_dager': len(fra_dag),
+    }
+
+
 def antall_prisoppdateringer_24t() -> int:
     with get_conn() as conn:
         return conn.execute(

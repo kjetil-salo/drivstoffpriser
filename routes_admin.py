@@ -1511,6 +1511,22 @@ def prognose_dag():
     return jsonify(prognose_daglig())
 
 
+@admin_bp.route('/admin/api/prognose-dag-brukere')
+@krever_innlogging
+@krever_moderator
+def prognose_dag_brukere():
+    from db import prognose_daglig_brukere
+    return jsonify(prognose_daglig_brukere())
+
+
+@admin_bp.route('/admin/api/prognose-dag-enheter')
+@krever_innlogging
+@krever_moderator
+def prognose_dag_enheter():
+    from db import prognose_daglig_enheter
+    return jsonify(prognose_daglig_enheter())
+
+
 @admin_bp.route('/admin/api/priser-historikk')
 @krever_innlogging
 @krever_admin
@@ -1625,6 +1641,11 @@ def oversikt():
   </div>
   <div class="seksjon">
     <h2>Unike enheter per dag – siste 14 dager</h2>
+    <div style="display:flex;align-items:center;gap:1rem;margin-bottom:0.5rem;flex-wrap:wrap">
+      <span style="font-size:0.82rem;color:#94a3b8">I dag: <strong id="prognose-enheter-idag" style="color:#3b82f6">–</strong></span>
+      <span style="font-size:0.82rem;color:#94a3b8">Prognose: <strong id="prognose-enheter-total" style="color:#a78bfa">–</strong></span>
+      <span id="prognose-enheter-meta" style="font-size:0.75rem;color:#475569"></span>
+    </div>
     <canvas id="enhetergraf" style="width:100%;max-height:240px"></canvas>
   </div>
   <div class="seksjon">
@@ -1654,6 +1675,11 @@ def oversikt():
   </div>
   <div class="seksjon">
     <h2>Unike bidragsytere per dag – siste 30 dager (ekskl. Kjetil)</h2>
+    <div style="display:flex;align-items:center;gap:1rem;margin-bottom:0.5rem;flex-wrap:wrap">
+      <span style="font-size:0.82rem;color:#94a3b8">I dag: <strong id="prognose-brukere-idag" style="color:#fb923c">–</strong></span>
+      <span style="font-size:0.82rem;color:#94a3b8">Prognose: <strong id="prognose-brukere-total" style="color:#a78bfa">–</strong></span>
+      <span id="prognose-brukere-meta" style="font-size:0.75rem;color:#475569"></span>
+    </div>
     <canvas id="brukererdaggraf" style="width:100%;max-height:240px"></canvas>
   </div>
   <div class="seksjon">
@@ -1684,23 +1710,47 @@ new Chart(document.getElementById('graf'), {{
     }}
   }}
 }});
-new Chart(document.getElementById('enhetergraf'), {{
+const enheterChart = new Chart(document.getElementById('enhetergraf'), {{
   type: 'bar',
   data: {{
     labels: {enheter_labels},
-    datasets: [{{ label: 'Unike enheter', data: {enheter_values},
-      backgroundColor: 'rgba(20,184,166,0.6)',
-      borderColor: 'rgba(20,184,166,1)', borderWidth: 1 }}]
+    datasets: [
+      {{ label: 'Unike enheter', data: {enheter_values},
+        backgroundColor: {enheter_labels}.map((d, i) => i === {enheter_labels}.length - 1 ? 'rgba(20,184,166,0.9)' : 'rgba(20,184,166,0.5)'),
+        borderColor: 'rgba(20,184,166,1)', borderWidth: 1, stack: 'e' }},
+      {{ label: 'Prognose (ekstra)', data: new Array({enheter_labels}.length).fill(0),
+        backgroundColor: 'rgba(167,139,250,0.35)',
+        borderColor: 'rgba(167,139,250,0.8)', borderWidth: 1, stack: 'e' }}
+    ]
   }},
   options: {{
     responsive: true,
     plugins: {{ legend: {{ display: false }} }},
     scales: {{
-      x: {{ ticks: {{ maxRotation: 45, color: '#94a3b8', font: {{ size: 10 }} }}, grid: {{ color: '#1f2937' }} }},
-      y: {{ beginAtZero: true, ticks: {{ color: '#94a3b8' }}, grid: {{ color: '#1f2937' }} }}
+      x: {{ stacked: true, ticks: {{ maxRotation: 45, color: '#94a3b8', font: {{ size: 10 }} }}, grid: {{ color: '#1f2937' }} }},
+      y: {{ stacked: true, beginAtZero: true, ticks: {{ color: '#94a3b8' }}, grid: {{ color: '#1f2937' }} }}
     }}
   }}
 }});
+(async () => {{
+  try {{
+    const r = await fetch('/admin/api/prognose-dag-enheter');
+    if (!r.ok) return;
+    const p = await r.json();
+    document.getElementById('prognose-enheter-idag').textContent = p.i_dag;
+    document.getElementById('prognose-enheter-total').textContent = p.prognose ?? '–';
+    if (p.prognose !== null) {{
+      const pct = p.fraaksjon !== null ? Math.round(p.fraaksjon * 100) : '?';
+      document.getElementById('prognose-enheter-meta').textContent =
+        `(time ${{p.time}}: historisk ${{pct}}% av dagstotal, basert på ${{p.antall_dager}} dager)`;
+      const ekstra = Math.max(0, p.prognose - p.i_dag);
+      enheterChart.data.datasets[1].data[enheterChart.data.datasets[1].data.length - 1] = ekstra;
+      enheterChart.update();
+    }} else {{
+      document.getElementById('prognose-enheter-meta').textContent = '(for lite data)';
+    }}
+  }} catch(e) {{ console.warn('prognose-enheter:', e); }}
+}})();
 new Chart(document.getElementById('timegraf'), {{
   type: 'bar',
   data: {{
@@ -1866,23 +1916,47 @@ async function oppdaterHistorikk() {{
 oppdaterHistorikk();
 setInterval(oppdaterHistorikk, 60_000);
 
-new Chart(document.getElementById('brukererdaggraf'), {{
+const brukererdagChart = new Chart(document.getElementById('brukererdaggraf'), {{
   type: 'bar',
   data: {{
     labels: {brukere_dag_labels},
-    datasets: [{{ label: 'Unike bidragsytere', data: {brukere_dag_values},
-      backgroundColor: 'rgba(251,146,60,0.6)',
-      borderColor: 'rgba(251,146,60,1)', borderWidth: 1 }}]
+    datasets: [
+      {{ label: 'Unike bidragsytere', data: {brukere_dag_values},
+        backgroundColor: {brukere_dag_labels}.map((d, i) => i === {brukere_dag_labels}.length - 1 ? 'rgba(251,146,60,0.9)' : 'rgba(251,146,60,0.45)'),
+        borderColor: 'rgba(251,146,60,1)', borderWidth: 1, stack: 'b' }},
+      {{ label: 'Prognose (ekstra)', data: new Array({brukere_dag_labels}.length).fill(0),
+        backgroundColor: 'rgba(167,139,250,0.35)',
+        borderColor: 'rgba(167,139,250,0.8)', borderWidth: 1, stack: 'b' }}
+    ]
   }},
   options: {{
     responsive: true,
     plugins: {{ legend: {{ display: false }} }},
     scales: {{
-      x: {{ ticks: {{ maxRotation: 45, color: '#94a3b8', font: {{ size: 9 }}, autoSkip: true, maxTicksLimit: 15 }}, grid: {{ color: '#1f2937' }} }},
-      y: {{ beginAtZero: true, ticks: {{ stepSize: 1, color: '#94a3b8' }}, grid: {{ color: '#1f2937' }} }}
+      x: {{ stacked: true, ticks: {{ maxRotation: 45, color: '#94a3b8', font: {{ size: 9 }}, autoSkip: true, maxTicksLimit: 15 }}, grid: {{ color: '#1f2937' }} }},
+      y: {{ stacked: true, beginAtZero: true, ticks: {{ stepSize: 1, color: '#94a3b8' }}, grid: {{ color: '#1f2937' }} }}
     }}
   }}
 }});
+(async () => {{
+  try {{
+    const r = await fetch('/admin/api/prognose-dag-brukere');
+    if (!r.ok) return;
+    const p = await r.json();
+    document.getElementById('prognose-brukere-idag').textContent = p.i_dag;
+    document.getElementById('prognose-brukere-total').textContent = p.prognose ?? '–';
+    if (p.prognose !== null) {{
+      const pct = p.fraaksjon !== null ? Math.round(p.fraaksjon * 100) : '?';
+      document.getElementById('prognose-brukere-meta').textContent =
+        `(time ${{p.time}}: historisk ${{pct}}% av dagstotal, basert på ${{p.antall_dager}} dager)`;
+      const ekstra = Math.max(0, p.prognose - p.i_dag);
+      brukererdagChart.data.datasets[1].data[brukererdagChart.data.datasets[1].data.length - 1] = ekstra;
+      brukererdagChart.update();
+    }} else {{
+      document.getElementById('prognose-brukere-meta').textContent = '(for lite data)';
+    }}
+  }} catch(e) {{ console.warn('prognose-brukere:', e); }}
+}})();
 </script>
 </body>
 </html>'''
