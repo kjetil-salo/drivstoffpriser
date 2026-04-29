@@ -1179,9 +1179,17 @@ def om():
   <h2>Versjonshistorikk</h2>
   <p><strong>v1.3.x</strong> <span class="tag">april 2026</span></p>
   <ul>
-    <li>Personlige splash-meldinger og bedre hjelpetekster i appen</li>
-    <li>Flere forbedringer for redigering av priser og stasjonsdetaljer</li>
-    <li>Utvidet blogg og analyseinnhold p&#229; <a href="/blogg/">/blogg/</a></li>
+    <li><strong>Favorittstasjoner</strong> &#8212; lagre favoritter p&#229; hjem-skjermen uten innlogging</li>
+    <li><strong>Anonymt prisinnlegging</strong> &#8212; legg inn pris uten konto (lavterskel for nye brukere)</li>
+    <li><strong>Kamera/OCR</strong> &#8212; ta bilde av prisskiltet og la appen lese av prisen automatisk</li>
+    <li><strong>Egendefinert s&#248;keradius</strong> &#8212; velg radius fra 1 til 250 km</li>
+    <li><strong>Endringsforslag</strong> &#8212; foresl&#229; nytt navn eller kjede p&#229; en stasjon direkte fra appen</li>
+    <li><strong>Godkjenning av nye stasjoner</strong> &#8212; brukerforeslåtte stasjoner godkjennes f&#248;r de vises for alle</li>
+    <li><strong>Kjede-snittpriser</strong> &#8212; se gjennomsnittspris per kjede i statistikk-fanen</li>
+    <li><strong>Radius-filter i statistikk</strong> &#8212; se billigste/dyreste priser avgrenset til valgt omr&#229;de</li>
+    <li><strong>PWA-installknapp</strong> &#8212; enklere &#171;Legg til som app&#187; for iOS, Android og desktop</li>
+    <li><strong>Nye kjeder:</strong> TANK, Bunker Oil, Trønder Oil</li>
+    <li>Utvidet blogg og prisanalyser p&#229; <a href="/blogg/">/blogg/</a></li>
   </ul>
   <p style="margin-top:1rem"><strong>v1.2.x</strong> <span class="tag">slutten av mars 2026</span></p>
   <ul>
