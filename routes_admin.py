@@ -32,7 +32,7 @@ from db import (finn_bruker_id, hent_alle_brukere, slett_bruker, har_rolle, sett
                 hent_blogg_stats, finn_stasjoner_by_navn, endre_navn_stasjon,
                 hent_endringsforslag, slett_endringsforslag, antall_ubehandlede_endringsforslag,
                 hent_ventende_stasjoner, antall_ventende_stasjoner, godkjenn_stasjon,
-                unike_enheter_per_dag, sett_drivstofftyper, hent_api_nøkler,
+                unike_enheter_per_dag, unike_brukere_per_dag, sett_drivstofftyper, hent_api_nøkler,
                 opprett_api_nøkkel, sett_api_nøkkel_aktiv)
 
 admin_bp = Blueprint('admin', __name__)
@@ -1532,6 +1532,9 @@ def oversikt():
     enheter_dag = unike_enheter_per_dag(14)
     enheter_labels = [r['dato'] for r in enheter_dag]
     enheter_values = [r['antall'] for r in enheter_dag]
+    brukere_dag = unike_brukere_per_dag(30)
+    brukere_dag_labels = [r['dato'][5:].replace('-', '.') for r in brukere_dag]
+    brukere_dag_values = [r['antall'] for r in brukere_dag]
     _oslo = ZoneInfo('Europe/Oslo')
     time_labels = []
     time_values = []
@@ -1635,6 +1638,10 @@ def oversikt():
   <div class="seksjon">
     <h2>Prisregistreringer per dag – siste 20 dager <span id="historikk-oppdatert" style="font-size:0.75rem;color:#64748b;margin-left:0.5rem"></span></h2>
     <canvas id="historikkgraf" style="width:100%;max-height:220px"></canvas>
+  </div>
+  <div class="seksjon">
+    <h2>Unike brukere per dag – siste 30 dager (ekskl. Kjetil)</h2>
+    <canvas id="brukererdaggraf" style="width:100%;max-height:240px"></canvas>
   </div>
   <div class="seksjon">
     <h2>Bloggvisninger per artikkel</h2>
@@ -1805,6 +1812,24 @@ async function oppdaterHistorikk() {{
 
 oppdaterHistorikk();
 setInterval(oppdaterHistorikk, 60_000);
+
+new Chart(document.getElementById('brukererdaggraf'), {{
+  type: 'bar',
+  data: {{
+    labels: {brukere_dag_labels},
+    datasets: [{{ label: 'Unike brukere', data: {brukere_dag_values},
+      backgroundColor: 'rgba(251,146,60,0.6)',
+      borderColor: 'rgba(251,146,60,1)', borderWidth: 1 }}]
+  }},
+  options: {{
+    responsive: true,
+    plugins: {{ legend: {{ display: false }} }},
+    scales: {{
+      x: {{ ticks: {{ maxRotation: 45, color: '#94a3b8', font: {{ size: 9 }}, autoSkip: true, maxTicksLimit: 15 }}, grid: {{ color: '#1f2937' }} }},
+      y: {{ beginAtZero: true, ticks: {{ stepSize: 1, color: '#94a3b8' }}, grid: {{ color: '#1f2937' }} }}
+    }}
+  }}
+}});
 </script>
 </body>
 </html>'''

@@ -323,85 +323,6 @@ function injiserBidragPromo() {
     });
 }
 
-function visBrukerePerDag(data) {
-    const canvas = document.getElementById('stat-brukere-canvas');
-    if (!canvas || !data.length) return;
-
-    const dpr = window.devicePixelRatio || 1;
-    const W = canvas.parentElement.clientWidth - 16; // padding
-    const H = 180;
-    canvas.width = W * dpr;
-    canvas.height = H * dpr;
-    canvas.style.width = W + 'px';
-    canvas.style.height = H + 'px';
-
-    const ctx = canvas.getContext('2d');
-    ctx.scale(dpr, dpr);
-
-    const PAD_TOP = 24;
-    const PAD_BOTTOM = 36;
-    const PAD_LEFT = 8;
-    const PAD_RIGHT = 8;
-    const chartW = W - PAD_LEFT - PAD_RIGHT;
-    const chartH = H - PAD_TOP - PAD_BOTTOM;
-
-    const verdier = data.map(d => d.antall);
-    const maks = Math.max(...verdier, 1);
-    const n = data.length;
-    const barW = chartW / n * 0.75;
-    const gap = chartW / n;
-
-    // Bakgrunn
-    ctx.fillStyle = getComputedStyle(document.documentElement)
-        .getPropertyValue('--color-card-bg').trim() || '#ffffff';
-    ctx.fillRect(0, 0, W, H);
-
-    // Rutenett
-    ctx.strokeStyle = 'rgba(148,163,184,0.2)';
-    ctx.lineWidth = 1;
-    for (let i = 0; i <= 4; i++) {
-        const y = PAD_TOP + chartH * (1 - i / 4);
-        ctx.beginPath();
-        ctx.moveTo(PAD_LEFT, y);
-        ctx.lineTo(W - PAD_RIGHT, y);
-        ctx.stroke();
-    }
-
-    // Søyler og etiketter
-    ctx.fillStyle = '#FF9800';
-    const fontSize = Math.max(8, Math.min(10, Math.floor(gap * 0.5)));
-    ctx.font = `bold ${fontSize}px sans-serif`;
-    ctx.textAlign = 'center';
-
-    data.forEach((d, i) => {
-        const x = PAD_LEFT + i * gap + gap / 2;
-        const barH = (d.antall / maks) * chartH;
-        const y = PAD_TOP + chartH - barH;
-
-        ctx.fillStyle = '#FF9800';
-        ctx.fillRect(x - barW / 2, y, barW, barH);
-
-        // Tall over søyle
-        if (d.antall > 0) {
-            ctx.fillStyle = '#374151';
-            ctx.fillText(d.antall, x, y - 3);
-        }
-    });
-
-    // X-akse datoetiketter (annenhver)
-    ctx.fillStyle = '#6b7280';
-    const labelSize = Math.max(7, Math.min(9, Math.floor(gap * 0.45)));
-    ctx.font = `${labelSize}px sans-serif`;
-    ctx.textAlign = 'center';
-    data.forEach((d, i) => {
-        if (i % 2 !== 0) return;
-        const x = PAD_LEFT + i * gap + gap / 2;
-        const dato = new Date(d.dato + 'T12:00:00');
-        const etikett = dato.toLocaleDateString('nb-NO', { day: 'numeric', month: 'short' });
-        ctx.fillText(etikett, x, H - 6);
-    });
-}
-
 function startAutoOppdatering() {
     if (autoOppdateringStartet) return;
     autoOppdateringStartet = true;
@@ -431,11 +352,10 @@ export async function lastStatistikk({ force = false } = {}) {
             statUrl += `?lat=${_gpsPos.lat}&lon=${_gpsPos.lon}&radius=${radius}`;
         }
 
-        const [respStat, respTopp, respKjede, respBrukere] = await Promise.all([
+        const [respStat, respTopp, respKjede] = await Promise.all([
             fetch(statUrl, { cache: 'no-store' }),
             fetch('/api/toppliste', { cache: 'no-store' }),
             fetch('/api/kjede-snitt', { cache: 'no-store' }),
-            fetch('/api/brukere-per-dag', { cache: 'no-store' }),
         ]);
         if (!respStat.ok) return;
         const data = await respStat.json();
@@ -457,9 +377,6 @@ export async function lastStatistikk({ force = false } = {}) {
 
         const kjedeData = respKjede.ok ? await respKjede.json() : [];
         visKjedeSnitt(kjedeData);
-
-        const brukereData = respBrukere.ok ? await respBrukere.json() : [];
-        visBrukerePerDag(brukereData);
 
         sistLastet = Date.now();
     } catch (e) {

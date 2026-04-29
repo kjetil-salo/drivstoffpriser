@@ -2554,21 +2554,6 @@ html, body {
   border: 1px solid var(--border-color);
 }
 
-.stat-brukere-diagram {
-  background: var(--color-card-bg);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-color);
-  margin: 0 0 var(--space-lg);
-  padding: var(--space-sm);
-  overflow-x: auto;
-}
-
-.stat-brukere-canvas {
-  display: block;
-  width: 100%;
-  height: auto;
-}
-
 .kjede-snitt-tabell {
   width: 100%;
   border-collapse: collapse;
