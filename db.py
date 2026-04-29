@@ -741,6 +741,74 @@ def prisoppdateringer_per_time_48t() -> list:
     return list(timer_map.items())
 
 
+def prognose_daglig() -> dict:
+    """Beregn prognose for dagens totalantall prisoppdateringer.
+
+    Algoritme: hent per-time historikk for siste 30 fullstendige dager,
+    beregn gjennomsnittlig kumulativ fraaksjon ved nåværende time,
+    og ekstrapoler ut fra hittil i dag.
+    """
+    from zoneinfo import ZoneInfo
+    _oslo = ZoneInfo('Europe/Oslo')
+    now = datetime.now(_oslo)
+    current_hour = now.hour
+
+    with get_conn() as conn:
+        # Alle rader for siste 31 dager (unntatt i dag) – UTC-tidsstempler
+        rader = conn.execute(
+            "SELECT tidspunkt FROM priser "
+            "WHERE tidspunkt >= datetime('now', '-32 days') "
+            "AND date(tidspunkt) < date('now')"
+        ).fetchall()
+        i_dag = conn.execute(
+            "SELECT COUNT(*) FROM priser WHERE date(tidspunkt) = date('now')"
+        ).fetchone()[0]
+
+    # Bygg per-dag per-time dict (Oslo-tid)
+    fra_dag: dict[str, dict[int, int]] = {}
+    for (ts,) in rader:
+        try:
+            lokal = datetime.fromisoformat(ts).replace(tzinfo=UTC).astimezone(_oslo)
+        except Exception:
+            continue
+        dato = lokal.strftime('%Y-%m-%d')
+        time = lokal.hour
+        if dato not in fra_dag:
+            fra_dag[dato] = {}
+        fra_dag[dato][time] = fra_dag[dato].get(time, 0) + 1
+
+    # Kumulativ fraaksjon per time, snitt over alle dager
+    fraaksjoner: dict[int, list[float]] = {h: [] for h in range(24)}
+    for timer in fra_dag.values():
+        total = sum(timer.values())
+        if total == 0:
+            continue
+        kumulativ = 0
+        for h in range(24):
+            kumulativ += timer.get(h, 0)
+            fraaksjoner[h].append(kumulativ / total)
+
+    avg_fraaksjon = {
+        h: (sum(v) / len(v)) if v else None
+        for h, v in fraaksjoner.items()
+    }
+
+    fraaksjon = avg_fraaksjon.get(current_hour)
+    prognose = round(i_dag / fraaksjon) if fraaksjon and fraaksjon > 0.01 else None
+
+    return {
+        'i_dag': i_dag,
+        'prognose': prognose,
+        'fraaksjon': round(fraaksjon, 3) if fraaksjon is not None else None,
+        'time': current_hour,
+        'antall_dager': len(fra_dag),
+        'avg_fraaksjon_per_time': {
+            h: (round(v, 3) if v is not None else None)
+            for h, v in avg_fraaksjon.items()
+        },
+    }
+
+
 def antall_prisoppdateringer_24t() -> int:
     with get_conn() as conn:
         return conn.execute(

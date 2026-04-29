@@ -1503,6 +1503,14 @@ oppdater();
 </body></html>'''
 
 
+@admin_bp.route('/admin/api/prognose-dag')
+@krever_innlogging
+@krever_moderator
+def prognose_dag():
+    from db import prognose_daglig
+    return jsonify(prognose_daglig())
+
+
 @admin_bp.route('/admin/api/priser-historikk')
 @krever_innlogging
 @krever_admin
@@ -1637,6 +1645,11 @@ def oversikt():
   </div>
   <div class="seksjon">
     <h2>Prisregistreringer per dag – siste 20 dager <span id="historikk-oppdatert" style="font-size:0.75rem;color:#64748b;margin-left:0.5rem"></span></h2>
+    <div style="display:flex;align-items:center;gap:1rem;margin-bottom:0.5rem;flex-wrap:wrap">
+      <span style="font-size:0.82rem;color:#94a3b8">I dag: <strong id="prognose-idag" style="color:#fb923c">–</strong></span>
+      <span style="font-size:0.82rem;color:#94a3b8">Prognose: <strong id="prognose-total" style="color:#a78bfa">–</strong></span>
+      <span id="prognose-meta" style="font-size:0.75rem;color:#475569"></span>
+    </div>
     <canvas id="historikkgraf" style="width:100%;max-height:220px"></canvas>
   </div>
   <div class="seksjon">
@@ -1761,15 +1774,26 @@ new Chart(document.getElementById('prisgraf48'), {{
 // Prisregistreringer per dag – siste 20 dager (live)
 const historikkChart = new Chart(document.getElementById('historikkgraf'), {{
   type: 'bar',
-  data: {{ labels: [], datasets: [{{ label: 'Registreringer', data: [],
-    backgroundColor: 'rgba(251,146,60,0.6)',
-    borderColor: 'rgba(251,146,60,1)', borderWidth: 1 }}] }},
+  data: {{
+    labels: [],
+    datasets: [
+      {{ label: 'Registreringer', data: [],
+        backgroundColor: 'rgba(251,146,60,0.6)',
+        borderColor: 'rgba(251,146,60,1)', borderWidth: 1,
+        stack: 'dag' }},
+      {{ label: 'Prognose (ekstra)', data: [],
+        backgroundColor: 'rgba(167,139,250,0.35)',
+        borderColor: 'rgba(167,139,250,0.8)', borderWidth: 1,
+        borderDash: [4, 3],
+        stack: 'dag' }}
+    ]
+  }},
   options: {{
     responsive: true,
     plugins: {{ legend: {{ display: false }} }},
     scales: {{
-      x: {{ ticks: {{ color: '#94a3b8', font: {{ size: 10 }} }}, grid: {{ color: '#1f2937' }} }},
-      y: {{ beginAtZero: true, ticks: {{ stepSize: 1, color: '#94a3b8' }}, grid: {{ color: '#1f2937' }} }}
+      x: {{ stacked: true, ticks: {{ color: '#94a3b8', font: {{ size: 10 }} }}, grid: {{ color: '#1f2937' }} }},
+      y: {{ stacked: true, beginAtZero: true, ticks: {{ stepSize: 1, color: '#94a3b8' }}, grid: {{ color: '#1f2937' }} }}
     }}
   }}
 }});
@@ -1788,19 +1812,48 @@ function fyllInnDager(data, dager) {{
 
 async function oppdaterHistorikk() {{
   try {{
-    const resp = await fetch('/admin/api/priser-historikk');
+    const [resp, progResp] = await Promise.all([
+      fetch('/admin/api/priser-historikk'),
+      fetch('/admin/api/prognose-dag')
+    ]);
     if (!resp.ok) {{
       document.getElementById('historikk-oppdatert').textContent = `(HTTP ${{resp.status}})`;
       return;
     }}
     const raw = await resp.json();
     const data = fyllInnDager(raw, 20);
+    const iDagDato = new Date().toISOString().slice(0, 10);
+
+    let prognose = null;
+    let iDagAntall = 0;
+    if (progResp.ok) {{
+      const prog = await progResp.json();
+      prognose = prog.prognose;
+      iDagAntall = prog.i_dag;
+      document.getElementById('prognose-idag').textContent = iDagAntall;
+      if (prognose !== null) {{
+        document.getElementById('prognose-total').textContent = prognose;
+        const pct = prog.fraaksjon !== null ? Math.round(prog.fraaksjon * 100) : '?';
+        document.getElementById('prognose-meta').textContent =
+          `(time ${{prog.time}}: historisk ${{pct}}% av dagstotal, basert på ${{prog.antall_dager}} dager)`;
+      }} else {{
+        document.getElementById('prognose-total').textContent = '–';
+        document.getElementById('prognose-meta').textContent = '(for lite data)';
+      }}
+    }}
+
     historikkChart.data.labels = data.map(d => d.dato.slice(5).replace('-', '.'));
     historikkChart.data.datasets[0].data = data.map(d => d.antall);
-    historikkChart.data.datasets[0].backgroundColor = data.map(d => {{
-      return d.dato === new Date().toISOString().slice(0, 10)
-        ? 'rgba(251,146,60,0.9)' : 'rgba(251,146,60,0.45)';
-    }});
+    historikkChart.data.datasets[0].backgroundColor = data.map(d =>
+      d.dato === iDagDato ? 'rgba(251,146,60,0.9)' : 'rgba(251,146,60,0.45)'
+    );
+
+    // Prognose-forlengelse: kun for i dag, resten 0
+    const ekstra = prognose !== null ? Math.max(0, prognose - iDagAntall) : 0;
+    historikkChart.data.datasets[1].data = data.map(d =>
+      d.dato === iDagDato ? ekstra : 0
+    );
+
     historikkChart.update();
     const nå = new Date().toLocaleTimeString('no-NO', {{ hour: '2-digit', minute: '2-digit' }});
     document.getElementById('historikk-oppdatert').textContent = `(oppdatert ${{nå}})`;
