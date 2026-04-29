@@ -1640,7 +1640,7 @@ def oversikt():
     <canvas id="historikkgraf" style="width:100%;max-height:220px"></canvas>
   </div>
   <div class="seksjon">
-    <h2>Unike brukere per dag – siste 30 dager (ekskl. Kjetil)</h2>
+    <h2>Unike bidragsytere per dag – siste 30 dager (ekskl. Kjetil)</h2>
     <canvas id="brukererdaggraf" style="width:100%;max-height:240px"></canvas>
   </div>
   <div class="seksjon">
@@ -1817,7 +1817,7 @@ new Chart(document.getElementById('brukererdaggraf'), {{
   type: 'bar',
   data: {{
     labels: {brukere_dag_labels},
-    datasets: [{{ label: 'Unike brukere', data: {brukere_dag_values},
+    datasets: [{{ label: 'Unike bidragsytere', data: {brukere_dag_values},
       backgroundColor: 'rgba(251,146,60,0.6)',
       borderColor: 'rgba(251,146,60,1)', borderWidth: 1 }}]
   }},
