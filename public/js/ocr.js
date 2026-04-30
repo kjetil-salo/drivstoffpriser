@@ -143,7 +143,11 @@ export async function gjenkjennPriserFraBilde(bildeFile, onStatus, kontekst = nu
     }
 
     stat.kilde = kilde;
-    loggOcrStat(stat);
+    const dbId = await loggOcrStat(stat);
+    if (dbId) {
+        stat._db_id = dbId;
+        sisteOcrStat = stat;
+    }
 
     return {
         priser: priser && harGyldigePriser(priser) ? priser : null,

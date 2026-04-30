@@ -1834,7 +1834,7 @@ Format:
 - Sett null for typer du ikke finner
 
 Kjede:
-- "kjede" = kjedelogo eller -navn synlig i bildet (f.eks. "Circle K", "Shell", "Esso", "Uno-X", "YX", "St1", "Best", "Tanken", "Haltbakk Express"). Ellers null.
+- "kjede" = kjedelogo eller -navn synlig i bildet (f.eks. "Circle K", "St1", "Esso", "Uno-X", "YX", "Best", "Tanken", "Haltbakk Express"). Ellers null.
 
 Nøyaktighet — LED-display:
 - På bilder tatt langt unna er desimalpunkt/komma ofte svakt eller usynlig. Les fire røde LED-siffer som XX.XX, ikke som heltall. Eksempel: 1949 -> 19.49 og 2079 -> 20.79.

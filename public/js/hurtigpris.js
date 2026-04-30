@@ -3,7 +3,7 @@
  * Flyt: Kamera-knapp → ta bilde → fullskjerm modal med stasjonskort + OCR-priser → lagre.
  * Minimalt antall trykk for effektive prisjegere.
  */
-import { gjenkjennPriserFraBilde } from './ocr.js';
+import { gjenkjennPriserFraBilde, loggOcrVedLagring } from './ocr.js';
 import { oppdaterPris } from './api.js';
 import { getKjedeFarge, getKjedeInitials, getKjedeLogo } from './kjede.js';
 
@@ -230,6 +230,8 @@ async function lagre() {
             lagreBtn.textContent = 'Lagre pris';
             return;
         }
+
+        loggOcrVedLagring({ stasjon_id: valgtStasjon.id, bensin, diesel, bensin98, diesel_avgiftsfri });
 
         const _nd = new Date(), _p = n => String(n).padStart(2, '0');
         const naa = `${_nd.getFullYear()}-${_p(_nd.getMonth()+1)}-${_p(_nd.getDate())} ${_p(_nd.getHours())}:${_p(_nd.getMinutes())}:${_p(_nd.getSeconds())}`;

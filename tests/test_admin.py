@@ -139,13 +139,13 @@ class TestPrislogg:
         assert 'Prislogg' in resp.data.decode()
 
     def test_viser_prisoppdateringer(self, admin_client):
-        db_mod.lagre_stasjon('S', 'Shell', 60.39, 5.33, 'node/1')
+        db_mod.lagre_stasjon('Teststasjon', 'Circle K', 60.39, 5.33, 'node/1')
         stasjoner = db_mod.get_stasjoner_med_priser(60.39, 5.33)
         bruker = db_mod.finn_bruker('admin@test.no')
         db_mod.lagre_pris(stasjoner[0]['id'], 21.0, 20.0, bruker_id=bruker['id'])
         resp = admin_client.get('/admin/prislogg')
         html = resp.data.decode()
-        assert 'Shell' in html
+        assert 'Teststasjon' in html
         assert 'admin@test.no' in html
 
 

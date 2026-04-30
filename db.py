@@ -23,7 +23,7 @@ _KJEDE_ALIASES = {
     'oljeleverandoren': 'Oljeleverandøren',
     'oljeleverandøren': 'Oljeleverandøren',
     'preem': 'Preem',
-    'shell': 'Shell',
+    'shell': 'St1',
     'st 1': 'St1',
     'st1': 'St1',
     'tank': 'TANK',
@@ -620,8 +620,7 @@ def hent_kjede_snitt_24t() -> list:
         "WHEN lower(trim(s.kjede)) = 'mh24' THEN 'MH24' "
         "WHEN lower(trim(s.kjede)) IN ('oljeleverandoren', 'oljeleverandøren') THEN 'Oljeleverandøren' "
         "WHEN lower(trim(s.kjede)) = 'preem' THEN 'Preem' "
-        "WHEN lower(trim(s.kjede)) = 'shell' THEN 'Shell' "
-        "WHEN lower(trim(s.kjede)) IN ('st1', 'st 1') THEN 'St1' "
+        "WHEN lower(trim(s.kjede)) IN ('shell', 'st1', 'st 1') THEN 'St1' "
         "WHEN lower(trim(s.kjede)) = 'tank' THEN 'TANK' "
         "WHEN lower(trim(s.kjede)) = 'tanken' THEN 'Tanken' "
         "WHEN lower(trim(s.kjede)) IN ('tronder oil', 'trønder oil') THEN 'Trønder Oil' "
