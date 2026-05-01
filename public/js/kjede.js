@@ -1,4 +1,4 @@
-export const KJEDE_NAVN = ['Best', 'Bunker Oil', 'Circle K', 'Din-X', 'Driv', 'Esso', 'Haltbakk Express', 'Haslestad Energi', 'Knapphus', 'MH24', 'Oljeleverandøren', 'Preem', 'St1', 'TANK', 'Tanken', 'Trønder Oil', 'Uno-X', 'YX'];
+export const KJEDE_NAVN = ['Best', 'Bunker Oil', 'Circle K', 'Din-X', 'Driv', 'Esso', 'Fuel4You', 'Haltbakk Express', 'Haslestad Energi', 'Knapphus', 'MH24', 'Oljeleverandøren', 'Preem', 'St1', 'TANK', 'Tanken', 'Trønder Oil', 'Uno-X', 'YX'];
 
 const KJEDE_DOMENER = [
     { match: ['circle k', 'circlek'],          logo: 'circlek',              farge: '#f97316' },
@@ -6,6 +6,7 @@ const KJEDE_DOMENER = [
     { match: ['uno-x', 'unox', 'uno x'],       logo: 'uno-x',                farge: '#e8181b' },
     { match: ['yx'],                            logo: 'yx',                   farge: '#dc2626' },
     { match: ['esso'],                          logo: 'esso',                 farge: '#2563eb' },
+    { match: ['fuel4you', 'fuel 4 you'],        logo: 'fuel4you',             farge: '#4caf50' },
     { match: ['shell'],                         logo: 'shell',                farge: '#ca8a04' },
     { match: ['preem'],                         logo: 'preem',                farge: '#059669' },
     { match: ['st1', 'st 1'],                   logo: 'st1',                  farge: '#f5c400' },
