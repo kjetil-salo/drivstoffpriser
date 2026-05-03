@@ -1754,6 +1754,27 @@ html, body {
   display: none !important;
 }
 
+.btn-bekreft-edit {
+  margin-top: 4px;
+  width: 100%;
+  padding: 6px 0;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--color-success);
+  background: transparent;
+  color: var(--color-success);
+  font-size: var(--font-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+.btn-bekreft-edit:hover { background: rgba(34,197,94,0.12); }
+.btn-bekreft-edit:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-bekreft-edit.bekreftet {
+  background: var(--color-success);
+  color: #fff;
+}
+.btn-bekreft-edit[hidden] { display: none !important; }
+
 #pris-status {
   font-size: var(--font-sm);
   padding: 6px 10px;
