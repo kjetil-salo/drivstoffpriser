@@ -1,5 +1,5 @@
 import { oppdaterPris, bekreftEnPris, settKjede, endreNavn, settDrivstofftyper, foreslåEndring } from './api.js';
-import { getInnstillinger } from './settings.js';
+import { getInnstillinger, getEffektivPris, getRabattØre } from './settings.js';
 import { getKjedeFarge, getKjedeInitials, getKjedeLogo } from './kjede.js';
 import { initOcr, visOcrForRolle, skjulOcrPreview, loggOcrVedLagring, loggOcrVedBekreftelse } from './ocr.js';
 import { erFavoritt, toggleFavoritt } from './favoritter.js';
@@ -257,6 +257,8 @@ function fyllVisning(s) {
 
     const inn = getInnstillinger();
     const innlogget = window.__innlogget;
+    const rabattØre = getRabattØre(s.kjede, inn);
+    const harRabatt = rabattØre > 0;
     const typer = [
         inn.bensin            && s.har_bensin !== false            ? { label: '95 oktan',       nøkkel: 'bensin',             v: s.bensin,            ts: s.bensin_tidspunkt             } : null,
         inn.bensin98          && s.har_bensin98 !== false          ? { label: '98 oktan',       nøkkel: 'bensin98',           v: s.bensin98,          ts: s.bensin98_tidspunkt           } : null,
@@ -265,13 +267,18 @@ function fyllVisning(s) {
     ].filter(Boolean);
     prisContainer.innerHTML = typer.map(t => {
         const bekreftet = _bekreftedeTyper.has(t.nøkkel) ? ' bekreftet' : '';
+        const effektiv = getEffektivPris(t.v, s.kjede, inn);
+        const prisVises = effektiv != null ? formatPris(effektiv) + ' kr' : '–';
+        const rabattHtml = harRabatt && t.v != null
+            ? `<span class="sheet-rabatt-info" title="Råpris: ${formatPris(t.v)} kr">din pris</span>`
+            : '';
         return `
         <div class="sheet-pris-rad">
             <div class="sheet-pris-rad-label">
                 ${t.v != null ? `<span class="pris-alder-dot ${prisAlderKlasse(t.ts)}"></span>` : ''}
-                <span>${t.label}</span>
+                <span>${t.label}</span>${rabattHtml}
             </div>
-            <div class="sheet-pris-verdi ${t.v == null ? 'ingen' : ''}">${t.v != null ? formatPris(t.v) + ' kr' : '–'}</div>
+            <div class="sheet-pris-verdi ${t.v == null ? 'ingen' : ''}">${prisVises}</div>
             ${innlogget && t.v != null
                 ? `<button class="btn-bekreft-rad${bekreftet}" data-type="${t.nøkkel}" aria-label="Bekreft ${t.label}">✓</button>`
                 : (innlogget ? '<div class="btn-bekreft-rad-placeholder"></div>' : '')}

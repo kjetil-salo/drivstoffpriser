@@ -5,7 +5,7 @@ import { visListe, oppdaterKort } from './list.js';
 import { initSheet, visStasjonSheet, oppdaterSheetStasjon, lukkSheet, refreshSheetInnstillinger } from './station-sheet.js';
 import { initHurtigpris, åpneHurtigKamera } from './hurtigpris.js';
 import { initSearch } from './search.js';
-import { initInnstillinger, getInnstillinger, triggerInstallPrompt, erInstallbar } from './settings.js';
+import { initInnstillinger, getInnstillinger, triggerInstallPrompt, erInstallbar, applyServerPreferences } from './settings.js';
 import { initAddStation, openAddStation } from './add-station.js';
 import { lastStatistikk } from './stats.js';
 import { initRuteplanlegger } from './route-planner.js';
@@ -157,6 +157,7 @@ window.__innlogget = meg.innlogget || false;
 window.__erAdmin = meg.er_admin || false;
 window.__roller = meg.roller || [];
 window.__anonymTillatt = meg.anonym_innlegging || false;
+if (meg.innlogget && meg.preferences) applyServerPreferences(meg.preferences);
 
 const authLenke = document.getElementById('auth-lenke');
 

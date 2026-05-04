@@ -38,7 +38,8 @@ from db import (get_stasjoner_med_priser, lagre_pris, bekreft_pris, logg_visning
                 prisoppdateringer_rullende_24t_uke,
                 har_rolle, hent_kjede_snitt_24t,
                 sjekk_rate_limit, logg_rate_limit, hent_anonym_bruker_id,
-                mask_stasjon_priser_for_tilganger)
+                mask_stasjon_priser_for_tilganger,
+                hent_preferences, sett_preferences)
 
 logger = logging.getLogger('drivstoff')
 
@@ -270,7 +271,36 @@ def meg():
     return jsonify({'innlogget': True, 'brukernavn': bruker['brukernavn'],
                     'kallenavn': bruker.get('kallenavn') or '', 'bruker_id': bruker['id'],
                     'er_admin': bool(bruker['er_admin']),
-                    'roller': roller, 'anonym_innlegging': anonym_tillatt})
+                    'roller': roller, 'anonym_innlegging': anonym_tillatt,
+                    'preferences': hent_preferences(bruker['id'])})
+
+
+@api_bp.route('/api/bruker/preferences', methods=['PUT'])
+def sett_bruker_preferences():
+    bruker_id = session.get('bruker_id')
+    if not bruker_id:
+        return jsonify({'error': 'Ikke innlogget'}), 401
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({'error': 'Ugyldig data'}), 400
+    # Tillat kun kjente nøkler for å unngå at klienten lagrer vilkårlig data
+    _TILLATNE_NØKLER = {'bensin', 'bensin98', 'diesel', 'diesel_avgiftsfri',
+                        'radius', 'radiusValg', 'radiusEgen', 'kartvisning', 'rabattkort'}
+    renset = {k: v for k, v in data.items() if k in _TILLATNE_NØKLER}
+    # Valider og rens rabattkort-verdier
+    if 'rabattkort' in renset:
+        rb = renset['rabattkort']
+        _GYLDIGE_KJEDER = {'Circle K', 'Uno-X', 'YX', 'Esso', 'St1'}
+        if not isinstance(rb, dict):
+            renset['rabattkort'] = {}
+        else:
+            renset['rabattkort'] = {
+                k: max(0, min(500, int(v)))
+                for k, v in rb.items()
+                if k in _GYLDIGE_KJEDER and isinstance(v, (int, float)) and v > 0
+            }
+    sett_preferences(bruker_id, renset)
+    return jsonify({'ok': True})
 
 
 @api_bp.route('/api/stasjoner')

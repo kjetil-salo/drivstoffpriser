@@ -1,4 +1,4 @@
-import { getInnstillinger } from './settings.js';
+import { getInnstillinger, getEffektivPris, getRabattØre } from './settings.js';
 import { getKjedeFarge, getKjedeInitials, getKjedeLogo } from './kjede.js';
 import { erFavoritt, toggleFavoritt, hentFavoritter } from './favoritter.js';
 
@@ -207,12 +207,17 @@ function aktuellPris(s, type) {
     const ts = s[`${type}_tidspunkt`];
     if (!ts) return null;
     const alderTimer = (Date.now() - new Date(ts.replace(' ', 'T') + 'Z').getTime()) / 3600000;
-    return alderTimer <= MAKS_TOPPLISTE_ALDER_TIMER ? s[type] : null;
+    if (alderTimer > MAKS_TOPPLISTE_ALDER_TIMER) return null;
+    return getEffektivPris(s[type], s.kjede, getInnstillinger());
 }
 
 function formatPris(v) {
     if (v == null) return null;
     return v.toFixed(2).replace('.', ',');
+}
+
+function escapeHtml(s) {
+    return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 function avstandTekst(m) {
@@ -255,34 +260,39 @@ function prisAlderKlasse(tidspunkt) {
 
 function kortHtml(s, billigste = {}, erHovedBilligst = false) {
     const inn = getInnstillinger();
+    const rabattØre = getRabattØre(s.kjede, inn);
+    const harRabatt = rabattØre > 0;
     const rader = [
-        inn.bensin              ? { label: '95',     v: formatPris(s.bensin),              billigst: billigste.bensin              === s.id, type: 'bensin',              ts: s.bensin_tidspunkt              } : null,
-        inn.bensin98            ? { label: '98',     v: formatPris(s.bensin98),            billigst: billigste.bensin98            === s.id, type: 'bensin98',            ts: s.bensin98_tidspunkt            } : null,
-        inn.diesel              ? { label: 'Diesel', v: formatPris(s.diesel),              billigst: billigste.diesel              === s.id, type: 'diesel',              ts: s.diesel_tidspunkt              } : null,
-        inn.diesel_avgiftsfri   ? { label: 'Avg.fri', v: formatPris(s.diesel_avgiftsfri),  billigst: billigste.diesel_avgiftsfri   === s.id, type: 'diesel_avgiftsfri',   ts: s.diesel_avgiftsfri_tidspunkt   } : null,
+        inn.bensin              ? { label: '95',     råpris: s.bensin,              v: formatPris(getEffektivPris(s.bensin, s.kjede, inn)),              billigst: billigste.bensin              === s.id, type: 'bensin',              ts: s.bensin_tidspunkt              } : null,
+        inn.bensin98            ? { label: '98',     råpris: s.bensin98,            v: formatPris(getEffektivPris(s.bensin98, s.kjede, inn)),            billigst: billigste.bensin98            === s.id, type: 'bensin98',            ts: s.bensin98_tidspunkt            } : null,
+        inn.diesel              ? { label: 'Diesel', råpris: s.diesel,              v: formatPris(getEffektivPris(s.diesel, s.kjede, inn)),              billigst: billigste.diesel              === s.id, type: 'diesel',              ts: s.diesel_tidspunkt              } : null,
+        inn.diesel_avgiftsfri   ? { label: 'Avg.fri', råpris: s.diesel_avgiftsfri,  v: formatPris(getEffektivPris(s.diesel_avgiftsfri, s.kjede, inn)),  billigst: billigste.diesel_avgiftsfri   === s.id, type: 'diesel_avgiftsfri',   ts: s.diesel_avgiftsfri_tidspunkt   } : null,
     ].filter(Boolean);
     const kjedeEllerNavn = s.kjede || s.navn;
     const logoUrl = getKjedeLogo(kjedeEllerNavn);
     const farge = getKjedeFarge(kjedeEllerNavn);
     const initials = getKjedeInitials(s.kjede || s.navn);
+    const eNavn = escapeHtml(s.navn);
+    const eKjede = escapeHtml(s.kjede);
     const badgeHtml = `<div class="sk-badge" style="background:${farge};position:relative">` +
-        `<span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#fff">${initials}</span>` +
-        (logoUrl ? `<img src="${logoUrl}" alt="${s.kjede || ''}" style="position:relative;width:28px;height:28px;object-fit:contain;background:#fff;border-radius:6px;padding:2px" onerror="this.style.display='none'">` : '') +
+        `<span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#fff">${escapeHtml(initials)}</span>` +
+        (logoUrl ? `<img src="${logoUrl}" alt="${eKjede}" style="position:relative;width:28px;height:28px;object-fit:contain;background:#fff;border-radius:6px;padding:2px" onerror="this.style.display='none'">` : '') +
         `</div>`;
     const kortKlasse = erHovedBilligst ? ' billigst-kort' : '';
     const bannerHtml = erHovedBilligst ? '<div class="sk-billigst-banner">★ billigste stasjon</div>' : '';
-    return `<div class="stasjon-kort${kortKlasse}" role="listitem" tabindex="0" aria-label="${s.navn}${s.kjede ? ', ' + s.kjede : ''}" data-id="${s.id}">
+    const rabattBadge = harRabatt ? `<span class="sk-rabatt-badge" title="-${rabattØre} øre/l med kort">-${rabattØre}¢</span>` : '';
+    return `<div class="stasjon-kort${kortKlasse}" role="listitem" tabindex="0" aria-label="${eNavn}${s.kjede ? ', ' + eKjede : ''}" data-id="${s.id}">
         ${bannerHtml}
         ${badgeHtml}
         <div class="sk-info">
             <div class="sk-navn-rad">
-                <div class="sk-navn">${s.navn}${s.kjede ? ` <span class="sk-kjede-inline">(${s.kjede})</span>` : ''}</div>
+                <div class="sk-navn">${eNavn}${s.kjede ? ` <span class="sk-kjede-inline">(${eKjede})</span>` : ''}${rabattBadge}</div>
                 <span class="sk-avstand">${avstandTekst(s.avstand_m)}</span>
             </div>
             <div class="sk-priser">
                 ${rader.map(r => `<div class="sk-pris-rad${r.type === aktivSort ? ' sort-aktiv' : ''}">
                     <span class="sk-pris-label">${r.label}</span>
-                    <span class="sk-pris-verdi ${r.v ? (r.billigst ? 'billigst' : '') : 'ingen'}">${r.v ?? '–'}</span>
+                    <span class="sk-pris-verdi ${r.v ? (r.billigst ? 'billigst' : '') : 'ingen'}">${r.v ?? '–'}${harRabatt && r.v ? '<span class="sk-din-pris"> din</span>' : ''}</span>
                     ${r.v && r.ts ? `<span class="pris-alder-tekst ${prisAlderKlasse(r.ts)}" title="${prisAlderTekst(r.ts)}">${prisAlderTekstKort(r.ts)}</span>` : ''}
                 </div>`).join('')}
             </div>

@@ -284,6 +284,10 @@ def _migrer_db():
         if 'stasjon_id' not in ocr_kolonner:
             conn.execute("ALTER TABLE ocr_statistikk ADD COLUMN stasjon_id INTEGER")
 
+        bruker_kolonner2 = [r[1] for r in conn.execute("PRAGMA table_info(brukere)").fetchall()]
+        if 'preferences' not in bruker_kolonner2:
+            conn.execute("ALTER TABLE brukere ADD COLUMN preferences TEXT")
+
 
 def sjekk_rate_limit(type: str, nokkel: str, maks: int, vindu_sekunder: int) -> bool:
     """Returner True hvis nokkel har nådd maks antall hendelser i vindu_sekunder."""
@@ -1151,6 +1155,25 @@ def sett_kallenavn(bruker_id: int, kallenavn: str):
     with get_conn() as conn:
         conn.execute("UPDATE brukere SET kallenavn = ? WHERE id = ?",
                      (kallenavn or None, bruker_id))
+
+
+def hent_preferences(bruker_id: int) -> dict:
+    import json as _json
+    with get_conn() as conn:
+        row = conn.execute("SELECT preferences FROM brukere WHERE id = ?", (bruker_id,)).fetchone()
+        if not row or not row[0]:
+            return {}
+        try:
+            return _json.loads(row[0])
+        except Exception:
+            return {}
+
+
+def sett_preferences(bruker_id: int, prefs: dict):
+    import json as _json
+    with get_conn() as conn:
+        conn.execute("UPDATE brukere SET preferences = ? WHERE id = ?",
+                     (_json.dumps(prefs, ensure_ascii=False), bruker_id))
 
 
 def sett_kjede_for_stasjon(stasjon_id: int, kjede: str):

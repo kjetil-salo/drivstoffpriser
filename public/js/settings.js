@@ -38,7 +38,32 @@ const STANDARD = {
     radiusValg: '30',
     radiusEgen: '5',
     kartvisning: 'kompakt',
+    rabattkort: {},
 };
+
+// Kjeder som støtter rabattkort – nøkkel = kjedenavn i DB
+const RABATTKORT_KJEDER = ['Circle K', 'Uno-X', 'YX', 'Esso', 'St1'];
+
+export function getRabattØre(kjede, inn) {
+    if (!kjede || !inn || !inn.rabattkort) return 0;
+    return Number(inn.rabattkort[kjede]) || 0;
+}
+
+export function getEffektivPris(råpris, kjede, inn) {
+    if (råpris == null) return null;
+    const øre = getRabattØre(kjede, inn);
+    if (øre === 0) return råpris;
+    return Math.round((råpris - øre / 100) * 100) / 100;
+}
+
+export function applyServerPreferences(serverPrefs) {
+    if (!serverPrefs || typeof serverPrefs !== 'object') return;
+    try {
+        const lokale = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}');
+        const merged = normaliserInnstillinger({ ...lokale, ...serverPrefs });
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(merged));
+    } catch { /* ignorer */ }
+}
 
 function formaterRadius(value) {
     const n = Number.parseFloat(String(value).replace(',', '.'));
@@ -54,7 +79,15 @@ function normaliserInnstillinger(stored = {}) {
         : (STANDARD_RADIUS.includes(lagretRadius) ? lagretRadius : 'egen');
     const radiusEgen = formaterRadius(base.radiusEgen ?? (radiusValg === 'egen' ? lagretRadius : STANDARD.radiusEgen));
     const radius = radiusValg === 'egen' ? Number.parseFloat(radiusEgen) : Number.parseFloat(radiusValg);
-    return { ...base, radiusValg, radiusEgen, radius };
+    // Normaliser rabattkort: kun gyldige kjeder, øre som tall >= 0
+    const rabattkort = {};
+    if (base.rabattkort && typeof base.rabattkort === 'object') {
+        for (const kjede of RABATTKORT_KJEDER) {
+            const v = Number(base.rabattkort[kjede]);
+            if (v > 0) rabattkort[kjede] = v;
+        }
+    }
+    return { ...base, radiusValg, radiusEgen, radius, rabattkort };
 }
 
 export function getInnstillinger() {
@@ -62,6 +95,15 @@ export function getInnstillinger() {
         const stored = JSON.parse(localStorage.getItem(SETTINGS_KEY));
         return normaliserInnstillinger(stored || {});
     } catch { return normaliserInnstillinger(); }
+}
+
+function _pushTilServer(innstillinger) {
+    const payload = { ...innstillinger };
+    fetch('/api/bruker/preferences', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    }).catch(() => { /* fire-and-forget, ignorer nettverksfeil */ });
 }
 
 export function initInnstillinger(onChange) {
@@ -113,14 +155,17 @@ export function initInnstillinger(onChange) {
         const kartvisning = document.querySelector('input[name="sett-kartvisning"]:checked')?.value || 'kompakt';
         const radiusValg = radiusSelect.value;
         if (radiusValg === 'egen') radiusEgen.value = formaterRadius(radiusEgen.value);
+        const eksisterende = getInnstillinger();
         const ny = normaliserInnstillinger({
             bensin: cbBensin.checked, bensin98: cbBensin98.checked, diesel: cbDiesel.checked,
             diesel_avgiftsfri: cbDieselAvgiftsfri.checked,
             radiusValg,
             radiusEgen: radiusEgen.value,
             kartvisning,
+            rabattkort: eksisterende.rabattkort,
         });
         localStorage.setItem(SETTINGS_KEY, JSON.stringify(ny));
+        if (window.__innlogget) _pushTilServer(ny);
         if (onChange) onChange(ny);
     }
 
@@ -139,6 +184,47 @@ export function initInnstillinger(onChange) {
     });
     radVanlig.addEventListener('change', lagre);
     radKompakt.addEventListener('change', lagre);
+
+    // ── Rabattkort (kun synlig ved innlogging) ────────────────────────────
+    const rabattkortSeksjon = document.getElementById('rabattkort-seksjon');
+    const rabattkortListe = document.getElementById('rabattkort-liste');
+    if (rabattkortSeksjon && rabattkortListe && window.__innlogget) {
+        rabattkortSeksjon.removeAttribute('hidden');
+        const gjeldende = s.rabattkort || {};
+        rabattkortListe.innerHTML = RABATTKORT_KJEDER.map(kjede => {
+            const øre = gjeldende[kjede] || '';
+            const id = `rabattkort-${kjede.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
+            return `<div class="rabattkort-rad" data-kjede="${kjede}">
+                <span class="rabattkort-kjede">${kjede}</span>
+                <label class="rabattkort-label">
+                    <input type="number" class="rabattkort-input" id="${id}" min="0" max="500" step="1"
+                        inputmode="numeric" placeholder="øre/l" value="${øre}"
+                        aria-label="${kjede} rabatt i øre per liter">
+                    <span class="rabattkort-enhet">øre/l</span>
+                </label>
+            </div>`;
+        }).join('');
+
+        function lagreRabattkort() {
+            const nyRabattkort = {};
+            rabattkortListe.querySelectorAll('.rabattkort-rad').forEach(rad => {
+                const kjede = rad.dataset.kjede;
+                const input = rad.querySelector('.rabattkort-input');
+                const v = Number(input.value);
+                if (v > 0) nyRabattkort[kjede] = v;
+            });
+            const eksisterende = getInnstillinger();
+            const ny = normaliserInnstillinger({ ...eksisterende, rabattkort: nyRabattkort });
+            localStorage.setItem(SETTINGS_KEY, JSON.stringify(ny));
+            if (window.__innlogget) _pushTilServer(ny);
+            if (onChange) onChange(ny);
+        }
+
+        rabattkortListe.querySelectorAll('.rabattkort-input').forEach(input => {
+            input.addEventListener('change', lagreRabattkort);
+            input.addEventListener('blur', lagreRabattkort);
+        });
+    }
 
     const erStandalone = window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone;
     const erIos = /iPad|iPhone|iPod/.test(navigator.userAgent);
