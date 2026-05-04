@@ -1,5 +1,5 @@
 import { oppdaterPris, bekreftEnPris, settKjede, endreNavn, settDrivstofftyper, foreslåEndring } from './api.js';
-import { getInnstillinger, getEffektivPris, getRabattØre } from './settings.js';
+import { getInnstillinger, getEffektivPris, harRabattKort } from './settings.js';
 import { getKjedeFarge, getKjedeInitials, getKjedeLogo } from './kjede.js';
 import { initOcr, visOcrForRolle, skjulOcrPreview, loggOcrVedLagring, loggOcrVedBekreftelse } from './ocr.js';
 import { erFavoritt, toggleFavoritt } from './favoritter.js';
@@ -257,8 +257,7 @@ function fyllVisning(s) {
 
     const inn = getInnstillinger();
     const innlogget = window.__innlogget;
-    const rabattØre = getRabattØre(s.kjede, inn);
-    const harRabatt = rabattØre > 0;
+    const harRabatt = harRabattKort(s.kjede, inn);
     const typer = [
         inn.bensin            && s.har_bensin !== false            ? { label: '95 oktan',       nøkkel: 'bensin',             v: s.bensin,            ts: s.bensin_tidspunkt             } : null,
         inn.bensin98          && s.har_bensin98 !== false          ? { label: '98 oktan',       nøkkel: 'bensin98',           v: s.bensin98,          ts: s.bensin98_tidspunkt           } : null,

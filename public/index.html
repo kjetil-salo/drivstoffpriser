@@ -90,11 +90,8 @@
     <div class="innstilling-tittel innstilling-separator">Kartvisning</div>
     <label class="innstilling-rad"><input type="radio" name="sett-kartvisning" id="sett-kartvisning-vanlig" value="vanlig"> Vanlig</label>
     <label class="innstilling-rad"><input type="radio" name="sett-kartvisning" id="sett-kartvisning-kompakt" value="kompakt"> Kompakt</label>
-    <div id="rabattkort-seksjon" hidden>
-      <div class="innstilling-tittel innstilling-separator">Rabattkort</div>
-      <div id="rabattkort-liste"></div>
-    </div>
     <div class="innstilling-separator"></div>
+    <button id="rabattkort-btn" class="innstilling-del-btn" hidden>Rabattkort</button>
     <button id="del-btn" class="innstilling-del-btn"><span aria-hidden="true">↗️</span> Del appen</button>
     <button id="hjemskjerm-btn" class="innstilling-del-btn" hidden><span aria-hidden="true">📲</span> Legg til som app</button>
   </div>
@@ -615,6 +612,32 @@
       <li>Trykk <strong>«Legg til»</strong> øverst til høyre</li>
     </ol>
     <button id="ios-install-lukk">Lukk</button>
+  </div>
+
+  <div id="rabattkort-modal-backdrop" class="modal-backdrop" hidden></div>
+  <div id="rabattkort-modal" class="rabattkort-modal" hidden role="dialog" aria-modal="true" aria-labelledby="rabattkort-modal-tittel">
+    <div class="rabattkort-modal-header">
+      <span id="rabattkort-modal-tittel" class="rabattkort-modal-tittel">Mine rabattkort</span>
+      <button id="rabattkort-modal-lukk" class="modal-lukk-btn" aria-label="Lukk">&times;</button>
+    </div>
+    <div id="rabattkort-kortliste" class="rabattkort-kortliste"></div>
+    <div class="rabattkort-legg-til">
+      <div class="rabattkort-legg-til-tittel">Legg til kort</div>
+      <div class="rabattkort-skjema-rad">
+        <select id="rabattkort-kjede-select" class="rabattkort-select" aria-label="Velg kjede">
+          <option value="">– Kjede –</option>
+        </select>
+      </div>
+      <div class="rabattkort-skjema-rad">
+        <select id="rabattkort-type-select" class="rabattkort-select" aria-label="Rabatttype">
+          <option value="kr">kr/liter</option>
+          <option value="pst">prosent (%)</option>
+        </select>
+        <input id="rabattkort-verdi-input" class="rabattkort-verdi-input" type="number" inputmode="decimal" min="0.01" step="0.01" placeholder="Verdi" aria-label="Rabattverdi">
+      </div>
+      <div id="rabattkort-status" class="rabattkort-status" role="alert" aria-live="polite"></div>
+      <button id="rabattkort-legg-til-btn" class="rabattkort-legg-til-btn">Legg til</button>
+    </div>
   </div>
 
   <div id="del-modal-backdrop" hidden></div>

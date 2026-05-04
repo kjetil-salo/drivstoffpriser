@@ -1,4 +1,4 @@
-import { getInnstillinger, getEffektivPris, getRabattØre } from './settings.js';
+import { getInnstillinger, getEffektivPris, harRabattKort, getRabattVisning } from './settings.js';
 import { getKjedeFarge, getKjedeInitials, getKjedeLogo } from './kjede.js';
 import { erFavoritt, toggleFavoritt, hentFavoritter } from './favoritter.js';
 
@@ -260,8 +260,8 @@ function prisAlderKlasse(tidspunkt) {
 
 function kortHtml(s, billigste = {}, erHovedBilligst = false) {
     const inn = getInnstillinger();
-    const rabattØre = getRabattØre(s.kjede, inn);
-    const harRabatt = rabattØre > 0;
+    const harRabatt = harRabattKort(s.kjede, inn);
+    const rabattVisning = getRabattVisning(s.kjede, inn);
     const rader = [
         inn.bensin              ? { label: '95',     råpris: s.bensin,              v: formatPris(getEffektivPris(s.bensin, s.kjede, inn)),              billigst: billigste.bensin              === s.id, type: 'bensin',              ts: s.bensin_tidspunkt              } : null,
         inn.bensin98            ? { label: '98',     råpris: s.bensin98,            v: formatPris(getEffektivPris(s.bensin98, s.kjede, inn)),            billigst: billigste.bensin98            === s.id, type: 'bensin98',            ts: s.bensin98_tidspunkt            } : null,
@@ -280,7 +280,7 @@ function kortHtml(s, billigste = {}, erHovedBilligst = false) {
         `</div>`;
     const kortKlasse = erHovedBilligst ? ' billigst-kort' : '';
     const bannerHtml = erHovedBilligst ? '<div class="sk-billigst-banner">★ billigste stasjon</div>' : '';
-    const rabattBadge = harRabatt ? `<span class="sk-rabatt-badge" title="-${rabattØre} øre/l med kort">-${rabattØre}¢</span>` : '';
+    const rabattBadge = harRabatt ? `<span class="sk-rabatt-badge" title="${rabattVisning} med kort">${rabattVisning}</span>` : '';
     return `<div class="stasjon-kort${kortKlasse}" role="listitem" tabindex="0" aria-label="${eNavn}${s.kjede ? ', ' + eKjede : ''}" data-id="${s.id}">
         ${bannerHtml}
         ${badgeHtml}

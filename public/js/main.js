@@ -5,7 +5,7 @@ import { visListe, oppdaterKort } from './list.js';
 import { initSheet, visStasjonSheet, oppdaterSheetStasjon, lukkSheet, refreshSheetInnstillinger } from './station-sheet.js';
 import { initHurtigpris, åpneHurtigKamera } from './hurtigpris.js';
 import { initSearch } from './search.js';
-import { initInnstillinger, getInnstillinger, triggerInstallPrompt, erInstallbar, applyServerPreferences } from './settings.js';
+import { initInnstillinger, getInnstillinger, triggerInstallPrompt, erInstallbar, applyServerPreferences, initRabattkortModal } from './settings.js';
 import { initAddStation, openAddStation } from './add-station.js';
 import { lastStatistikk } from './stats.js';
 import { initRuteplanlegger } from './route-planner.js';
@@ -308,7 +308,7 @@ if (!lagretPos && !_fraAdmin) {
 
 // ── Innstillinger ─────────────────────────────────
 let sisteRadius = getInnstillinger().radius;
-initInnstillinger(async (ny) => {
+const _onInnstillingerChange = async (ny) => {
     if (viewListe.style.display !== 'none') visListe(stasjoner, visStasjonSheet);
     refreshKartInnstillinger();
     refreshSheetInnstillinger();
@@ -325,7 +325,9 @@ initInnstillinger(async (ny) => {
         }
     }
     sisteRadius = ny.radius;
-});
+};
+initInnstillinger(_onInnstillingerChange);
+initRabattkortModal(_onInnstillingerChange);
 
 
 // ── Sheet + search init ───────────────────────────

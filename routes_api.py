@@ -287,18 +287,33 @@ def sett_bruker_preferences():
     _TILLATNE_NØKLER = {'bensin', 'bensin98', 'diesel', 'diesel_avgiftsfri',
                         'radius', 'radiusValg', 'radiusEgen', 'kartvisning', 'rabattkort'}
     renset = {k: v for k, v in data.items() if k in _TILLATNE_NØKLER}
-    # Valider og rens rabattkort-verdier
+    # Valider og rens rabattkort – nytt format: [{kjede, type, verdi}]
     if 'rabattkort' in renset:
         rb = renset['rabattkort']
-        _GYLDIGE_KJEDER = {'Circle K', 'Uno-X', 'YX', 'Esso', 'St1'}
-        if not isinstance(rb, dict):
-            renset['rabattkort'] = {}
+        if not isinstance(rb, list):
+            renset['rabattkort'] = []
         else:
-            renset['rabattkort'] = {
-                k: max(0, min(500, int(v)))
-                for k, v in rb.items()
-                if k in _GYLDIGE_KJEDER and isinstance(v, (int, float)) and v > 0
-            }
+            renset_kort = []
+            sett = set()
+            for k in rb:
+                if not isinstance(k, dict):
+                    continue
+                kjede = k.get('kjede')
+                type_ = k.get('type')
+                verdi = k.get('verdi')
+                if not isinstance(kjede, str) or not kjede:
+                    continue
+                if type_ not in ('kr', 'pst'):
+                    continue
+                if not isinstance(verdi, (int, float)) or verdi <= 0:
+                    continue
+                maks = 100 if type_ == 'pst' else 10
+                verdi = min(float(verdi), maks)
+                if kjede in sett:
+                    continue  # én per kjede
+                sett.add(kjede)
+                renset_kort.append({'kjede': kjede, 'type': type_, 'verdi': verdi})
+            renset['rabattkort'] = renset_kort
     sett_preferences(bruker_id, renset)
     return jsonify({'ok': True})
 

@@ -1,3 +1,5 @@
+import { KJEDE_NAVN } from './kjede.js';
+
 const SETTINGS_KEY = 'drivstoff_innstillinger';
 const STANDARD_RADIUS = ['5', '10', '20', '30', '50', '100'];
 
@@ -20,6 +22,10 @@ export function erInstallbar() {
     return !!deferredInstallPrompt;
 }
 
+function _escHtml(s) {
+    return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 let toastTimer;
 function visToast(tekst) {
     const el = document.getElementById('toast');
@@ -38,22 +44,72 @@ const STANDARD = {
     radiusValg: '30',
     radiusEgen: '5',
     kartvisning: 'kompakt',
-    rabattkort: {},
+    rabattkort: [],
 };
 
-// Kjeder som støtter rabattkort – nøkkel = kjedenavn i DB
-const RABATTKORT_KJEDER = ['Circle K', 'Uno-X', 'YX', 'Esso', 'St1'];
+// ── Rabattkort-hjelpere ───────────────────────────────────────────────────────
 
-export function getRabattØre(kjede, inn) {
-    if (!kjede || !inn || !inn.rabattkort) return 0;
-    return Number(inn.rabattkort[kjede]) || 0;
+function _finnKort(kjede, inn) {
+    if (!kjede || !inn || !Array.isArray(inn.rabattkort)) return null;
+    return inn.rabattkort.find(k => k.kjede === kjede) || null;
+}
+
+export function harRabattKort(kjede, inn) {
+    return _finnKort(kjede, inn) !== null;
+}
+
+export function getRabattVisning(kjede, inn) {
+    const kort = _finnKort(kjede, inn);
+    if (!kort) return null;
+    if (kort.type === 'pst') return `-${kort.verdi}%`;
+    return `-${Math.round(kort.verdi * 100)} øre`;
 }
 
 export function getEffektivPris(råpris, kjede, inn) {
     if (råpris == null) return null;
-    const øre = getRabattØre(kjede, inn);
-    if (øre === 0) return råpris;
-    return Math.round((råpris - øre / 100) * 100) / 100;
+    const kort = _finnKort(kjede, inn);
+    if (!kort) return råpris;
+    if (kort.type === 'pst') {
+        return Math.round(råpris * (1 - kort.verdi / 100) * 100) / 100;
+    }
+    // type === 'kr'
+    return Math.round((råpris - kort.verdi) * 100) / 100;
+}
+
+// Bakover-kompatibel – returnerer effektiv kr-rabatt (brukt i eldre kode)
+export function getRabattØre(kjede, inn) {
+    const kort = _finnKort(kjede, inn);
+    if (!kort) return 0;
+    if (kort.type === 'kr') return kort.verdi * 100; // kr → øre
+    return 0; // pst kan ikke uttrykkes som fast øre uten råpris
+}
+
+// ── Normalisering ─────────────────────────────────────────────────────────────
+
+function _migrerGammeltRabattkort(gammel) {
+    // Gammelt format: { "Circle K": 50, "Uno-X": 30 } (øre som heltall)
+    if (!gammel || typeof gammel !== 'object' || Array.isArray(gammel)) return null;
+    const kort = [];
+    for (const [kjede, øre] of Object.entries(gammel)) {
+        const v = Number(øre);
+        if (v > 0) kort.push({ kjede, type: 'kr', verdi: Math.round(v) / 100 });
+    }
+    return kort;
+}
+
+function _normaliserKortliste(liste) {
+    if (!Array.isArray(liste)) return [];
+    const sett = new Map();
+    for (const k of liste) {
+        if (!k || typeof k !== 'object') continue;
+        if (typeof k.kjede !== 'string' || !k.kjede) continue;
+        if (k.type !== 'kr' && k.type !== 'pst') continue;
+        const v = Number(k.verdi);
+        if (!Number.isFinite(v) || v <= 0) continue;
+        const maks = k.type === 'pst' ? 100 : 10;
+        sett.set(k.kjede, { kjede: k.kjede, type: k.type, verdi: Math.min(v, maks) });
+    }
+    return [...sett.values()];
 }
 
 export function applyServerPreferences(serverPrefs) {
@@ -79,14 +135,14 @@ function normaliserInnstillinger(stored = {}) {
         : (STANDARD_RADIUS.includes(lagretRadius) ? lagretRadius : 'egen');
     const radiusEgen = formaterRadius(base.radiusEgen ?? (radiusValg === 'egen' ? lagretRadius : STANDARD.radiusEgen));
     const radius = radiusValg === 'egen' ? Number.parseFloat(radiusEgen) : Number.parseFloat(radiusValg);
-    // Normaliser rabattkort: kun gyldige kjeder, øre som tall >= 0
-    const rabattkort = {};
-    if (base.rabattkort && typeof base.rabattkort === 'object') {
-        for (const kjede of RABATTKORT_KJEDER) {
-            const v = Number(base.rabattkort[kjede]);
-            if (v > 0) rabattkort[kjede] = v;
-        }
+
+    // Migrér gammelt objekt-format til nytt array-format
+    let rabattkort = base.rabattkort;
+    if (rabattkort && !Array.isArray(rabattkort)) {
+        rabattkort = _migrerGammeltRabattkort(rabattkort) ?? [];
     }
+    rabattkort = _normaliserKortliste(rabattkort);
+
     return { ...base, radiusValg, radiusEgen, radius, rabattkort };
 }
 
@@ -98,13 +154,20 @@ export function getInnstillinger() {
 }
 
 function _pushTilServer(innstillinger) {
-    const payload = { ...innstillinger };
     fetch('/api/bruker/preferences', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-    }).catch(() => { /* fire-and-forget, ignorer nettverksfeil */ });
+        body: JSON.stringify(innstillinger),
+    }).catch(() => { /* fire-and-forget */ });
 }
+
+function _lagreOgVarsle(ny, onChange) {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(ny));
+    if (window.__innlogget) _pushTilServer(ny);
+    if (onChange) onChange(ny);
+}
+
+// ── initInnstillinger ─────────────────────────────────────────────────────────
 
 export function initInnstillinger(onChange) {
     const btn = document.getElementById('innstillinger-btn');
@@ -134,7 +197,6 @@ export function initInnstillinger(onChange) {
         btn.setAttribute('aria-expanded', panel.hasAttribute('hidden') ? 'false' : 'true');
     });
 
-    // Ikke bruk stopPropagation – sjekk panel-state i stedet (iOS-kompatibelt)
     document.addEventListener('click', (e) => {
         if (panel.hasAttribute('hidden')) return;
         if (!panel.contains(e.target) && !btn.contains(e.target)) {
@@ -164,9 +226,7 @@ export function initInnstillinger(onChange) {
             kartvisning,
             rabattkort: eksisterende.rabattkort,
         });
-        localStorage.setItem(SETTINGS_KEY, JSON.stringify(ny));
-        if (window.__innlogget) _pushTilServer(ny);
-        if (onChange) onChange(ny);
+        _lagreOgVarsle(ny, onChange);
     }
 
     cbBensin.addEventListener('change', function () { oppdater(this); });
@@ -185,54 +245,25 @@ export function initInnstillinger(onChange) {
     radVanlig.addEventListener('change', lagre);
     radKompakt.addEventListener('change', lagre);
 
-    // ── Rabattkort (kun synlig ved innlogging) ────────────────────────────
-    const rabattkortSeksjon = document.getElementById('rabattkort-seksjon');
-    const rabattkortListe = document.getElementById('rabattkort-liste');
-    if (rabattkortSeksjon && rabattkortListe && window.__innlogget) {
-        rabattkortSeksjon.removeAttribute('hidden');
-        const gjeldende = s.rabattkort || {};
-        rabattkortListe.innerHTML = RABATTKORT_KJEDER.map(kjede => {
-            const øre = gjeldende[kjede] || '';
-            const id = `rabattkort-${kjede.toLowerCase().replace(/[^a-z0-9]/g, '-')}`;
-            return `<div class="rabattkort-rad" data-kjede="${kjede}">
-                <span class="rabattkort-kjede">${kjede}</span>
-                <label class="rabattkort-label">
-                    <input type="number" class="rabattkort-input" id="${id}" min="0" max="500" step="1"
-                        inputmode="numeric" placeholder="øre/l" value="${øre}"
-                        aria-label="${kjede} rabatt i øre per liter">
-                    <span class="rabattkort-enhet">øre/l</span>
-                </label>
-            </div>`;
-        }).join('');
-
-        function lagreRabattkort() {
-            const nyRabattkort = {};
-            rabattkortListe.querySelectorAll('.rabattkort-rad').forEach(rad => {
-                const kjede = rad.dataset.kjede;
-                const input = rad.querySelector('.rabattkort-input');
-                const v = Number(input.value);
-                if (v > 0) nyRabattkort[kjede] = v;
-            });
-            const eksisterende = getInnstillinger();
-            const ny = normaliserInnstillinger({ ...eksisterende, rabattkort: nyRabattkort });
-            localStorage.setItem(SETTINGS_KEY, JSON.stringify(ny));
-            if (window.__innlogget) _pushTilServer(ny);
-            if (onChange) onChange(ny);
-        }
-
-        rabattkortListe.querySelectorAll('.rabattkort-input').forEach(input => {
-            input.addEventListener('change', lagreRabattkort);
-            input.addEventListener('blur', lagreRabattkort);
+    // ── Rabattkort-knapp (kun synlig ved innlogging) ───────────────────────────
+    const rabattkortBtn = document.getElementById('rabattkort-btn');
+    if (rabattkortBtn && window.__innlogget) {
+        rabattkortBtn.removeAttribute('hidden');
+        _oppdaterRabattkortKnapp(rabattkortBtn, getInnstillinger().rabattkort);
+        rabattkortBtn.addEventListener('click', () => {
+            panel.setAttribute('hidden', '');
+            btn.setAttribute('aria-expanded', 'false');
+            _åpneRabattkortModal(onChange);
         });
     }
 
+    // ── Hjemskjerm / del ──────────────────────────────────────────────────────
     const erStandalone = window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone;
     const erIos = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    const erAndroid = /Android/.test(navigator.userAgent);
     const hjemskjermBtn = document.getElementById('hjemskjerm-btn');
     if (hjemskjermBtn && !erStandalone) {
         if (erIos) hjemskjermBtn.removeAttribute('hidden');
-        else if (deferredInstallPrompt) hjemskjermBtn.removeAttribute('hidden'); // Android + desktop Chrome/Edge
+        else if (deferredInstallPrompt) hjemskjermBtn.removeAttribute('hidden');
 
         hjemskjermBtn.addEventListener('click', async () => {
             if (deferredInstallPrompt) {
@@ -280,6 +311,129 @@ export function initInnstillinger(onChange) {
     }
 }
 
+function _oppdaterRabattkortKnapp(btn, rabattkort) {
+    const n = Array.isArray(rabattkort) ? rabattkort.length : 0;
+    btn.textContent = n > 0 ? `Rabattkort (${n} aktive)` : 'Rabattkort';
+}
+
+// ── Rabattkort-modal ──────────────────────────────────────────────────────────
+
+function _åpneRabattkortModal(onChange) {
+    const backdrop = document.getElementById('rabattkort-modal-backdrop');
+    const modal = document.getElementById('rabattkort-modal');
+    if (!backdrop || !modal) return;
+
+    _renderKortliste(onChange);
+    backdrop.removeAttribute('hidden');
+    modal.removeAttribute('hidden');
+    modal.querySelector('#rabattkort-modal-lukk')?.focus();
+}
+
+function _lukkRabattkortModal() {
+    document.getElementById('rabattkort-modal-backdrop')?.setAttribute('hidden', '');
+    document.getElementById('rabattkort-modal')?.setAttribute('hidden', '');
+}
+
+function _renderKortliste(onChange) {
+    const liste = document.getElementById('rabattkort-kortliste');
+    const btn = document.getElementById('rabattkort-btn');
+    if (!liste) return;
+
+    const inn = getInnstillinger();
+    const kort = inn.rabattkort;
+
+    if (kort.length === 0) {
+        liste.innerHTML = '<p class="rabattkort-tom">Ingen kort registrert ennå.</p>';
+    } else {
+        liste.innerHTML = kort.map((k, i) => {
+            const eKjede = _escHtml(k.kjede);
+            const visning = k.type === 'pst' ? `${k.verdi}%` : `${Math.round(k.verdi * 100)} øre/l`;
+            return `<div class="rabattkort-element">
+                <span class="rabattkort-el-kjede">${eKjede}</span>
+                <span class="rabattkort-el-verdi">${_escHtml(visning)}</span>
+                <button class="rabattkort-slett-btn" data-index="${i}" aria-label="Slett ${eKjede}-kort">×</button>
+            </div>`;
+        }).join('');
+
+        liste.querySelectorAll('.rabattkort-slett-btn').forEach(slettBtn => {
+            slettBtn.addEventListener('click', () => {
+                const idx = parseInt(slettBtn.dataset.index, 10);
+                const eksisterende = getInnstillinger();
+                const nyListe = eksisterende.rabattkort.filter((_, i) => i !== idx);
+                const ny = normaliserInnstillinger({ ...eksisterende, rabattkort: nyListe });
+                _lagreOgVarsle(ny, onChange);
+                if (btn) _oppdaterRabattkortKnapp(btn, ny.rabattkort);
+                _renderKortliste(onChange);
+            });
+        });
+    }
+}
+
+// Kobler opp modal-events (kalles én gang ved sidelast)
+export function initRabattkortModal(onChange) {
+    const backdrop = document.getElementById('rabattkort-modal-backdrop');
+    const modal = document.getElementById('rabattkort-modal');
+    if (!backdrop || !modal) return;
+
+    // Populer kjede-dropdown
+    const kjedeSelect = document.getElementById('rabattkort-kjede-select');
+    if (kjedeSelect && kjedeSelect.options.length <= 1) {
+        for (const navn of KJEDE_NAVN) {
+            const opt = document.createElement('option');
+            opt.value = navn;
+            opt.textContent = navn;
+            kjedeSelect.appendChild(opt);
+        }
+    }
+
+    const lukkBtn = document.getElementById('rabattkort-modal-lukk');
+    lukkBtn?.addEventListener('click', _lukkRabattkortModal);
+    backdrop.addEventListener('click', _lukkRabattkortModal);
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !modal.hasAttribute('hidden')) _lukkRabattkortModal();
+    });
+
+    // Legg til-skjema
+    const leggTilBtn = document.getElementById('rabattkort-legg-til-btn');
+    leggTilBtn?.addEventListener('click', () => {
+        const kjedeEl = document.getElementById('rabattkort-kjede-select');
+        const typeEl = document.getElementById('rabattkort-type-select');
+        const verdiEl = document.getElementById('rabattkort-verdi-input');
+        const statusEl = document.getElementById('rabattkort-status');
+
+        const kjede = kjedeEl?.value;
+        const type = typeEl?.value;
+        const verdi = Number(verdiEl?.value);
+
+        if (!kjede) { if (statusEl) statusEl.textContent = 'Velg kjede.'; return; }
+        if (!Number.isFinite(verdi) || verdi <= 0) {
+            if (statusEl) statusEl.textContent = 'Tast inn gyldig verdi.';
+            return;
+        }
+        const maks = type === 'pst' ? 100 : 10;
+        if (verdi > maks) {
+            if (statusEl) statusEl.textContent = type === 'pst' ? 'Maks 100%.' : 'Maks 10 kr/l.';
+            return;
+        }
+
+        const eksisterende = getInnstillinger();
+        // Overskriv hvis kjeden allerede finnes
+        const filtrert = eksisterende.rabattkort.filter(k => k.kjede !== kjede);
+        const nyListe = [...filtrert, { kjede, type, verdi }];
+        const ny = normaliserInnstillinger({ ...eksisterende, rabattkort: nyListe });
+        _lagreOgVarsle(ny, onChange);
+
+        const btn = document.getElementById('rabattkort-btn');
+        if (btn) _oppdaterRabattkortKnapp(btn, ny.rabattkort);
+
+        if (statusEl) statusEl.textContent = '';
+        if (verdiEl) verdiEl.value = '';
+        _renderKortliste(onChange);
+    });
+}
+
+// ── Del-modal og iOS-install ──────────────────────────────────────────────────
+
 function visDelModal() {
     document.getElementById('del-modal-backdrop').removeAttribute('hidden');
     document.getElementById('del-modal').removeAttribute('hidden');
@@ -304,3 +458,4 @@ function lukkIosInstallModal() {
     document.getElementById('ios-install-backdrop')?.setAttribute('hidden', '');
     document.getElementById('ios-install-modal')?.setAttribute('hidden', '');
 }
+
