@@ -7,7 +7,7 @@ drivstoff.db
 *.db
 test-results/
 .env
-.claude/
+.claude/settings.local.json
 .DS_Store
 app.log
 drivstoff.db.backup-*
