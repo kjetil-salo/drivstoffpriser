@@ -511,29 +511,36 @@
         <div class="pris-grid">
           <div id="sheet-gruppe-bensin" class="pris-grid-celle">
             <label for="sheet-bensin-input">95 oktan</label>
-            <input id="sheet-bensin-input" type="text" inputmode="decimal" placeholder="–" autocomplete="off">
-            <button id="sheet-edit-bekreft-bensin" class="btn-bekreft-edit" data-type="bensin" hidden aria-label="Bekreft 95 oktan-pris uten endring">✓ Bekreft</button>
+            <div class="pris-input-rad">
+              <input id="sheet-bensin-input" type="text" inputmode="decimal" placeholder="–" autocomplete="off">
+              <button id="sheet-edit-bekreft-bensin" class="btn-bekreft-rad" data-type="bensin" hidden aria-label="Bekreft 95 oktan">✓</button>
+            </div>
           </div>
           <div id="sheet-gruppe-bensin98" class="pris-grid-celle">
             <label for="sheet-bensin98-input">98 oktan</label>
-            <input id="sheet-bensin98-input" type="text" inputmode="decimal" placeholder="–" autocomplete="off">
-            <button id="sheet-edit-bekreft-bensin98" class="btn-bekreft-edit" data-type="bensin98" hidden aria-label="Bekreft 98 oktan-pris uten endring">✓ Bekreft</button>
+            <div class="pris-input-rad">
+              <input id="sheet-bensin98-input" type="text" inputmode="decimal" placeholder="–" autocomplete="off">
+              <button id="sheet-edit-bekreft-bensin98" class="btn-bekreft-rad" data-type="bensin98" hidden aria-label="Bekreft 98 oktan">✓</button>
+            </div>
           </div>
           <div id="sheet-gruppe-diesel" class="pris-grid-celle">
             <label for="sheet-diesel-input">Diesel</label>
-            <input id="sheet-diesel-input" type="text" inputmode="decimal" placeholder="–" autocomplete="off">
-            <button id="sheet-edit-bekreft-diesel" class="btn-bekreft-edit" data-type="diesel" hidden aria-label="Bekreft diesel-pris uten endring">✓ Bekreft</button>
+            <div class="pris-input-rad">
+              <input id="sheet-diesel-input" type="text" inputmode="decimal" placeholder="–" autocomplete="off">
+              <button id="sheet-edit-bekreft-diesel" class="btn-bekreft-rad" data-type="diesel" hidden aria-label="Bekreft diesel">✓</button>
+            </div>
           </div>
           <div id="sheet-gruppe-diesel-avgiftsfri" class="pris-grid-celle">
             <label for="sheet-diesel-avgiftsfri-input">Avg.fri diesel</label>
-            <input id="sheet-diesel-avgiftsfri-input" type="text" inputmode="decimal" placeholder="–" autocomplete="off">
-            <button id="sheet-edit-bekreft-diesel-avgiftsfri" class="btn-bekreft-edit" data-type="diesel_avgiftsfri" hidden aria-label="Bekreft avgiftsfri diesel-pris uten endring">✓ Bekreft</button>
+            <div class="pris-input-rad">
+              <input id="sheet-diesel-avgiftsfri-input" type="text" inputmode="decimal" placeholder="–" autocomplete="off">
+              <button id="sheet-edit-bekreft-diesel-avgiftsfri" class="btn-bekreft-rad" data-type="diesel_avgiftsfri" hidden aria-label="Bekreft avg.fri diesel">✓</button>
+            </div>
           </div>
         </div>
         <div id="sheet-edit-status" role="status" aria-live="polite"></div>
         <div class="modal-btns">
           <button id="sheet-edit-avbryt" class="btn-avbryt">Avbryt</button>
-          <button id="sheet-edit-lagre" class="btn-lagre">Lagre pris</button>
         </div>
       </div>
 

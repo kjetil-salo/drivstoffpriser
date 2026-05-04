@@ -776,7 +776,14 @@ def prognose_daglig() -> dict:
             fra_dag[dato] = {}
         fra_dag[dato][time] = fra_dag[dato].get(time, 0) + 1
 
-    # Kumulativ fraaksjon per time, snitt over alle dager
+    # Filtrer til kun samme dagtype som i dag (hverdag vs. helg)
+    is_weekend = now.weekday() >= 5
+    fra_dag = {
+        dato: timer for dato, timer in fra_dag.items()
+        if (datetime.strptime(dato, '%Y-%m-%d').weekday() >= 5) == is_weekend
+    }
+
+    # Kumulativ fraaksjon per time, snitt over alle dager av samme type
     fraaksjoner: dict[int, list[float]] = {h: [] for h in range(24)}
     for timer in fra_dag.values():
         total = sum(timer.values())
@@ -875,6 +882,13 @@ def prognose_daglig_brukere() -> dict:
             fra_dag[dato][time] = set()
         fra_dag[dato][time].add(bruker_id)
 
+    # Filtrer til kun samme dagtype som i dag (hverdag vs. helg)
+    is_weekend = now.weekday() >= 5
+    fra_dag = {
+        dato: timer for dato, timer in fra_dag.items()
+        if (datetime.strptime(dato, '%Y-%m-%d').weekday() >= 5) == is_weekend
+    }
+
     # Beregn kumulativ fraaksjon per time per dag (unike brukere)
     fraaksjoner: dict[int, list[float]] = {h: [] for h in range(24)}
     for timer in fra_dag.values():
@@ -935,6 +949,13 @@ def prognose_daglig_enheter() -> dict:
         if time not in fra_dag[dato]:
             fra_dag[dato][time] = set()
         fra_dag[dato][time].add(device_id)
+
+    # Filtrer til kun samme dagtype som i dag (hverdag vs. helg)
+    is_weekend = now.weekday() >= 5
+    fra_dag = {
+        dato: timer for dato, timer in fra_dag.items()
+        if (datetime.strptime(dato, '%Y-%m-%d').weekday() >= 5) == is_weekend
+    }
 
     fraaksjoner: dict[int, list[float]] = {h: [] for h in range(24)}
     for timer in fra_dag.values():

@@ -397,6 +397,11 @@ def admin():
     <div class="tile-tittel">OCR-bilder</div>
     <div class="tile-info">Bilder, AI-resultat og fasit</div>
   </a>
+  <a href="/admin/kart" class="tile">
+    <div class="tile-ikon">&#128506;&#65039;</div>
+    <div class="tile-tittel">Kart</div>
+    <div class="tile-info">Stasjoner med pris</div>
+  </a>
 {admin_tiles}
 </div>
 </div></body></html>'''
@@ -1964,7 +1969,7 @@ const brukererdagChart = new Chart(document.getElementById('brukererdaggraf'), {
 
 @admin_bp.route('/admin/kart')
 @krever_innlogging
-@krever_admin
+@krever_moderator
 def admin_kart():
     import json
     from datetime import datetime, timezone
@@ -2432,7 +2437,7 @@ document.getElementById('bruk-posisjon').addEventListener('click', () => {{
 
 @admin_bp.route('/admin/kart2')
 @krever_innlogging
-@krever_admin
+@krever_moderator
 def admin_kart2():
     import json
     stasjoner = stasjoner_med_pris_koordinater()

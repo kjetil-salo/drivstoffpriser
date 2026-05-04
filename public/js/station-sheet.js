@@ -59,7 +59,6 @@ const bensin98Input = document.getElementById('sheet-bensin98-input');
 const dieselInput = document.getElementById('sheet-diesel-input');
 const dieselAvgiftsfriInput = document.getElementById('sheet-diesel-avgiftsfri-input');
 const editStatus = document.getElementById('sheet-edit-status');
-const editLagreBtn = document.getElementById('sheet-edit-lagre');
 const editAvbrytBtn = document.getElementById('sheet-edit-avbryt');
 const editBekreftKnapper = [
     document.getElementById('sheet-edit-bekreft-bensin'),
@@ -78,7 +77,6 @@ export function initSheet(onOppdatert) {
     endreBtnEl.addEventListener('click', visEditModus);
     prisContainer.addEventListener('click', håndterBekreftKlikk);
     editAvbrytBtn.addEventListener('click', visVisModus);
-    editLagreBtn.addEventListener('click', lagrePris);
     editBekreftKnapper.forEach(k => k?.addEventListener('click', håndterEditBekreftKlikk));
     forslagBtnEl.addEventListener('click', åpneForslagModal);
     forslagAvbrytEl.addEventListener('click', lukkForslagModal);
@@ -123,22 +121,22 @@ export function initSheet(onOppdatert) {
     navnlagreBtnEl.addEventListener('click', lagreNavn);
     drivstofflagreBtnEl.addEventListener('click', lagreDrivstofftyper);
 
-    const enterLagre = (e) => { if (e.key === 'Enter') lagrePris(); };
-    bensinInput.addEventListener('keydown', enterLagre);
-    bensin98Input.addEventListener('keydown', enterLagre);
-    dieselInput.addEventListener('keydown', enterLagre);
-    dieselAvgiftsfriInput.addEventListener('keydown', enterLagre);
-
     bensinInput.addEventListener('input', autoKomma);
     bensin98Input.addEventListener('input', autoKomma);
     dieselInput.addEventListener('input', autoKomma);
     dieselAvgiftsfriInput.addEventListener('input', autoKomma);
 
-    const markDirty = () => { _inputsDirty = true; };
-    bensinInput.addEventListener('input', markDirty);
-    bensin98Input.addEventListener('input', markDirty);
-    dieselInput.addEventListener('input', markDirty);
-    dieselAvgiftsfriInput.addEventListener('input', markDirty);
+    // Vis bekreft-knapp når brukeren skriver noe i et tomt felt (ingen eksisterende pris)
+    const visBekreftVedInput = (input, type) => {
+        input.addEventListener('input', () => {
+            const knapp = document.getElementById(`sheet-edit-bekreft-${type.replace('_', '-')}`);
+            if (knapp && input.value.trim()) knapp.removeAttribute('hidden');
+        });
+    };
+    visBekreftVedInput(bensinInput, 'bensin');
+    visBekreftVedInput(bensin98Input, 'bensin98');
+    visBekreftVedInput(dieselInput, 'diesel');
+    visBekreftVedInput(dieselAvgiftsfriInput, 'diesel_avgiftsfri');
 
     const selectAll = (e) => e.target.select();
     bensinInput.addEventListener('focus', selectAll);
@@ -222,9 +220,6 @@ export function refreshSheetInnstillinger() {
 }
 
 export function lukkSheet() {
-    if (sheet.classList.contains('edit-modus') && _inputsDirty) {
-        if (!confirm('Prisen er ikke lagret. Vil du lukke uten å lagre?')) return;
-    }
     sheet.classList.remove('open');
     sheet.classList.remove('edit-modus');
     sheet.style.bottom = '';
@@ -295,13 +290,13 @@ function fyllVisning(s) {
 }
 
 function visVisModus() {
-    _inputsDirty = false;
+
     sheet.classList.remove('edit-modus');
     sheet.style.bottom = '';
     viewEl.removeAttribute('hidden');
     editEl.setAttribute('hidden', '');
     visPrisStatus('', null);
-    editLagreBtn.disabled = false;
+    if (aktivStasjon) fyllVisning(aktivStasjon);
 }
 
 function visEditModus() {
@@ -323,11 +318,10 @@ function visEditModus() {
     skjul('sheet-edit-bekreft-bensin98',          aktivStasjon.har_bensin98 !== false && aktivStasjon.bensin98 != null);
     skjul('sheet-edit-bekreft-diesel',            aktivStasjon.har_diesel !== false && aktivStasjon.diesel != null);
     skjul('sheet-edit-bekreft-diesel-avgiftsfri', aktivStasjon.har_diesel_avgiftsfri !== false && aktivStasjon.diesel_avgiftsfri != null);
-    editBekreftKnapper.forEach(k => { if (k) { k.disabled = false; k.classList.remove('bekreftet'); k.textContent = '✓ Bekreft'; } });
+    editBekreftKnapper.forEach(k => { if (k) { k.disabled = false; k.classList.remove('bekreftet'); k.textContent = '✓'; } });
 
     visPrisStatus('', null);
-    editLagreBtn.disabled = false;
-    _inputsDirty = false;
+
     sheet.classList.add('edit-modus');
     viewEl.setAttribute('hidden', '');
     editEl.removeAttribute('hidden');
@@ -344,7 +338,7 @@ function erTouchMobil() {
 }
 
 const _bekreftedeTyper = new Set();
-let _inputsDirty = false;
+
 
 async function håndterBekreftKlikk(e) {
     const knapp = e.target.closest('.btn-bekreft-rad');
@@ -387,32 +381,51 @@ async function håndterEditBekreftKlikk(e) {
     const type = knapp.dataset.type;
     if (!type || !aktivStasjon) return;
 
+    const inputMap = { bensin: bensinInput, bensin98: bensin98Input, diesel: dieselInput, diesel_avgiftsfri: dieselAvgiftsfriInput };
+    const input = inputMap[type];
+    const nyPris = parsePris(input?.value);
+    const harEndret = nyPris !== aktivStasjon[type];
+
     knapp.disabled = true;
     knapp.textContent = '…';
 
-    try {
-        const resultat = await bekreftEnPris(aktivStasjon.id, type);
-        if (resultat?.lagret === false || resultat?.status === 401) {
-            knapp.disabled = false;
-            knapp.textContent = '✓ Bekreft';
-            return;
-        }
-        const _nd = new Date(), _p = n => String(n).padStart(2, '0');
-        const naa = `${_nd.getFullYear()}-${_p(_nd.getMonth()+1)}-${_p(_nd.getDate())} ${_p(_nd.getHours())}:${_p(_nd.getMinutes())}:${_p(_nd.getSeconds())}`;
-        loggOcrVedBekreftelse(aktivStasjon.id, type, aktivStasjon[type]);
-        aktivStasjon = { ...aktivStasjon, [type + '_tidspunkt']: naa };
-        _bekreftedeTyper.add(type);
-        if (onPrisOppdatert) onPrisOppdatert(aktivStasjon);
+    const _nd = new Date(), _p = n => String(n).padStart(2, '0');
+    const naa = () => `${_nd.getFullYear()}-${_p(_nd.getMonth()+1)}-${_p(_nd.getDate())} ${_p(_nd.getHours())}:${_p(_nd.getMinutes())}:${_p(_nd.getSeconds())}`;
+
+    const ferdig = () => {
         knapp.classList.add('bekreftet');
-        knapp.textContent = '✓ Bekreftet';
-        setTimeout(() => {
-            knapp.classList.remove('bekreftet');
-            knapp.textContent = '✓ Bekreft';
-            knapp.disabled = false;
-        }, 2000);
+        knapp.textContent = '✓';
+        setTimeout(() => { knapp.classList.remove('bekreftet'); knapp.textContent = '✓'; knapp.disabled = false; }, 2000);
+    };
+    const avbryt = () => { knapp.disabled = false; knapp.textContent = '✓'; };
+
+    try {
+        if (harEndret) {
+            // Advar ved stor prisendring (>30%)
+            const advarsler = sjekkPrisavvik(aktivStasjon, { [type]: nyPris });
+            if (advarsler.length > 0 && !confirm(advarsler.join('\n') + '\n\nVil du lagre likevel?')) { avbryt(); return; }
+
+            // Lagre ny pris for denne typen alene
+            const sendArgs = { bensin: null, bensin98: null, diesel: null, diesel_avgiftsfri: null, [type]: nyPris };
+            const resultat = await oppdaterPris(aktivStasjon.id, sendArgs.bensin, sendArgs.diesel, sendArgs.bensin98, sendArgs.diesel_avgiftsfri);
+            if (resultat?.status === 401) { avbryt(); return; }
+            loggOcrVedLagring({ stasjon_id: aktivStasjon.id, ...sendArgs });
+            aktivStasjon = { ...aktivStasjon, [type]: nyPris, [type + '_tidspunkt']: naa() };
+            _bekreftedeTyper.add(type);
+            if (onPrisOppdatert) onPrisOppdatert(aktivStasjon);
+            ferdig();
+        } else {
+            // Bekreft gjeldende pris
+            const resultat = await bekreftEnPris(aktivStasjon.id, type);
+            if (resultat?.lagret === false || resultat?.status === 401) { avbryt(); return; }
+            loggOcrVedBekreftelse(aktivStasjon.id, type, aktivStasjon[type]);
+            aktivStasjon = { ...aktivStasjon, [type + '_tidspunkt']: naa() };
+            _bekreftedeTyper.add(type);
+            if (onPrisOppdatert) onPrisOppdatert(aktivStasjon);
+            ferdig();
+        }
     } catch {
-        knapp.disabled = false;
-        knapp.textContent = '✓ Bekreft';
+        avbryt();
     }
 }
 
@@ -569,69 +582,6 @@ async function lagreDrivstofftyper() {
     drivstofflagreBtnEl.textContent = 'Lagre drivstofftyper';
 }
 
-async function lagrePris() {
-    const bensin = parsePris(bensinInput.value);
-    const bensin98 = parsePris(bensin98Input.value);
-    const diesel = parsePris(dieselInput.value);
-    const diesel_avgiftsfri = parsePris(dieselAvgiftsfriInput.value);
-
-    // Finn hvilke priser som faktisk er endret
-    const bensinEndret = bensin !== aktivStasjon.bensin;
-    const bensin98Endret = bensin98 !== aktivStasjon.bensin98;
-    const dieselEndret = diesel !== aktivStasjon.diesel;
-    const diesel_avgiftsfriEndret = diesel_avgiftsfri !== aktivStasjon.diesel_avgiftsfri;
-
-    const noenEndret = bensinEndret || bensin98Endret || dieselEndret || diesel_avgiftsfriEndret;
-    const noenFyltUt = bensinInput.value.trim() !== '' || bensin98Input.value.trim() !== '' || dieselInput.value.trim() !== '' || dieselAvgiftsfriInput.value.trim() !== '';
-    if (!noenFyltUt && !confirm('Fjern alle priser på denne stasjonen?')) return;
-    if (!noenEndret) { visVisModus(); return; }
-
-    // Send kun endrede priser — uendrede får null → backend oppdaterer ikke tidsstempel for dem
-    const sendBensin = bensinEndret ? bensin : null;
-    const sendBensin98 = bensin98Endret ? bensin98 : null;
-    const sendDiesel = dieselEndret ? diesel : null;
-    const sendDiesel_avgiftsfri = diesel_avgiftsfriEndret ? diesel_avgiftsfri : null;
-
-    const advarsler = sjekkPrisavvik(aktivStasjon, { bensin: sendBensin, bensin98: sendBensin98, diesel: sendDiesel, diesel_avgiftsfri: sendDiesel_avgiftsfri });
-    if (advarsler.length > 0 && !confirm(advarsler.join('\n') + '\n\nVil du lagre likevel?')) return;
-
-    editLagreBtn.disabled = true;
-    visPrisStatus('Lagrer …', false);
-
-    try {
-        const resultat = await oppdaterPris(aktivStasjon.id, sendBensin, sendDiesel, sendBensin98, sendDiesel_avgiftsfri);
-        if (resultat?.status === 401) {
-            visPrisStatus('Du må logge inn for å endre priser. <a href="/auth/logg-inn">Logg inn</a>', true);
-            editLagreBtn.disabled = false;
-            return;
-        }
-        // Logg OCR-statistikk ved vellykket lagring
-        loggOcrVedLagring({ stasjon_id: aktivStasjon.id, bensin: sendBensin, diesel: sendDiesel, bensin98: sendBensin98, diesel_avgiftsfri: sendDiesel_avgiftsfri });
-
-        const _nd = new Date(), _p = n => String(n).padStart(2, '0');
-        const naa = `${_nd.getFullYear()}-${_p(_nd.getMonth()+1)}-${_p(_nd.getDate())} ${_p(_nd.getHours())}:${_p(_nd.getMinutes())}:${_p(_nd.getSeconds())}`;
-
-        const oppdatert = {
-            ...aktivStasjon,
-            bensin: bensinEndret ? bensin : aktivStasjon.bensin,
-            bensin98: bensin98Endret ? bensin98 : aktivStasjon.bensin98,
-            diesel: dieselEndret ? diesel : aktivStasjon.diesel,
-            diesel_avgiftsfri: diesel_avgiftsfriEndret ? diesel_avgiftsfri : aktivStasjon.diesel_avgiftsfri,
-            bensin_tidspunkt: bensinEndret ? naa : aktivStasjon.bensin_tidspunkt,
-            diesel_tidspunkt: dieselEndret ? naa : aktivStasjon.diesel_tidspunkt,
-            bensin98_tidspunkt: bensin98Endret ? naa : aktivStasjon.bensin98_tidspunkt,
-            diesel_avgiftsfri_tidspunkt: diesel_avgiftsfriEndret ? naa : aktivStasjon.diesel_avgiftsfri_tidspunkt,
-        };
-        aktivStasjon = oppdatert;
-        fyllVisning(oppdatert);
-        if (onPrisOppdatert) onPrisOppdatert(oppdatert);
-        visPrisStatus('', null);
-        visVisModus();
-    } catch (e) {
-        visPrisStatus(e.message || 'Feil ved lagring. Prøv igjen.', true);
-        editLagreBtn.disabled = false;
-    }
-}
 
 function visPrisStatus(melding, erFeil) {
     if (!melding) { editStatus.style.display = 'none'; return; }

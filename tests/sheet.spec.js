@@ -75,8 +75,14 @@ test('lagre ny pris oppdaterer visning', async ({ page }) => {
     await page.locator('#sheet-endre-btn').click();
 
     await page.locator('#sheet-bensin-input').fill('22.50');
+    await page.locator('#sheet-edit-bekreft-bensin').click();
+    await expect(page.locator('#sheet-edit-bekreft-bensin')).not.toBeDisabled({ timeout: 3000 });
+
     await page.locator('#sheet-diesel-input').fill('21.00');
-    await page.locator('#sheet-edit-lagre').click();
+    await page.locator('#sheet-edit-bekreft-diesel').click();
+    await expect(page.locator('#sheet-edit-bekreft-diesel')).not.toBeDisabled({ timeout: 3000 });
+
+    await page.locator('#sheet-edit-avbryt').click();
 
     // Skal gå tilbake til visning med nye priser
     await expect(page.locator('#sheet-view')).not.toHaveAttribute('hidden', { timeout: 3000 });
