@@ -39,8 +39,23 @@ EOF
 # Vekk Fly.io-instansen og vent til den er klar
 echo "Vekker Fly.io..."
 curl -s -o /dev/null --max-time 30 "https://drivstoffpriser.fly.dev/health" || true
-echo "Venter 30 sekunder..."
-sleep 30
+
+echo "Venter til Fly.io er klar..."
+READY=0
+for attempt in $(seq 1 18); do
+    if curl -fsS -o /dev/null --max-time 10 "https://drivstoffpriser.fly.dev/health"; then
+        READY=1
+        echo "Fly.io er klar etter $attempt sjekk(er)."
+        break
+    fi
+    sleep 5
+done
+
+if [ "$READY" -ne 1 ]; then
+    echo "Fly.io ble ikke klar i tide" >&2
+    rm -f "$TMP_BACKUP"
+    exit 1
+fi
 
 # Send til Fly.io (maks 90 sek, 3 forsøk ved feil)
 HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' \

@@ -295,6 +295,8 @@ Det finnes også utvidede testfiler i [`tests/`](./tests) for nyere API- og DB-f
 
 Databasen synkes automatisk fra Pi til Fly.io hver 4. time (kl 00, 04, 08, 12, 16, 20):
 
+Fly.io er satt opp som cold standby for failover, ikke som alltid-på drift. Maskinen kan derfor sove mellom synk og forespørsler, og første request etter dvale kan bruke litt ekstra tid mens instansen starter.
+
 - **Script:** `/home/kjetil/drivstoffpriser/sync-til-fly.sh`
 - **Cron:** root sin crontab (`0 */4 * * *`)
 - **Logg:** `/tmp/drivstoff-sync.log`
