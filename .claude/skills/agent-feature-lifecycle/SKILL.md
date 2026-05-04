@@ -16,6 +16,16 @@ SQLite på Raspberry Pi, ~2000 daglige brukere. Kunden merker nedetid. Vær kons
 
 ## Prosess
 
+### Steg 0: Kontekst-sjekk
+
+Før implementering starter — spør brukeren:
+
+> «Vil du at jeg starter i en ny, tom konversasjon for å unngå kontekstproblemer underveis?»
+
+Gjør dette alltid hvis featuren involverer flere faser eller store filer (settings.js, list.js, routes_api.py). Lang kontekst kan føre til at tidligere lest kode ikke er tilgjengelig og at feil gjentas.
+
+Hvis brukeren sier ja: stopp her og be dem åpne ny konversasjon og kjøre `/agent-feature-lifecycle` på nytt med samme argument.
+
 ### Steg 1: Analyse
 
 Gjøres i konversasjonen — ikke opprett dokumenter med mindre featuren er kompleks.

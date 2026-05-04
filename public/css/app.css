@@ -328,7 +328,7 @@ html, body {
   border: 1px solid var(--border-color-medium);
   border-radius: var(--radius-sm);
   padding: 6px 8px;
-  font-size: var(--font-sm);
+  font-size: 1rem; /* ≥16px hindrer iOS Safari auto-zoom */
   min-height: 44px;
 }
 
@@ -339,7 +339,7 @@ html, body {
   border: 1px solid var(--border-color-medium);
   border-radius: var(--radius-sm);
   padding: 6px 8px;
-  font-size: var(--font-sm);
+  font-size: 1rem; /* ≥16px hindrer iOS Safari auto-zoom */
   min-height: 44px;
 }
 
