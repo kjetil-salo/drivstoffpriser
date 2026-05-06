@@ -92,7 +92,7 @@ Alle kan se priser. For å rapportere priser trenger du en konto.
 | Geocoding | Photon (komoot.io) |
 | OCR | Tesseract.js i frontend + backend-endepunkt for gjenkjenning/logging |
 | E-post | Resend (passordreset og enkelte adminflyter) |
-| Hosting | Raspberry Pi + Docker + Cloudflare Tunnel |
+| Hosting | Raspberry Pi + Docker + Cloudflare Tunnel — se [docs/infrastruktur.md](docs/infrastruktur.md) |
 | Failover | Fly.io — DB synkes automatisk fra Pi hver 4. time (kl 00, 04, 08, 12, 16, 20) |
 | PWA | Service Worker, manifest, offline-støtte |
 | Tester | pytest (enhetstester), Playwright (E2E) |
