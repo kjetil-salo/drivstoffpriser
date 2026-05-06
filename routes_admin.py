@@ -63,6 +63,12 @@ MORE_POLYGON = [
     [61.90, 6.50], [61.95, 5.80], [62.05, 5.05],
 ]
 
+INDRE_ØSTFOLD_POLYGON = [
+    [59.65, 10.82], [59.73, 11.18], [59.68, 11.52],
+    [59.52, 11.68], [59.28, 11.65], [59.25, 11.20],
+    [59.38, 10.95], [59.55, 10.82], [59.65, 10.82],
+]
+
 
 def _punkt_i_polygon(lat, lon, polygon):
     """Ray casting – avgjør om (lat, lon) er innenfor polygon [[lat,lon],...]."""
@@ -81,6 +87,8 @@ def _punkt_i_polygon(lat, lon, polygon):
 def _region_for(lat, lon):
     if lat is None or lon is None:
         return "Ukjent"
+    if _punkt_i_polygon(lat, lon, INDRE_ØSTFOLD_POLYGON):
+        return "Indre Østfold"
     for navn, _, lat_min, lat_max, lon_min, lon_max in REGIONER_RECT:
         if lat_min <= lat <= lat_max and lon_min <= lon <= lon_max:
             return navn
@@ -2005,6 +2013,12 @@ def admin_kart():
         'coords': MORE_POLYGON,
         'antall24t': region_tell_24t.get('Møre og Romsdal', 0),
     })
+    regioner_js.append({
+        'navn': 'Indre Østfold', 'farge': '#FF6F00',
+        'type': 'polygon',
+        'coords': INDRE_ØSTFOLD_POLYGON,
+        'antall24t': region_tell_24t.get('Indre Østfold', 0),
+    })
     region_tell_sorted = sorted(
         [(k, v) for k, v in region_tell_24t.items() if k not in ('Ukjent', 'Annet')],
         key=lambda x: -x[1]
@@ -2056,7 +2070,7 @@ def admin_kart():
 <div id="map"></div>
 <div id="regionpanel">
   <h3>Priser siste 24t per region</h3>
-  <table>{''.join(f"<tr><td><span class='reg-dot' style='background:{farge}'></span>{navn}</td><td>{region_tell_24t.get(navn,0)}</td></tr>" for navn, farge, *_ in REGIONER_RECT + [("Møre og Romsdal", "#FFC107")] if region_tell_24t.get(navn, 0) > 0)}</table>
+  <table>{''.join(f"<tr><td><span class='reg-dot' style='background:{farge}'></span>{navn}</td><td>{region_tell_24t.get(navn,0)}</td></tr>" for navn, farge, *_ in REGIONER_RECT + [("Møre og Romsdal", "#FFC107"), ("Indre Østfold", "#FF6F00")] if region_tell_24t.get(navn, 0) > 0)}</table>
 </div>
 <script src="/js/vendor/leaflet.js"></script>
 <script>
