@@ -9,7 +9,7 @@ let stasjonOnKlikk = null;
 let sisteKartvisning = null;
 let ruteLag = null;
 let ruteAktiv = false;
-const MAKS_BILLIGST_ALDER_TIMER = 24 * 7;
+const MAKS_BILLIGST_ALDER_TIMER = 24;
 
 export function initMap(containerId, startPos) {
     const senter = startPos ? [startPos.lat, startPos.lon] : [59.91, 10.75];
@@ -183,7 +183,7 @@ export function visStasjoner(stasjoner, onKlikk) {
 
 function finnBilligstePerType(stasjoner) {
     const inn = getInnstillinger();
-    const result = new Map(); // type → stasjonId
+    const result = new Map(); // type → Set<stasjonId>
     const typer = [
         inn.bensin             ? 'bensin'             : null,
         inn.bensin98           ? 'bensin98'           : null,
@@ -191,19 +191,22 @@ function finnBilligstePerType(stasjoner) {
         inn.diesel_avgiftsfri  ? 'diesel_avgiftsfri'  : null,
     ].filter(Boolean);
     for (const type of typer) {
-        let minPris = Infinity, minId = null;
+        let minPris = Infinity;
+        const minIds = new Set();
         for (const s of stasjoner) {
             const pris = aktuellPris(s, type);
-            if (pris != null && pris < minPris) { minPris = pris; minId = s.id; }
+            if (pris == null) continue;
+            if (pris < minPris) { minPris = pris; minIds.clear(); minIds.add(s.id); }
+            else if (pris === minPris) { minIds.add(s.id); }
         }
-        if (minId != null) result.set(type, minId);
+        if (minIds.size) result.set(type, minIds);
     }
     return result;
 }
 
 function billigsteTyperForStasjon(s, billigstePerType) {
     const typer = [];
-    billigstePerType.forEach((id, type) => { if (id === s.id) typer.push(type); });
+    billigstePerType.forEach((ids, type) => { if (ids.has(s.id)) typer.push(type); });
     return typer;
 }
 
@@ -304,7 +307,7 @@ function oppdaterMarkerTooltip(marker, s, billigsteTyper) {
         el.classList.toggle('billigst-tooltip', erBilligst);
         const farge = prisFarge(s);
         ['green', 'orange', 'red'].forEach(f =>
-            el.classList.toggle(`tooltip-${f}`, !erBilligst && farge === f));
+            el.classList.toggle(`tooltip-${f}`, farge === f));
     }
 }
 
@@ -324,7 +327,7 @@ function lagMarker(s, billigsteTyper = []) {
         marker.bindTooltip(byggTooltip(s, billigsteTyper), {
             permanent: true,
             direction: 'top',
-            className: erBilligst ? 'station-tooltip billigst-tooltip' : `station-tooltip tooltip-${prisFarge(s)}`,
+            className: `station-tooltip${erBilligst ? ' billigst-tooltip' : ''} tooltip-${prisFarge(s)}`,
             offset: [0, -38],
         });
     }

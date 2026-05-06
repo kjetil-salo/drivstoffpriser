@@ -604,7 +604,6 @@ html, body {
 
 .billigst-tooltip {
   background: #15803d !important;
-  border: 2px solid #4ade80 !important;
   box-shadow: 0 0 0 2px rgba(74,222,128,0.25), 0 6px 20px rgba(0,0,0,0.5) !important;
   padding: 5px 10px !important;
   z-index: 10000 !important;
@@ -1070,6 +1069,19 @@ html, body {
 .pris-alder-tekst.alder-utdatert { color: var(--color-muted); }
 .pris-alder-tekst.alder-ingen { display: none; }
 
+.pris-alder-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-top: 3px;
+}
+.pris-alder-dot.alder-fersk    { background: var(--color-success); }
+.pris-alder-dot.alder-gammel   { background: var(--color-fuel); }
+.pris-alder-dot.alder-utdatert { background: var(--color-danger, #ef4444); }
+.pris-alder-dot.alder-kritisk  { background: var(--color-danger, #ef4444); }
+.pris-alder-dot.alder-ingen    { display: none; }
+
 .sk-endre-btn {
   background: transparent;
   border: 1px solid var(--border-color-medium);
@@ -1502,10 +1514,11 @@ html, body {
 }
 #stasjon-sheet.open { transform: translateY(0); }
 #stasjon-sheet.edit-modus {
-  max-height: 92dvh;
+  max-height: 100dvh;
+  border-radius: 0;
 }
 #stasjon-sheet.edit-modus #sheet-scroll {
-  max-height: calc(92dvh - 20px);
+  max-height: calc(100dvh - 20px);
 }
 
 .sheet-handle {
@@ -1599,11 +1612,22 @@ html, body {
 
 .sheet-pris-rad-label {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
   font-size: var(--font-sm);
   color: var(--color-muted);
   min-width: 7rem;
+}
+.sheet-pris-rad-label-tekster {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.sheet-pris-ts {
+  font-size: 0.7rem;
+  color: var(--color-muted);
+  opacity: 0.75;
+  line-height: 1.2;
 }
 
 .sheet-pris-verdi {
@@ -1652,6 +1676,11 @@ html, body {
   color: #fff;
   border-color: var(--color-success);
   animation: bekreft-puls 0.35s ease;
+}
+.btn-bekreft-rad.staged {
+  background: var(--color-success);
+  color: #fff;
+  border-color: var(--color-success);
 }
 
 .btn-bekreft-rad-placeholder {
@@ -1911,13 +1940,19 @@ html, body {
   background: rgba(148, 163, 184, 0.12);
   border: 1.5px solid var(--border-color-medium);
   border-radius: var(--radius-sm);
-  color: var(--color-text);
+  color: var(--color-muted);
   font-size: 1.35rem;
   font-weight: 600;
   padding: 14px 8px;
   text-align: center;
   outline: none;
   -webkit-appearance: none;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.pris-grid-celle input.pris-staged {
+  color: var(--color-text);
+  border-color: var(--color-success);
+  background: rgba(34,197,94,0.06);
 }
 
 .pris-grid-celle input::placeholder {
