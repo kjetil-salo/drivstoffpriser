@@ -387,20 +387,10 @@ def admin():
     <div class="tile-tittel">Toppliste</div>
     <div class="tile-info">Topp 50 bidragsytere</div>
   </a>
-  <a href="/admin/drivstofftyper" class="tile">
-    <div class="tile-ikon">&#9981;</div>
-    <div class="tile-tittel">Drivstofftyper</div>
-    <div class="tile-info">Aktiver/deaktiver per stasjon</div>
-  </a>
   <a href="/admin/ocr-bilder" class="tile">
     <div class="tile-ikon">&#128247;</div>
     <div class="tile-tittel">OCR-bilder</div>
     <div class="tile-info">Bilder, AI-resultat og fasit</div>
-  </a>
-  <a href="/admin/kart" class="tile">
-    <div class="tile-ikon">&#128506;&#65039;</div>
-    <div class="tile-tittel">Kart</div>
-    <div class="tile-info">Stasjoner med pris</div>
   </a>
 {admin_tiles}
 </div>
