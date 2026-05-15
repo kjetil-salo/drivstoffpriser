@@ -60,12 +60,79 @@ const dieselInput = document.getElementById('sheet-diesel-input');
 const dieselAvgiftsfriInput = document.getElementById('sheet-diesel-avgiftsfri-input');
 const editStatus = document.getElementById('sheet-edit-status');
 const editAvbrytBtn = document.getElementById('sheet-edit-avbryt');
+
+// Tid-hjul (power users)
+const tidSidenEl = document.getElementById('sheet-tid-siden');
+const hjulTimerEl = document.getElementById('hjul-timer');
+const hjulMinutterEl = document.getElementById('hjul-minutter');
+const hjulTimerContainerEl = document.getElementById('hjul-timer-container');
+const hjulMinutterContainerEl = document.getElementById('hjul-minutter-container');
 const editBekreftKnapper = [
     document.getElementById('sheet-edit-bekreft-bensin'),
     document.getElementById('sheet-edit-bekreft-bensin98'),
     document.getElementById('sheet-edit-bekreft-diesel'),
     document.getElementById('sheet-edit-bekreft-diesel-avgiftsfri'),
 ];
+const editBekreftAlleBtn = document.getElementById('sheet-edit-bekreft-alle');
+
+// Module-level input map og staged-tilstand
+const inputMap = { bensin: bensinInput, bensin98: bensin98Input, diesel: dieselInput, diesel_avgiftsfri: dieselAvgiftsfriInput };
+const _stagedPriser = new Set(); // typer som er klare for lagring
+
+function markerStaged(type) {
+    _stagedPriser.add(type);
+    inputMap[type]?.classList.add('pris-staged');
+    document.getElementById(`sheet-edit-bekreft-${type.replace('_', '-')}`)?.classList.add('staged');
+}
+
+function fjernStaged(type) {
+    _stagedPriser.delete(type);
+    inputMap[type]?.classList.remove('pris-staged');
+    document.getElementById(`sheet-edit-bekreft-${type.replace('_', '-')}`)?.classList.remove('staged');
+}
+
+const _HJUL_ITEM_H = 44;
+const _HJUL_TIMER_VERDIER  = [0,1,2,3,4,5,6,7,8,9,10,11,12];
+const _HJUL_MINUTT_VERDIER = [0,5,10,15,20,25,30,35,40,45,50,55];
+
+function lagHjulListe(el, verdier) {
+    el.innerHTML = '';
+    const ghost = () => { const d = document.createElement('div'); d.className = 'tid-hjul-item tid-hjul-ghost'; d.textContent = '00'; return d; };
+    el.appendChild(ghost());
+    verdier.forEach(v => {
+        const d = document.createElement('div');
+        d.className = 'tid-hjul-item';
+        d.textContent = String(v).padStart(2, '0');
+        el.appendChild(d);
+    });
+    el.appendChild(ghost());
+}
+
+function getHjulVerdi(el, verdier) {
+    const idx = Math.round(el.scrollTop / _HJUL_ITEM_H);
+    return verdier[Math.max(0, Math.min(verdier.length - 1, idx))] ?? 0;
+}
+
+const _ROLLE_NIVAA = { power: 1, moderator: 2, admin: 3 };
+function harRolle(rolle) {
+    if (window.__erAdmin) return true;
+    const roller = window.__roller || [];
+    const krevd = _ROLLE_NIVAA[rolle];
+    if (krevd === undefined) return roller.includes(rolle);
+    return roller.some(r => (_ROLLE_NIVAA[r] ?? 0) >= krevd);
+}
+
+function getTidSidenMinutter() {
+    const t = getHjulVerdi(hjulTimerEl, _HJUL_TIMER_VERDIER);
+    const m = getHjulVerdi(hjulMinutterEl, _HJUL_MINUTT_VERDIER);
+    return t * 60 + m;
+}
+
+function oppdaterTidSidenAktiv() {
+    const aktiv = getTidSidenMinutter() > 0;
+    hjulTimerContainerEl?.classList.toggle('aktiv', aktiv);
+    hjulMinutterContainerEl?.classList.toggle('aktiv', aktiv);
+}
 
 export function initSheet(onOppdatert) {
     onPrisOppdatert = onOppdatert;
@@ -77,7 +144,14 @@ export function initSheet(onOppdatert) {
     endreBtnEl.addEventListener('click', visEditModus);
     prisContainer.addEventListener('click', håndterBekreftKlikk);
     editAvbrytBtn.addEventListener('click', visVisModus);
-    editBekreftKnapper.forEach(k => k?.addEventListener('click', håndterEditBekreftKlikk));
+    editBekreftKnapper.forEach(k => k?.addEventListener('click', () => {
+        const type = k.dataset.type;
+        if (type) markerStaged(type);
+    }));
+    editBekreftAlleBtn.addEventListener('click', lagreAlleStaged);
+    lagHjulListe(hjulTimerEl, _HJUL_TIMER_VERDIER);
+    lagHjulListe(hjulMinutterEl, _HJUL_MINUTT_VERDIER);
+    [hjulTimerEl, hjulMinutterEl].forEach(el => el?.addEventListener('scroll', oppdaterTidSidenAktiv, { passive: true }));
     forslagBtnEl.addEventListener('click', åpneForslagModal);
     forslagAvbrytEl.addEventListener('click', lukkForslagModal);
     forslagBackdropEl.addEventListener('click', lukkForslagModal);
@@ -96,10 +170,10 @@ export function initSheet(onOppdatert) {
     // OCR: kamera-prisgjenkjenning for admin/moderator
     initOcr(
         (priser) => {
-            if (priser.bensin != null) bensinInput.value = formatPrisInput(priser.bensin);
-            if (priser.bensin98 != null) bensin98Input.value = formatPrisInput(priser.bensin98);
-            if (priser.diesel != null) dieselInput.value = formatPrisInput(priser.diesel);
-            if (priser.diesel_avgiftsfri != null) dieselAvgiftsfriInput.value = formatPrisInput(priser.diesel_avgiftsfri);
+            if (priser.bensin != null) { bensinInput.value = formatPrisInput(priser.bensin); markerStaged('bensin'); }
+            if (priser.bensin98 != null) { bensin98Input.value = formatPrisInput(priser.bensin98); markerStaged('bensin98'); }
+            if (priser.diesel != null) { dieselInput.value = formatPrisInput(priser.diesel); markerStaged('diesel'); }
+            if (priser.diesel_avgiftsfri != null) { dieselAvgiftsfriInput.value = formatPrisInput(priser.diesel_avgiftsfri); markerStaged('diesel_avgiftsfri'); }
             // Advarsel hvis gjenkjent kjede ikke matcher stasjonens kjede
             if (priser.kjede && aktivStasjon?.kjede && priser.kjede.toLowerCase() !== aktivStasjon.kjede.toLowerCase()) {
                 const ocrStatus = document.getElementById('sheet-ocr-status');
@@ -126,17 +200,22 @@ export function initSheet(onOppdatert) {
     dieselInput.addEventListener('input', autoKomma);
     dieselAvgiftsfriInput.addEventListener('input', autoKomma);
 
-    // Vis bekreft-knapp når brukeren skriver noe i et tomt felt (ingen eksisterende pris)
-    const visBekreftVedInput = (input, type) => {
+    // Stage pris og vis bekreft-knapp når brukeren skriver
+    const stagingPåInput = (input, type) => {
         input.addEventListener('input', () => {
             const knapp = document.getElementById(`sheet-edit-bekreft-${type.replace('_', '-')}`);
-            if (knapp && input.value.trim()) knapp.removeAttribute('hidden');
+            if (input.value.trim()) {
+                knapp?.removeAttribute('hidden');
+                markerStaged(type);
+            } else {
+                fjernStaged(type);
+            }
         });
     };
-    visBekreftVedInput(bensinInput, 'bensin');
-    visBekreftVedInput(bensin98Input, 'bensin98');
-    visBekreftVedInput(dieselInput, 'diesel');
-    visBekreftVedInput(dieselAvgiftsfriInput, 'diesel_avgiftsfri');
+    stagingPåInput(bensinInput, 'bensin');
+    stagingPåInput(bensin98Input, 'bensin98');
+    stagingPåInput(dieselInput, 'diesel');
+    stagingPåInput(dieselAvgiftsfriInput, 'diesel_avgiftsfri');
 
     const selectAll = (e) => e.target.select();
     bensinInput.addEventListener('focus', selectAll);
@@ -219,6 +298,11 @@ export function refreshSheetInnstillinger() {
     if (aktivStasjon) fyllVisning(aktivStasjon);
 }
 
+export function åpneEditModus(stasjon) {
+    visStasjonSheet(stasjon);
+    visEditModus();
+}
+
 export function lukkSheet() {
     sheet.classList.remove('open');
     sheet.classList.remove('edit-modus');
@@ -271,11 +355,15 @@ function fyllVisning(s) {
         const rabattHtml = harRabatt && t.v != null
             ? `<span class="sheet-rabatt-info" title="Råpris: ${formatPris(t.v)} kr">din pris</span>`
             : '';
+        const tidTekst = t.v != null && t.ts ? formaterPrisTid(t.ts) : '';
         return `
         <div class="sheet-pris-rad">
             <div class="sheet-pris-rad-label">
                 ${t.v != null ? `<span class="pris-alder-dot ${prisAlderKlasse(t.ts)}"></span>` : ''}
-                <span>${t.label}</span>${rabattHtml}
+                <div class="sheet-pris-rad-label-tekster">
+                    <span>${t.label}</span>${rabattHtml}
+                    ${tidTekst ? `<span class="sheet-pris-ts">${tidTekst}</span>` : ''}
+                </div>
             </div>
             <div class="sheet-pris-verdi ${t.v == null ? 'ingen' : ''}">${prisVises}</div>
             ${innlogget && t.v != null
@@ -284,15 +372,7 @@ function fyllVisning(s) {
         </div>`;
     }).join('');
 
-    const nyesteTidspunkt = [s.bensin_tidspunkt, s.diesel_tidspunkt, s.bensin98_tidspunkt, s.diesel_avgiftsfri_tidspunkt]
-        .filter(Boolean)
-        .reduce((a, b) => a > b ? a : b, null);
-    if (nyesteTidspunkt) {
-        tidEl.textContent = 'Sist oppdatert: ' + formaterTid(nyesteTidspunkt);
-        tidEl.style.display = '';
-    } else {
-        tidEl.style.display = 'none';
-    }
+    tidEl.style.display = 'none';
 }
 
 function visVisModus() {
@@ -324,7 +404,19 @@ function visEditModus() {
     skjul('sheet-edit-bekreft-bensin98',          aktivStasjon.har_bensin98 !== false && aktivStasjon.bensin98 != null);
     skjul('sheet-edit-bekreft-diesel',            aktivStasjon.har_diesel !== false && aktivStasjon.diesel != null);
     skjul('sheet-edit-bekreft-diesel-avgiftsfri', aktivStasjon.har_diesel_avgiftsfri !== false && aktivStasjon.diesel_avgiftsfri != null);
-    editBekreftKnapper.forEach(k => { if (k) { k.disabled = false; k.classList.remove('bekreftet'); k.textContent = '✓'; } });
+    editBekreftKnapper.forEach(k => { if (k) { k.disabled = false; k.classList.remove('bekreftet', 'staged'); k.textContent = '✓'; } });
+    _stagedPriser.clear();
+    Object.values(inputMap).forEach(i => i.classList.remove('pris-staged'));
+    editBekreftAlleBtn.disabled = false;
+    editBekreftAlleBtn.textContent = 'Bekreft';
+
+    const erPowerUser = harRolle('power');
+    tidSidenEl?.toggleAttribute('hidden', !erPowerUser);
+    if (erPowerUser) {
+        if (hjulTimerEl) hjulTimerEl.scrollTop = 0;
+        if (hjulMinutterEl) hjulMinutterEl.scrollTop = 0;
+        oppdaterTidSidenAktiv();
+    }
 
     visPrisStatus('', null);
 
@@ -368,7 +460,7 @@ async function håndterBekreftKlikk(e) {
             return;
         }
         const _nd = new Date(), _p = n => String(n).padStart(2, '0');
-        const naa = `${_nd.getFullYear()}-${_p(_nd.getMonth()+1)}-${_p(_nd.getDate())} ${_p(_nd.getHours())}:${_p(_nd.getMinutes())}:${_p(_nd.getSeconds())}`;
+        const naa = `${_nd.getUTCFullYear()}-${_p(_nd.getUTCMonth()+1)}-${_p(_nd.getUTCDate())} ${_p(_nd.getUTCHours())}:${_p(_nd.getUTCMinutes())}:${_p(_nd.getUTCSeconds())}`;
 
         const tidspunktFelt = type + '_tidspunkt';
         loggOcrVedBekreftelse(aktivStasjon.id, type, aktivStasjon[type]);
@@ -382,60 +474,77 @@ async function håndterBekreftKlikk(e) {
     }
 }
 
-async function håndterEditBekreftKlikk(e) {
-    const knapp = e.currentTarget;
-    const type = knapp.dataset.type;
-    if (!type || !aktivStasjon) return;
+async function lagreAlleStaged() {
+    if (!aktivStasjon) return;
+    if (_stagedPriser.size === 0) {
+        visPrisStatus('Ingen priser er merket for lagring. Trykk ✓ ved siden av en pris eller endre verdien.', true);
+        return;
+    }
 
-    const inputMap = { bensin: bensinInput, bensin98: bensin98Input, diesel: dieselInput, diesel_avgiftsfri: dieselAvgiftsfriInput };
-    const input = inputMap[type];
-    const nyPris = parsePris(input?.value);
-    const harEndret = nyPris !== aktivStasjon[type];
+    const btn = editBekreftAlleBtn;
+    btn.disabled = true;
+    btn.textContent = '…';
 
-    knapp.disabled = true;
-    knapp.textContent = '…';
+    const typer = ['bensin', 'bensin98', 'diesel', 'diesel_avgiftsfri'];
 
-    const _nd = new Date(), _p = n => String(n).padStart(2, '0');
-    const naa = () => `${_nd.getFullYear()}-${_p(_nd.getMonth()+1)}-${_p(_nd.getDate())} ${_p(_nd.getHours())}:${_p(_nd.getMinutes())}:${_p(_nd.getSeconds())}`;
+    // Sjekk prisavvik for alle endrede priser samlet
+    const endringer = {};
+    for (const type of typer) {
+        if (!_stagedPriser.has(type)) continue;
+        const nyPris = parsePris(inputMap[type]?.value);
+        if (nyPris !== null && nyPris !== aktivStasjon[type]) endringer[type] = nyPris;
+    }
+    const advarsler = sjekkPrisavvik(aktivStasjon, endringer);
+    if (advarsler.length > 0 && !confirm(advarsler.join('\n') + '\n\nVil du lagre likevel?')) {
+        btn.disabled = false;
+        btn.textContent = 'Bekreft';
+        return;
+    }
 
-    const ferdig = () => {
-        knapp.classList.add('bekreftet');
-        knapp.textContent = '✓';
-        setTimeout(() => { knapp.classList.remove('bekreftet'); knapp.textContent = '✓'; knapp.disabled = false; }, 2000);
-    };
-    const avbryt = () => { knapp.disabled = false; knapp.textContent = '✓'; };
+    const minutter_siden = getTidSidenMinutter();
+    const _nd = new Date(Date.now() - minutter_siden * 60000), _p = n => String(n).padStart(2, '0');
+    const naa = () => `${_nd.getUTCFullYear()}-${_p(_nd.getUTCMonth()+1)}-${_p(_nd.getUTCDate())} ${_p(_nd.getUTCHours())}:${_p(_nd.getUTCMinutes())}:${_p(_nd.getUTCSeconds())}`;
 
-    try {
-        if (harEndret) {
-            // Advar ved stor prisendring (>30%)
-            const advarsler = sjekkPrisavvik(aktivStasjon, { [type]: nyPris });
-            if (advarsler.length > 0 && !confirm(advarsler.join('\n') + '\n\nVil du lagre likevel?')) { avbryt(); return; }
+    let feil = false;
+    const ocrLoggPriser = { stasjon_id: aktivStasjon.id };
+    for (const type of typer) {
+        if (!_stagedPriser.has(type)) continue;
+        const input = inputMap[type];
+        const nyPris = parsePris(input?.value);
+        const harEndret = nyPris !== null && nyPris !== aktivStasjon[type];
 
-            // Lagre ny pris for denne typen alene
-            const sendArgs = { bensin: null, bensin98: null, diesel: null, diesel_avgiftsfri: null, [type]: nyPris };
-            const resultat = await oppdaterPris(aktivStasjon.id, sendArgs.bensin, sendArgs.diesel, sendArgs.bensin98, sendArgs.diesel_avgiftsfri);
-            if (resultat?.status === 401) { avbryt(); return; }
-            loggOcrVedLagring({ stasjon_id: aktivStasjon.id, ...sendArgs });
-            aktivStasjon = { ...aktivStasjon, [type]: nyPris, [type + '_tidspunkt']: naa() };
-            _bekreftedeTyper.add(type);
-            if (onPrisOppdatert) onPrisOppdatert(aktivStasjon);
-            ferdig();
-        } else {
-            // Bekreft gjeldende pris
-            const resultat = await bekreftEnPris(aktivStasjon.id, type);
-            if (resultat?.lagret === false || resultat?.status === 401) { avbryt(); return; }
-            loggOcrVedBekreftelse(aktivStasjon.id, type, aktivStasjon[type]);
-            aktivStasjon = { ...aktivStasjon, [type + '_tidspunkt']: naa() };
-            _bekreftedeTyper.add(type);
-            if (onPrisOppdatert) onPrisOppdatert(aktivStasjon);
-            ferdig();
+        try {
+            if (harEndret) {
+                const sendArgs = { bensin: null, bensin98: null, diesel: null, diesel_avgiftsfri: null, [type]: nyPris };
+                const resultat = await oppdaterPris(aktivStasjon.id, sendArgs.bensin, sendArgs.diesel, sendArgs.bensin98, sendArgs.diesel_avgiftsfri, minutter_siden);
+                if (resultat?.status === 401) { feil = true; break; }
+                ocrLoggPriser[type] = nyPris;
+                aktivStasjon = { ...aktivStasjon, [type]: nyPris, [type + '_tidspunkt']: naa() };
+                _bekreftedeTyper.add(type);
+                if (onPrisOppdatert) onPrisOppdatert(aktivStasjon);
+            } else if (aktivStasjon[type] != null) {
+                const resultat = await bekreftEnPris(aktivStasjon.id, type);
+                if (resultat?.status === 401) { feil = true; break; }
+                if (resultat?.lagret === false) continue;
+                ocrLoggPriser[type] = aktivStasjon[type];
+                aktivStasjon = { ...aktivStasjon, [type + '_tidspunkt']: naa() };
+                _bekreftedeTyper.add(type);
+                if (onPrisOppdatert) onPrisOppdatert(aktivStasjon);
+            }
+        } catch {
+            feil = true;
         }
-    } catch {
-        avbryt();
+    }
+    loggOcrVedLagring(ocrLoggPriser);
+
+    if (feil) {
+        btn.textContent = 'Feil!';
+        setTimeout(() => { btn.disabled = false; btn.textContent = 'Bekreft'; }, 1500);
+    } else {
+        btn.textContent = 'Lagret!';
+        setTimeout(() => { btn.disabled = false; btn.textContent = 'Bekreft'; visVisModus(); }, 1000);
     }
 }
-
-
 
 function åpneForslagModal() {
     forslagKjedeEl.value = aktivStasjon.kjede || '';
@@ -671,6 +780,25 @@ function parsePris(v) {
 
 function avstandTekst(m) {
     return m < 1000 ? `${m} m` : `${(m / 1000).toFixed(1)} km`;
+}
+
+function formaterPrisTid(tidStr) {
+    try {
+        const d = new Date(tidStr.replace(' ', 'T') + 'Z');
+        const diffMs = Date.now() - d.getTime();
+        const min = Math.floor(diffMs / 60000);
+        const timer = Math.floor(diffMs / 3600000);
+        const dager = Math.floor(diffMs / 86400000);
+        if (min < 1) return 'akkurat nå';
+        if (min < 60) return `${min} min siden`;
+        if (timer < 24) return `${timer} t siden`;
+        const erPrivileged = window.__erAdmin || (window.__roller || []).includes('moderator');
+        if (!erPrivileged) return 'over 24 t siden';
+        if (dager < 7) return `for ${dager} dag${dager === 1 ? '' : 'er'} siden`;
+        return d.toLocaleDateString('no', { day: 'numeric', month: 'short', year: 'numeric' });
+    } catch {
+        return '';
+    }
 }
 
 function formaterTid(tidStr) {
