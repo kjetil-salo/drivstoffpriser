@@ -4,6 +4,21 @@ import os
 import threading
 from contextlib import contextmanager
 from datetime import UTC, datetime
+from zoneinfo import ZoneInfo
+
+_oslo = ZoneInfo('Europe/Oslo')
+
+
+def fra_db_ts(ts_str: str) -> datetime:
+    """Parse DB-tidsstempel ('YYYY-MM-DD HH:MM:SS', UTC) til aware UTC datetime."""
+    dt = datetime.fromisoformat(ts_str)
+    return dt if dt.tzinfo is not None else dt.replace(tzinfo=UTC)
+
+
+def til_oslo(ts_str: str) -> datetime:
+    """Parse DB-tidsstempel og konverter til Oslo-tid."""
+    return fra_db_ts(ts_str).astimezone(_oslo)
+
 
 _default_db = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'drivstoff.db')
 DB_PATH = os.environ.get('DB_PATH', _default_db)
@@ -73,9 +88,7 @@ def get_conn():
 
 
 def _sekunder_siden_db_tidspunkt(ts_str: str) -> float:
-    # SQLite datetime('now') lagres i UTC uten tz-info.
-    ts = datetime.strptime(ts_str, '%Y-%m-%d %H:%M:%S').replace(tzinfo=UTC)
-    return (datetime.now(UTC) - ts).total_seconds()
+    return (datetime.now(UTC) - fra_db_ts(ts_str)).total_seconds()
 
 
 def init_db():
@@ -118,6 +131,7 @@ def init_db():
                 ts        TEXT DEFAULT (datetime('now'))
             );
             CREATE INDEX IF NOT EXISTS idx_stasjoner_pos ON stasjoner(lat, lon);
+            CREATE INDEX IF NOT EXISTS idx_priser_stasjon ON priser(stasjon_id, id);
             CREATE INDEX IF NOT EXISTS idx_visninger_device ON visninger(device_id);
             CREATE INDEX IF NOT EXISTS idx_visninger_ts ON visninger(ts);
             CREATE TABLE IF NOT EXISTS brukere (
@@ -703,10 +717,7 @@ def prisoppdateringer_rullende_24t_uke() -> list:
         ).fetchall()
     timestamps = []
     for (ts_str,) in rows:
-        t = datetime.fromisoformat(ts_str)
-        if t.tzinfo is None:
-            t = t.replace(tzinfo=timezone.utc)
-        timestamps.append(t.timestamp())
+        timestamps.append(fra_db_ts(ts_str).timestamp())
     result = []
     for i in range(10 * 24, -1, -1):
         slot = now - timedelta(hours=i)
@@ -765,8 +776,6 @@ def prognose_daglig() -> dict:
     beregn gjennomsnittlig kumulativ fraaksjon ved nåværende time,
     og ekstrapoler ut fra hittil i dag.
     """
-    from zoneinfo import ZoneInfo
-    _oslo = ZoneInfo('Europe/Oslo')
     now = datetime.now(_oslo)
     current_hour = now.hour
 
@@ -785,7 +794,7 @@ def prognose_daglig() -> dict:
     fra_dag: dict[str, dict[int, int]] = {}
     for (ts,) in rader:
         try:
-            lokal = datetime.fromisoformat(ts).replace(tzinfo=UTC).astimezone(_oslo)
+            lokal = til_oslo(ts)
         except Exception:
             continue
         dato = lokal.strftime('%Y-%m-%d')
@@ -866,8 +875,6 @@ def _beregn_fraaksjonsprofil(rader_oslo: list[tuple[str, int]]) -> dict:
 
 def prognose_daglig_brukere() -> dict:
     """Prognose for dagens antall unike bidragsytere (alle brukere inkl. Kjetil)."""
-    from zoneinfo import ZoneInfo
-    _oslo = ZoneInfo('Europe/Oslo')
     now = datetime.now(_oslo)
     current_hour = now.hour
 
@@ -889,7 +896,7 @@ def prognose_daglig_brukere() -> dict:
     fra_dag: dict[str, dict[int, set]] = {}
     for ts, bruker_id in rader:
         try:
-            lokal = datetime.fromisoformat(ts).replace(tzinfo=UTC).astimezone(_oslo)
+            lokal = til_oslo(ts)
         except Exception:
             continue
         dato = lokal.strftime('%Y-%m-%d')
@@ -936,8 +943,6 @@ def prognose_daglig_brukere() -> dict:
 
 def prognose_daglig_enheter() -> dict:
     """Prognose for dagens antall unike enheter (device_id fra visninger)."""
-    from zoneinfo import ZoneInfo
-    _oslo = ZoneInfo('Europe/Oslo')
     now = datetime.now(_oslo)
     current_hour = now.hour
 
@@ -957,7 +962,7 @@ def prognose_daglig_enheter() -> dict:
     fra_dag: dict[str, dict[int, set]] = {}
     for ts, device_id in rader:
         try:
-            lokal = datetime.fromisoformat(ts).replace(tzinfo=UTC).astimezone(_oslo)
+            lokal = til_oslo(ts)
         except Exception:
             continue
         dato = lokal.strftime('%Y-%m-%d')
