@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v130';
+const CACHE_VERSION = 'v131';
 const STATIC_CACHE = `drivstoff-static-${CACHE_VERSION}`;
 const DATA_CACHE = `drivstoff-data-${CACHE_VERSION}`;
 
@@ -69,7 +69,7 @@ self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
 
   // API-kall: network first, fall tilbake til cache
-  if (url.pathname.startsWith('/api/')) {
+  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/admin/api/')) {
     e.respondWith(networkFirstThenCache(e.request));
     return;
   }
