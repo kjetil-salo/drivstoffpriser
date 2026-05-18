@@ -60,7 +60,7 @@ def _normaliser_eksisterende_kjeder(conn):
 
 @contextmanager
 def get_conn():
-    conn = sqlite3.connect(DB_PATH, timeout=10)
+    conn = sqlite3.connect(DB_PATH, timeout=30)
     conn.execute("PRAGMA journal_mode=WAL")
     try:
         yield conn
@@ -284,6 +284,17 @@ def _migrer_db():
         if 'stasjon_id' not in ocr_kolonner:
             conn.execute("ALTER TABLE ocr_statistikk ADD COLUMN stasjon_id INTEGER")
 
+        if 'drivstoffappen_sync' not in tabeller:
+            conn.execute('''CREATE TABLE drivstoffappen_sync (
+                id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                tidspunkt           TEXT DEFAULT (datetime('now')),
+                stasjoner_sjekket   INTEGER DEFAULT 0,
+                priser_skrevet      INTEGER DEFAULT 0,
+                hoppet_over         INTEGER DEFAULT 0,
+                avvist_validering   INTEGER DEFAULT 0,
+                feil                INTEGER DEFAULT 0
+            )''')
+
         bruker_kolonner2 = [r[1] for r in conn.execute("PRAGMA table_info(brukere)").fetchall()]
         if 'preferences' not in bruker_kolonner2:
             conn.execute("ALTER TABLE brukere ADD COLUMN preferences TEXT")
@@ -427,13 +438,14 @@ def bekreft_pris(stasjon_id, type_navn, bruker_id, min_intervall=300):
     return True
 
 
-def lagre_pris(stasjon_id, bensin, diesel, bensin98=None, bruker_id=None, diesel_avgiftsfri=None, min_intervall=300, kilde=None, tillat_korreksjon=True):
+def lagre_pris(stasjon_id, bensin, diesel, bensin98=None, bruker_id=None, diesel_avgiftsfri=None, min_intervall=300, kilde=None, tillat_korreksjon=True, tidspunkt=None):
     """Lagrer pris. Oppdaterer siste rad hvis bruker korrigerer innen intervallet, ellers insert.
     Ved UPDATE bevares verdier fra samme rad slik at delvis korreksjon ikke sletter det brukeren nettopp tastet.
-    Ved INSERT lagres kun de oppgitte verdiene — subquery-ene i hent_stasjoner() henter siste verdi per type."""
+    Ved INSERT lagres kun de oppgitte verdiene — subquery-ene i hent_stasjoner() henter siste verdi per type.
+    tidspunkt (ISO-streng UTC) brukes for historiske innlegginger — korreksjonslogikken hoppes over."""
     with _pris_lock:
         with get_conn() as conn:
-            if bruker_id is not None and tillat_korreksjon:
+            if bruker_id is not None and tillat_korreksjon and tidspunkt is None:
                 sist = conn.execute(
                     "SELECT id, tidspunkt, bensin, diesel, bensin98, diesel_avgiftsfri FROM priser WHERE bruker_id=? AND stasjon_id=? ORDER BY tidspunkt DESC LIMIT 1",
                     (bruker_id, stasjon_id)
@@ -454,10 +466,10 @@ def lagre_pris(stasjon_id, bensin, diesel, bensin98=None, bruker_id=None, diesel
                         return True
 
             conn.execute(
-                'INSERT INTO priser (stasjon_id, bensin, diesel, bensin98, bruker_id, diesel_avgiftsfri, kilde) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                'INSERT INTO priser (stasjon_id, bensin, diesel, bensin98, bruker_id, diesel_avgiftsfri, kilde, tidspunkt) VALUES (?, ?, ?, ?, ?, ?, ?, COALESCE(?, datetime("now")))',
                 (stasjon_id, _gyldig_pris_eller_null(bensin), _gyldig_pris_eller_null(diesel),
                  _gyldig_pris_eller_null(bensin98), bruker_id,
-                 _gyldig_pris_eller_null(diesel_avgiftsfri), kilde)
+                 _gyldig_pris_eller_null(diesel_avgiftsfri), kilde, tidspunkt)
             )
     return True
 
@@ -570,13 +582,15 @@ def get_statistikk() -> dict:
     }
 
 
-def hent_billigste_priser_24t(lat=None, lon=None, radius_km=None) -> list:
-    """Hent de billigste prisene registrert siste 24 timer, per drivstofftype.
+def hent_billigste_priser_24t(lat=None, lon=None, radius_km=None, timer=24) -> list:
+    """Hent prisene registrert siste `timer` timer, per drivstofftype.
 
     Valgfri radius-filtrering: hvis lat/lon/radius_km er oppgitt, begrenses
     resultatet til stasjoner innenfor en bounding box rundt koordinatene.
     """
     import math
+    timer = max(1, min(48, int(timer)))
+    tidsfilter = f'-{timer} hours'
     params = []
     bbox_filter = ''
     if lat is not None and lon is not None and radius_km:
@@ -597,13 +611,13 @@ def hent_billigste_priser_24t(lat=None, lon=None, radius_km=None) -> list:
                JOIN stasjoner s ON s.id = p.stasjon_id
                WHERE s.godkjent != 0
                  AND (s.land IS NULL OR s.land = 'NO')
-                 AND p.tidspunkt > datetime('now', '-24 hours')
+                 AND p.tidspunkt > datetime('now', ?)
                  AND p.id IN (SELECT MAX(p2.id) FROM priser p2
-                              WHERE p2.tidspunkt > datetime('now', '-24 hours')
+                              WHERE p2.tidspunkt > datetime('now', ?)
                               GROUP BY p2.stasjon_id)
                  {bbox_filter}
                ORDER BY p.tidspunkt DESC''',
-            params
+            [tidsfilter, tidsfilter] + params
         ).fetchall()
 
         return [dict(r) for r in rows]
@@ -1031,12 +1045,20 @@ def antall_priser_for_bruker(bruker_id: int) -> int:
 KAMERA_PRISANTALL_GRENSE = 0
 
 
+_ROLLE_NIVAA = {'power': 1, 'moderator': 2, 'admin': 3}
+
 def har_rolle(bruker: dict, rolle: str) -> bool:
     if not bruker:
         return False
     if rolle == 'kamera' and antall_priser_for_bruker(bruker['id']) >= KAMERA_PRISANTALL_GRENSE:
         return True
-    return rolle in (bruker.get('roller') or '').split()
+    roller = set((bruker.get('roller') or '').split())
+    if bruker.get('er_admin'):
+        roller.add('admin')
+    if rolle not in _ROLLE_NIVAA:
+        return rolle in roller
+    krevd = _ROLLE_NIVAA[rolle]
+    return any(_ROLLE_NIVAA.get(r, 0) >= krevd for r in roller)
 
 
 def sett_roller_bruker(bruker_id: int, roller: list[str]):
@@ -1174,6 +1196,16 @@ def sett_preferences(bruker_id: int, prefs: dict):
     with get_conn() as conn:
         conn.execute("UPDATE brukere SET preferences = ? WHERE id = ?",
                      (_json.dumps(prefs, ensure_ascii=False), bruker_id))
+
+
+def sett_siste_pos(bruker_id: int, lat: float, lon: float):
+    import json as _json
+    pos_json = _json.dumps({'lat': lat, 'lon': lon}, ensure_ascii=False)
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE brukere SET preferences = json_set(COALESCE(NULLIF(preferences, ''), '{}'), '$.siste_pos', json(?)) WHERE id = ?",
+            (pos_json, bruker_id)
+        )
 
 
 def sett_kjede_for_stasjon(stasjon_id: int, kjede: str):
