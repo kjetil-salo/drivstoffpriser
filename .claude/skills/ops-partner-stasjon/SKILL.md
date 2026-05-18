@@ -48,8 +48,34 @@ Hvis stasjonen ikke finnes i DB: stopp og informer brukeren — den må legges t
 
 ## Steg 2: Finn Drivstoffappens stasjon-ID
 
-Drivstoffappen har **egne IDer** som ikke samsvarer med OSM eller vår DB.
-Søk ved å batch-skanne ID-ranges og filtrere på navn:
+### 2a: Søk i lokal dump (foretrekkes)
+
+Sjekk om `tools/drivstoffappen_stasjoner.json` finnes:
+
+```bash
+python3 - << 'EOF'
+import json, sys
+with open("tools/drivstoffappen_stasjoner.json", encoding="utf-8") as f:
+    data = json.load(f)
+søk = "øyrane"  # sett søkeord her, lowercase
+treff = [s for s in data["stasjoner"] if søk in (s.get("name") or "").lower()]
+for s in treff:
+    print(f"id={s['id']}  navn={s['name']}  brand={s['brand']}")
+print(f"\n(Fil generert: {data['generert']}, {data['antall']} stasjoner)")
+EOF
+```
+
+Hvis filen mangler eller er utdatert (>30 dager gammel), kjør dumpen først:
+
+```bash
+python3 tools/drivstoffappen_dump.py
+```
+
+Dumpen tar 2–4 minutter og lagrer alle stasjoner lokalt. Kjøres kun ved behov.
+
+### 2b: Fallback — live API-scan (kun hvis dump ikke hjelper)
+
+Bruk dette kun hvis stasjonen ikke finnes i dump-filen:
 
 ```python
 import hashlib, json, urllib.request, time
@@ -71,11 +97,8 @@ api_key = utled_api_nøkkel(token)
 headers = {'X-API-KEY': api_key, 'X-CLIENT-ID': CLIENT_ID}
 
 BATCH = 50
-# Søk fra 1 til ca. 30000 (kjente ID-er er <5000 for norske stasjoner)
-# Begrens til relevante ranges basert på kjente ID-er i STASJON_MAPPING
-alle_ids = list(range(1, 5000))
-
-søk_navn = ["hundvåg", "nygård"]  # lowercase søkeord
+alle_ids = list(range(1, 30000))
+søk_navn = ["søkeord"]  # lowercase søkeord
 
 for start in range(0, len(alle_ids), BATCH):
     batch = alle_ids[start:start+BATCH]
@@ -94,7 +117,7 @@ for start in range(0, len(alle_ids), BATCH):
     time.sleep(0.15)
 ```
 
-Kjøres **lokalt** (ikke på Pi). Kan ta 1–2 min for full scan av 1–5000.
+Kjøres **lokalt** (ikke på Pi). Kan ta flere minutter.
 
 ## Steg 3: Bekreft funnet stasjon
 

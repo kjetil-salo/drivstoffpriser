@@ -66,6 +66,8 @@ STASJON_MAPPING = {
     18: 1324,   # St1 Lone
     36: 2093,   # St1 Nygård
     5690: 468,  # Esso Hundvåg
+    35: 1094,   # Uno-X 7-Eleven Øyrane torg
+    11: 28414,  # Haltbakk Express Ostereidet
 }
 
 FUEL_NAVN = {1: 'diesel', 2: 'bensin'}
@@ -84,12 +86,12 @@ def _utled_api_nøkkel(token: str) -> str:
 
 
 def _hent_stasjoner(api_key: str, drivstoff_ids: list[int]) -> list[dict]:
-    ids_str = ','.join(str(i) for i in drivstoff_ids)
-    url = f"{BASE_URL}/api/v1/stations?ids={ids_str}"
     headers = {'X-API-KEY': api_key, 'X-CLIENT-ID': CLIENT_ID}
-    req = urllib.request.Request(url, headers=headers)
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        return json.loads(resp.read())
+    req = urllib.request.Request(f"{BASE_URL}/api/v1/stations", headers=headers)
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        alle = json.loads(resp.read())
+    ids_set = set(drivstoff_ids)
+    return [s for s in alle if s['id'] in ids_set]
 
 
 def _vaar_siste_tidspunkt(conn, stasjon_id: int, kolonne: str) -> datetime | None:
