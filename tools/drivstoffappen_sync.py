@@ -10,12 +10,28 @@ import json
 import logging
 import os
 import random
+import sqlite3
 import sys
 import urllib.request
 from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db import get_conn, lagre_pris
+
+SYNC_DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data', 'partner_sync.db')
+
+
+def _get_sync_conn():
+    conn = sqlite3.connect(SYNC_DB_PATH)
+    conn.execute('''CREATE TABLE IF NOT EXISTS stasjon_bidrag (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        tidspunkt   TEXT DEFAULT (datetime('now')),
+        stasjon_id  INTEGER NOT NULL,
+        bensin      INTEGER DEFAULT 0,
+        diesel      INTEGER DEFAULT 0
+    )''')
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_bidrag_stasjon ON stasjon_bidrag(stasjon_id)")
+    return conn
 
 logging.basicConfig(
     format='%(asctime)s drivstoffappen_sync %(levelname)s %(message)s',
@@ -158,7 +174,7 @@ def kjør():
         _logg_stats(stats)
         return
 
-    with get_conn() as conn:
+    with get_conn() as conn, _get_sync_conn() as sync_conn:
         partner_id = _hent_eller_opprett_partner(conn)
 
         for s in stasjoner:
@@ -239,6 +255,12 @@ def kjør():
                             deler.append(f"diesel={priser_denne['diesel']:.2f}")
                         log.info(f'{stasjonsnavn}: lagret {", ".join(deler)} (ts={lagre_ts})')
                         linjer.append(f'  SKREVET  {stasjonsnavn:<35s} {", ".join(deler)} (+{jitter_min}min)')
+                        sync_conn.execute(
+                            "INSERT INTO stasjon_bidrag (stasjon_id, bensin, diesel) VALUES (?, ?, ?)",
+                            (vaar_id,
+                             1 if priser_denne['bensin'] is not None else 0,
+                             1 if priser_denne['diesel'] is not None else 0),
+                        )
                     else:
                         stats['hoppet_over'] += 1
                 except Exception as e:
