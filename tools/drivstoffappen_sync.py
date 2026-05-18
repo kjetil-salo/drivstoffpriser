@@ -47,6 +47,7 @@ STASJON_MAPPING = {
     42: 49,     # Uno-x gullgruven (Åsane)
     43: 121,    # Uno-X 7-Eleven Nyborg
     45: 1222,   # St1 Isdalstø
+    18: 1324,   # St1 Lone
 }
 
 FUEL_NAVN = {1: 'diesel', 2: 'bensin'}
