@@ -68,6 +68,7 @@ STASJON_MAPPING = {
     5690: 468,  # Esso Hundvåg
     35: 1094,   # Uno-X 7-Eleven Øyrane torg
     11: 28414,  # Haltbakk Express Ostereidet
+    1882: 1351, # St1 Randabergveien
 }
 
 FUEL_NAVN = {1: 'diesel', 2: 'bensin'}
@@ -274,13 +275,13 @@ def kjør():
     _logg_stats(stats)
 
     emne = (
-        f"Drivstoffappen-sync {nå:%d.%m %H:%M} — "
+        f"Partner1-sync {nå:%d.%m %H:%M} — "
         f"{stats['priser_skrevet']} skrevet, "
         f"{stats['hoppet_over']} skip, "
         f"{stats['avvist_validering']} avvist"
     )
     kropp_linjer = [
-        f"Drivstoffappen-sync {nå:%Y-%m-%d %H:%M} UTC",
+        f"Partner1-sync {nå:%Y-%m-%d %H:%M} UTC",
         f"Stasjoner sjekket: {stats['stasjoner_sjekket']}",
         f"Priser skrevet:    {stats['priser_skrevet']}",
         f"Hoppet over:       {stats['hoppet_over']}  (vi hadde nyere)",

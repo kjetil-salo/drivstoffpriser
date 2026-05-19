@@ -34,6 +34,8 @@ for r in rows: print(r)
 conn.close()
 ```
 
+**Merk:** `stasjoner`-tabellen har IKKE `adresse`-kolonne — bruk kun `id` og `navn`.
+
 Bruk `scp` + `docker cp` + `docker exec`-mønsteret (se memory: Docker SQL-spørringer på Pi):
 ```bash
 # Skriv script lokalt, kopier til Pi, kjør i container
@@ -54,13 +56,14 @@ Sjekk om `tools/drivstoffappen_stasjoner.json` finnes:
 
 ```bash
 python3 - << 'EOF'
-import json, sys
+import json
 with open("tools/drivstoffappen_stasjoner.json", encoding="utf-8") as f:
     data = json.load(f)
 søk = "øyrane"  # sett søkeord her, lowercase
+# OBS: brand er en streng i denne dumpen, ikke en dict
 treff = [s for s in data["stasjoner"] if søk in (s.get("name") or "").lower()]
 for s in treff:
-    print(f"id={s['id']}  navn={s['name']}  brand={s['brand']}")
+    print(f"id={s['id']}  navn={s['name']}  brand={s.get('brand')}")
 print(f"\n(Fil generert: {data['generert']}, {data['antall']} stasjoner)")
 EOF
 ```
