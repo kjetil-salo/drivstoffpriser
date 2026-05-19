@@ -49,6 +49,7 @@ PRIS_MAX = 37.0
 PARTNER_BRUKERNAVN = 'partner1'
 
 # Vår DB-id → Drivstoffappen-id
+# Basis-liste — kjøres av cron-jobb
 STASJON_MAPPING = {
     1:  433,    # Esso Frekhaug
     2:  2190,   # Circle K Automat Knarvik
@@ -71,7 +72,10 @@ STASJON_MAPPING = {
     1882: 1351, # St1 Randabergveien
     1887: 221,  # Esso Tjensvollkrysset
     12: 791,    # Circle K Viken
-    # Haugalandet
+}
+
+# Region-tillegg — kun manuell kjøring via --region
+STASJON_MAPPING_HAUGALANDET = {
     70: 3602,   # Circle K Automat Karmsundgata
     2004: 3170, # Circle K Automat Kopervik
     72: 257,    # Circle K Automat Spannaveien
@@ -106,7 +110,9 @@ STASJON_MAPPING = {
     68: 136,    # Uno-X Spannavegen
     67: 3160,   # YX Bømlo
     2114: 884,  # YX Truck Aksdal
-    # Stavanger
+}
+
+STASJON_MAPPING_STAVANGER = {
     1842: 3691,  # Circle K Automat Hafrsfjord
     5661: 2865,  # Circle K Automat Hundvåg
     1869: 189,   # Circle K Automat Lagårdsveien
@@ -162,6 +168,11 @@ STASJON_MAPPING = {
     1847: 3589,  # Uno-X Tananger
     1845: 140,   # Uno-X Tasta
     1821: 138,   # Uno-X Tau
+}
+
+REGIONER = {
+    'haugalandet': STASJON_MAPPING_HAUGALANDET,
+    'stavanger':   STASJON_MAPPING_STAVANGER,
 }
 
 FUEL_NAVN = {1: 'diesel', 2: 'bensin'}
@@ -243,15 +254,23 @@ def _send_epost(emne: str, kropp: str):
         log.error(f'Epost feilet: {e}')
 
 
-def kjør(prosent: float = 100):
+def kjør(prosent: float = 100, region: str | None = None):
     nå = datetime.now(timezone.utc)
 
-    mapping = STASJON_MAPPING
-    if prosent < 100:
-        k = max(1, round(len(STASJON_MAPPING) * prosent / 100))
-        utvalg = random.sample(list(STASJON_MAPPING.keys()), k)
-        mapping = {vaar: STASJON_MAPPING[vaar] for vaar in utvalg}
-        log.info(f'Tilfeldig utvalg: {k}/{len(STASJON_MAPPING)} stasjoner ({prosent}%)')
+    if region:
+        basis = REGIONER.get(region)
+        if basis is None:
+            log.error(f'Ukjent region: {region}. Gyldige: {", ".join(REGIONER)}')
+            return
+        mapping = basis
+        log.info(f'Region {region}: {len(mapping)} stasjoner')
+    else:
+        mapping = STASJON_MAPPING
+        if prosent < 100:
+            k = max(1, round(len(STASJON_MAPPING) * prosent / 100))
+            utvalg = random.sample(list(STASJON_MAPPING.keys()), k)
+            mapping = {vaar: STASJON_MAPPING[vaar] for vaar in utvalg}
+            log.info(f'Tilfeldig utvalg: {k}/{len(STASJON_MAPPING)} stasjoner ({prosent}%)')
 
     stats = {
         'stasjoner_sjekket': 0,
@@ -433,5 +452,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--prosent', type=float, default=100,
                         help='Prosent av stasjoner som skal sjekkes (f.eks. 20 = ~20%%)')
+    parser.add_argument('--region', choices=list(REGIONER), default=None,
+                        help='Kjør kun én region manuelt (haugalandet, stavanger)')
     args = parser.parse_args()
-    kjør(prosent=args.prosent)
+    kjør(prosent=args.prosent, region=args.region)
