@@ -39,7 +39,7 @@ from db import (get_stasjoner_med_priser, lagre_pris, bekreft_pris, logg_visning
                 har_rolle, hent_kjede_snitt_24t,
                 sjekk_rate_limit, logg_rate_limit, hent_anonym_bruker_id,
                 mask_stasjon_priser_for_tilganger,
-                hent_preferences, sett_preferences)
+                hent_preferences, sett_preferences, sett_siste_pos)
 
 logger = logging.getLogger('drivstoff')
 
@@ -315,6 +315,25 @@ def sett_bruker_preferences():
                 renset_kort.append({'kjede': kjede, 'type': type_, 'verdi': verdi})
             renset['rabattkort'] = renset_kort
     sett_preferences(bruker_id, renset)
+    return jsonify({'ok': True})
+
+
+@api_bp.route('/api/bruker/siste-pos', methods=['PUT'])
+@krever_innlogging
+def sett_bruker_siste_pos():
+    bruker_id = session.get('bruker_id')
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({'error': 'Ugyldig data'}), 400
+    lat = data.get('lat')
+    lon = data.get('lon')
+    if not isinstance(lat, (int, float)) or isinstance(lat, bool):
+        return jsonify({'error': 'lat og lon må være tall'}), 400
+    if not isinstance(lon, (int, float)) or isinstance(lon, bool):
+        return jsonify({'error': 'lat og lon må være tall'}), 400
+    if not er_i_norge(lat, lon):
+        return jsonify({'error': 'Posisjon må være i Norge'}), 400
+    sett_siste_pos(bruker_id, float(lat), float(lon))
     return jsonify({'ok': True})
 
 
@@ -698,7 +717,9 @@ def statistikk():
     lat = request.args.get('lat', type=float)
     lon = request.args.get('lon', type=float)
     radius = request.args.get('radius', type=float)
-    priser_24t = hent_billigste_priser_24t(lat=lat, lon=lon, radius_km=radius)
+    timer = request.args.get('timer', 24, type=int)
+    timer = max(1, min(48, timer))
+    priser_24t = hent_billigste_priser_24t(lat=lat, lon=lon, radius_km=radius, timer=timer)
     antall_oppdateringer = antall_prisoppdateringer_24t()
 
     billigst = {'bensin': None, 'diesel': None, 'bensin98': None, 'diesel_avgiftsfri': None}
@@ -729,7 +750,11 @@ def statistikk():
 
 @api_bp.route('/api/kjede-snitt')
 def kjede_snitt():
-    return jsonify(hent_kjede_snitt_24t())
+    lat = request.args.get('lat', type=float)
+    lon = request.args.get('lon', type=float)
+    radius = request.args.get('radius', type=float)
+    timer = request.args.get('timer', 24, type=int)
+    return jsonify(hent_kjede_snitt_24t(lat=lat, lon=lon, radius_km=radius, timer=timer))
 
 
 @api_bp.route('/api/prisregistreringer-per-time')
@@ -855,6 +880,25 @@ def oppdater_pris():
 
     kilde = data.get('kilde') or None
 
+    # Historisk tidspunkt (kun for power users)
+    tidspunkt = None
+    minutter_siden_raw = data.get('minutter_siden')
+    if minutter_siden_raw is not None:
+        try:
+            minutter_siden = int(minutter_siden_raw)
+        except (ValueError, TypeError):
+            return jsonify({'error': 'minutter_siden må være et heltall'}), 400
+        if not (0 <= minutter_siden <= 779):
+            return jsonify({'error': 'Tidspunkt kan maks være 12 timer og 59 minutter tilbake'}), 400
+        if minutter_siden > 0:
+            if anonym:
+                return jsonify({'error': 'Ikke innlogget'}), 401
+            bruker = finn_bruker_id(bruker_id)
+            if not har_rolle(bruker, 'power'):
+                return jsonify({'error': 'Ikke tilgang'}), 403
+            UTC = timezone.utc
+            tidspunkt = (datetime.now(UTC) - timedelta(minutes=minutter_siden)).strftime('%Y-%m-%d %H:%M:%S')
+
     # Avvikssjekk mot siste kjente pris for stasjonen
     if anonym:
         avvik_anonym = _sjekk_prisavvik(stasjon_id, bensin, diesel, bensin98, diesel_avgiftsfri, _AVVIK_GRENSE_ANONYM)
@@ -883,6 +927,7 @@ def oppdater_pris():
         min_intervall=intervall,
         kilde=kilde,
         tillat_korreksjon=tillat_korreksjon,
+        tidspunkt=tidspunkt,
     )
     if lagret:
         if anonym:
@@ -1003,7 +1048,9 @@ def nyhet():
     if tekst and utloper:
         try:
             utloper_dt = datetime.fromisoformat(utloper)
-            if datetime.now() < utloper_dt:
+            if utloper_dt.tzinfo is None:
+                utloper_dt = utloper_dt.replace(tzinfo=timezone.utc)
+            if datetime.now(timezone.utc) < utloper_dt:
                 nyhet_id = hashlib.md5(tekst.encode()).hexdigest()[:8]
                 return jsonify({'tekst': tekst, 'utloper': utloper, 'id': nyhet_id, 'tittel': 'Nyhet', 'noekkel': noekkel})
         except ValueError:
@@ -1013,7 +1060,6 @@ def nyhet():
     if hent_innstilling('personlig_splash', '') != '1':
         return jsonify({'tekst': None})
 
-    from datetime import timedelta
     from db import get_conn
 
     uke = datetime.now().isocalendar()[1]
@@ -1292,7 +1338,7 @@ def personvern():
 
 <div class="kort">
   <h2>Kort oppsummert</h2>
-  <p>Drivstoffpriser er et hobbyprosjekt som samler inn s&#229; lite data som mulig. Du trenger ikke opprette konto for &#229; bruke appen. Posisjonen din forblir i nettleseren din og sendes ikke til serveren.</p>
+  <p>Drivstoffpriser er et hobbyprosjekt som samler inn s&#229; lite data som mulig. Du trenger ikke opprette konto for &#229; bruke appen. Uten innlogging forblir posisjonen din kun i nettleseren.</p>
 </div>
 
 <div class="kort">
@@ -1316,7 +1362,8 @@ def personvern():
 
 <div class="kort">
   <h2>Posisjon / GPS</h2>
-  <p>N&#229;r du deler posisjonen din med appen, lagres den <strong>kun lokalt i nettleseren</strong> (localStorage). Posisjonen sendes ikke til serveren og logges ikke.</p>
+  <p><strong>Uten innlogging:</strong> Posisjonen lagres kun lokalt i nettleseren (localStorage) og sendes ikke til serveren.</p>
+  <p><strong>Med innlogging:</strong> Sist s&#248;kte sted lagres p&#229; brukerkontoen din slik at appen husker posisjonen p&#229; tvers av enheter. Posisjonen brukes utelukkende til dette form&#229;let og logges ikke.</p>
 </div>
 
 <div class="kort">
@@ -1374,10 +1421,12 @@ def share_prices():
     fra = request.args.get('from')
     til = request.args.get('to')
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     if fra:
         try:
             fra_dt = datetime.fromisoformat(fra)
+            if fra_dt.tzinfo is None:
+                fra_dt = fra_dt.replace(tzinfo=timezone.utc)
         except ValueError:
             return jsonify({'error': 'Ugyldig from-format, bruk ISO 8601'}), 400
     else:
@@ -1386,6 +1435,8 @@ def share_prices():
     if til:
         try:
             til_dt = datetime.fromisoformat(til)
+            if til_dt.tzinfo is None:
+                til_dt = til_dt.replace(tzinfo=timezone.utc)
         except ValueError:
             return jsonify({'error': 'Ugyldig to-format, bruk ISO 8601'}), 400
     else:
@@ -1820,9 +1871,9 @@ def _ocr_stasjon_prompt_tillegg(stasjon_kontekst):
         deler = [f'{_OCR_DRIVSTOFF_LABELS.get(k, k)}: {v} kr' for k, v in forrige.items()]
         tekst += (
             f'- Sist kjente priser for denne stasjonen: {", ".join(deler)}.\n'
-            '  Bruk dette som sanity-check: hvis ditt OCR-resultat avviker mer enn ~3 kr fra '
-            'forrige pris, dobbeltsjekk sifrene nøye (spesielt 1↔7, 8↔9, 6↔8 på LED). '
-            'Priser KAN ha endret seg, men store avvik bør verifiseres.\n'
+            '  Bruk dette som sanity-check: hvis ditt OCR-resultat avviker mer enn ~0.50 kr fra '
+            'forrige pris, dobbeltsjekk sifrene nøye (spesielt 1↔7, 0↔8, 8↔9, 6↔8 på LED). '
+            'Priser KAN ha endret seg, men avvik over 1 kr bør verifiseres.\n'
         )
     return tekst
 
@@ -1884,7 +1935,9 @@ Kjede:
 Nøyaktighet — LED-display:
 - På bilder tatt langt unna er desimalpunkt/komma ofte svakt eller usynlig. Les fire røde LED-siffer som XX.XX, ikke som heltall. Eksempel: 1949 -> 19.49 og 2079 -> 20.79.
 - Uno-X-skilt kan ha to røde prisrader uten store produktnavn. Ofte er en liten "95" synlig ved nederste rad. Da er nederste rad bensin 95, og øverste rad er diesel selv om den er dyrere enn bensin.
+- Viktig for Uno-X: etikettene "95" og "D" er drivstofftype-etiketter — de er IKKE en del av prisen. Prisen er de 4 LED-sifrene som kommer etter etiketten på samme rad. Ignorer "95"-teksten som mulig pris; les kun de 4 sifrene som følger etter.
 - Røde/oransje LED-display: sifrene 1 og 7 forveksles svært lett. Sjekk: har sifferet et topphorisontalt segment? Da er det trolig 7, ikke 1. Eks: "18.19" der 95-oktan er i nærheten av 21.29 (98-oktan), er feil — den laveste prisen for 95 kan gjerne være 18.79 (7 lest som 1).
+- 0 og 8 forveksles på røde LED-display: 8 har midtsegmentet tent, 0 mangler det. Eksempel: "22.09" kan egentlig være "22.89" hvis midtsegmentet i det tredje sifferet er svakt tent. Hvis en avlest pris avviker fra forrige kjente pris ved at ett siffer er 0 vs 8, foretrekk 8.
 - Les 7-tall ekstra strengt på røde LED-skilt: et 7-tall har toppstrek og høyre segmenter, mens 1 mangler toppstreken. Hvis en pris ser ut som "16.19", men tredje siffer har en tydelig toppstrek, skal den leses som "16.79".
 - 8 og 9 forveksles svært ofte på LED-skilt. Sjekk spesielt nedre venstre segment: hvis nedre venstre segment er tent, er sifferet trolig 8; hvis nedre venstre segment mangler mens øvre/midtre/nedre og høyre side er tent, er det trolig 9. Ikke velg 8 eller 9 uten å kontrollere dette segmentet.
 - 4 og 9 kan også ligne på LED-skilt. Sjekk topp- og bunnsegmentene: 9 har vanligvis både toppsegment og bunnsegment tent, mens 4 vanligvis mangler toppsegment og bunnsegment og består mest av midtsegment + øvre venstre + høyre side. Ikke les 19.49 som 19.99 eller omvendt uten å sjekke disse segmentene.
@@ -2154,17 +2207,16 @@ def _ocr_korriger_med_forrige(resultat, stasjon_kontekst):
         if original_diff < 0.30:
             continue  # Nær nok, ingen korreksjon nødvendig
 
-        # Prøv alle enkelt-siffer 1↔7-swaps
+        # Prøv alle enkelt-siffer LED-forvekslinger: 1↔7 og 0↔8
         ocr_str = f'{ocr_val:.2f}'
         beste = ocr_val
         beste_diff = original_diff
+        _LED_SWAP = {'1': '7', '7': '1', '0': '8', '8': '0'}
         for i, ch in enumerate(ocr_str):
-            if ch == '1':
-                ny = ocr_str[:i] + '7' + ocr_str[i+1:]
-            elif ch == '7':
-                ny = ocr_str[:i] + '1' + ocr_str[i+1:]
-            else:
+            motpart = _LED_SWAP.get(ch)
+            if motpart is None:
                 continue
+            ny = ocr_str[:i] + motpart + ocr_str[i+1:]
             try:
                 ny_val = float(ny)
             except ValueError:
@@ -2178,7 +2230,8 @@ def _ocr_korriger_med_forrige(resultat, stasjon_kontekst):
 
         # Bare korriger hvis resultatet er svært nært forrige pris
         if beste != ocr_val and beste_diff <= 0.30:
-            logger.info(f'OCR 1↔7 korreksjon: {felt} {ocr_val} → {beste} (forrige={forrige_val})')
+            swap_par = f'{ocr_val}→{beste}'
+            logger.info(f'OCR LED-korreksjon: {felt} {swap_par} (forrige={forrige_val})')
             resultat[felt] = beste
 
     return resultat
@@ -2364,6 +2417,16 @@ def _gemini_json_request(bilde_b64, content_type, prompt):
     raise ValueError('Ingen Gemini-modeller konfigurert')
 
 
+def _ocr_mangler_bensin(resultat: dict, stasjon_kontekst) -> bool:
+    """Returnerer True hvis stasjonen selger bensin men AI ikke fant bensinpris."""
+    if resultat.get('bensin') is not None:
+        return False
+    if not _har_ocr_priser(resultat):
+        return False
+    tillatte = _ocr_tillatte_felt(stasjon_kontekst) if stasjon_kontekst else {'bensin', 'diesel'}
+    return 'bensin' in tillatte
+
+
 def _ocr_via_gemini(bilde_b64, content_type, forventet_kjede=None, stasjon_kontekst=None):
     primar = _filtrer_ocr_drivstoff(
         _normaliser_ocr_resultat(
@@ -2371,8 +2434,35 @@ def _ocr_via_gemini(bilde_b64, content_type, forventet_kjede=None, stasjon_konte
         ),
         stasjon_kontekst,
     )
-    if _har_ocr_priser(primar):
+    if _har_ocr_priser(primar) and not _ocr_mangler_bensin(primar, stasjon_kontekst):
         return primar
+
+    # Retry med forsterket prompt hvis bensin mangler men diesel ble funnet
+    if _ocr_mangler_bensin(primar, stasjon_kontekst):
+        logger.info('OCR Gemini: bensin=null men diesel funnet — prøver bensin-retry')
+        kjede_hint = f' Kjede: {forventet_kjede}.' if forventet_kjede else ''
+        retry_prompt = (
+            _lag_ocr_prompt(forventet_kjede, stasjon_kontekst=stasjon_kontekst) +
+            f'\n\nVIKTIG RETRY: Forrige forsøk fant diesel men IKKE bensin (95 oktan).{kjede_hint} '
+            'Det er svært sannsynlig at bildet har en bensin-rad du ikke leste. '
+            'Se spesielt etter en rad merket "95", "Blyfri" eller lignende. '
+            'Husk: på Uno-X-skilt er "95"-teksten en ETIKETT, ikke en pris — '
+            'prisen er de 4 LED-sifrene etter "95"-etiketten på samme rad. '
+            'Les bunnen av prisdisplayet på nytt og rapporter bensin-prisen.'
+        )
+        retry = _filtrer_ocr_drivstoff(
+            _normaliser_ocr_resultat(
+                _gemini_json_request(bilde_b64, content_type, retry_prompt)
+            ),
+            stasjon_kontekst,
+        )
+        if retry.get('bensin') is not None:
+            logger.info(f'OCR Gemini bensin-retry OK: bensin={retry.get("bensin")}')
+            retry['_bensin_retry'] = True
+            return retry
+        logger.info('OCR Gemini bensin-retry fant heller ikke bensin')
+        if _har_ocr_priser(primar):
+            return primar
 
     fallback_prompt = _OCR_PROMPT_FALLBACK
     if forventet_kjede:

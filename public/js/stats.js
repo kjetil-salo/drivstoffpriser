@@ -14,6 +14,7 @@ let _radiusModus = false;      // false = Norge, true = nærhet
 let _gpsPos = null;            // { lat, lon } — caches siste kjente posisjon
 let _henterGps = false;
 let _toggleInitiert = false;
+let _tidsvindu = 24;           // 24 eller 8 timer
 
 function _settGpsStatus(tekst) {
     const el = document.getElementById('stat-gps-status');
@@ -43,14 +44,67 @@ function _hentGps() {
     });
 }
 
+function _formaterRadius(value) {
+    const n = Number.parseFloat(String(value).replace(',', '.'));
+    if (!Number.isFinite(n)) return '5';
+    return String(Math.min(500, Math.max(0.1, n)));
+}
+
+function _aktivRadius() {
+    const sel = document.getElementById('stat-radius-select');
+    const egenInput = document.getElementById('stat-radius-egen');
+    if (sel?.value === 'egen') {
+        return _formaterRadius(egenInput?.value || localStorage.getItem('stat_radius_eigen') || '25');
+    }
+    return sel?.value || '25';
+}
+
+function _oppdaterPriserTittel() {
+    const el = document.getElementById('stat-priser-tittel');
+    if (el) el.textContent = `Priser siste ${_tidsvindu} timer`;
+}
+
 function _initOmradeToggle() {
     if (_toggleInitiert) return;
     const knappNorge = document.getElementById('stat-toggle-norge');
     const knappNaerhet = document.getElementById('stat-toggle-naerhet');
     const radiusVelger = document.getElementById('stat-radius-velger');
     const radiusSelect = document.getElementById('stat-radius-select');
+    const radiusEgenInput = document.getElementById('stat-radius-egen');
+    const tidsvinduSelect = document.getElementById('stat-tidsvindu-select');
     if (!knappNorge || !knappNaerhet) return;
     _toggleInitiert = true;
+
+    // Gjenopprett lagret tidsvindu
+    const lagretTidsvindu = localStorage.getItem('stat_tidsvindu');
+    if (lagretTidsvindu && tidsvinduSelect) {
+        tidsvinduSelect.value = lagretTidsvindu;
+        _tidsvindu = Number(lagretTidsvindu);
+        _oppdaterPriserTittel();
+    }
+
+    // Gjenopprett lagret radius (inkl. Eigen)
+    if (radiusSelect) {
+        const lagretRadius = localStorage.getItem('stat_radius');
+        const standardVerdier = [...radiusSelect.options].map(o => o.value).filter(v => v !== 'egen');
+        if (lagretRadius) {
+            if (standardVerdier.includes(lagretRadius) || lagretRadius === 'egen') {
+                radiusSelect.value = lagretRadius;
+            } else {
+                radiusSelect.value = 'egen';
+                if (radiusEgenInput) {
+                    radiusEgenInput.value = _formaterRadius(lagretRadius);
+                    localStorage.setItem('stat_radius_eigen', radiusEgenInput.value);
+                }
+            }
+        }
+        const egenInput = document.getElementById('stat-radius-egen');
+        if (egenInput) {
+            egenInput.hidden = radiusSelect.value !== 'egen';
+            const lagretEigen = localStorage.getItem('stat_radius_eigen');
+            if (lagretEigen && radiusSelect.value === 'egen') egenInput.value = lagretEigen;
+        }
+    }
 
     knappNorge.addEventListener('click', () => {
         _radiusModus = false;
@@ -81,6 +135,33 @@ function _initOmradeToggle() {
 
     if (radiusSelect) {
         radiusSelect.addEventListener('change', () => {
+            const egenInput = document.getElementById('stat-radius-egen');
+            if (egenInput) egenInput.hidden = radiusSelect.value !== 'egen';
+            if (radiusSelect.value === 'egen' && egenInput) egenInput.focus();
+            localStorage.setItem('stat_radius', radiusSelect.value);
+            sistLastet = 0;
+            lastStatistikk({ force: true });
+        });
+    }
+
+    const egenInput = document.getElementById('stat-radius-egen');
+    if (egenInput) {
+        egenInput.addEventListener('change', () => {
+            egenInput.value = _formaterRadius(egenInput.value);
+            localStorage.setItem('stat_radius_eigen', egenInput.value);
+            sistLastet = 0;
+            lastStatistikk({ force: true });
+        });
+        egenInput.addEventListener('keydown', e => {
+            if (e.key === 'Enter') egenInput.blur();
+        });
+    }
+
+    if (tidsvinduSelect) {
+        tidsvinduSelect.addEventListener('change', () => {
+            _tidsvindu = Number(tidsvinduSelect.value);
+            localStorage.setItem('stat_tidsvindu', tidsvinduSelect.value);
+            _oppdaterPriserTittel();
             sistLastet = 0;
             lastStatistikk({ force: true });
         });
@@ -346,16 +427,19 @@ export async function lastStatistikk({ force = false } = {}) {
 
     laster = true;
     try {
-        let statUrl = '/api/statistikk';
+        let statUrl = `/api/statistikk?timer=${_tidsvindu}`;
+        let kjedeUrl = `/api/kjede-snitt?timer=${_tidsvindu}`;
         if (_radiusModus && _gpsPos) {
-            const radius = document.getElementById('stat-radius-select')?.value || '25';
-            statUrl += `?lat=${_gpsPos.lat}&lon=${_gpsPos.lon}&radius=${radius}`;
+            const radius = _aktivRadius();
+            const posParams = `&lat=${_gpsPos.lat}&lon=${_gpsPos.lon}&radius=${radius}`;
+            statUrl += posParams;
+            kjedeUrl += posParams;
         }
 
         const [respStat, respTopp, respKjede] = await Promise.all([
             fetch(statUrl, { cache: 'no-store' }),
             fetch('/api/toppliste', { cache: 'no-store' }),
-            fetch('/api/kjede-snitt', { cache: 'no-store' }),
+            fetch(kjedeUrl, { cache: 'no-store' }),
         ]);
         if (!respStat.ok) return;
         const data = await respStat.json();

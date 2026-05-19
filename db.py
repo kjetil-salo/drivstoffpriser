@@ -637,8 +637,22 @@ def hent_billigste_priser_24t(lat=None, lon=None, radius_km=None, timer=24) -> l
         return [dict(r) for r in rows]
 
 
-def hent_kjede_snitt_24t() -> list:
-    """Gjennomsnittspriser per kjede basert på siste registrerte pris per stasjon siste 24 timer."""
+def hent_kjede_snitt_24t(lat=None, lon=None, radius_km=None, timer=24) -> list:
+    """Gjennomsnittspriser per kjede basert på siste registrerte pris per stasjon."""
+    import math
+    timer = max(1, min(48, int(timer)))
+    tidsfilter = f'-{timer} hours'
+    params = []
+    bbox_filter = ''
+    if lat is not None and lon is not None and radius_km:
+        lat_delta = radius_km / 111.0
+        lon_delta = radius_km / (111.0 * max(math.cos(math.radians(lat)), 0.01))
+        bbox_filter = (
+            ' AND s.lat BETWEEN ? AND ?'
+            ' AND s.lon BETWEEN ? AND ?'
+        )
+        params = [lat - lat_delta, lat + lat_delta, lon - lon_delta, lon + lon_delta]
+
     kjede_expr = (
         "CASE "
         "WHEN lower(trim(s.kjede)) = 'bunker oil' THEN 'Bunker Oil' "
@@ -674,13 +688,15 @@ def hent_kjede_snitt_24t() -> list:
                WHERE s.godkjent != 0
                  AND (s.land IS NULL OR s.land = 'NO')
                  AND s.kjede IS NOT NULL AND s.kjede != ''
-                 AND p.tidspunkt > datetime('now', '-24 hours')
+                 AND p.tidspunkt > datetime('now', ?)
                  AND p.id IN (SELECT MAX(p2.id) FROM priser p2
-                              WHERE p2.tidspunkt > datetime('now', '-24 hours')
+                              WHERE p2.tidspunkt > datetime('now', ?)
                               GROUP BY p2.stasjon_id)
+                 {bbox_filter}
                GROUP BY {kjede_expr}
                HAVING antall_stasjoner >= 2
-               ORDER BY snitt_diesel'''
+               ORDER BY snitt_diesel''',
+            [tidsfilter, tidsfilter] + params
         ).fetchall()
         return [dict(r) for r in rows]
 
