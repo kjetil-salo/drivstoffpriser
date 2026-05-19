@@ -3166,6 +3166,7 @@ def admin_leser_kart():
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="stylesheet" href="/css/leaflet.css">
 <script src="/js/vendor/leaflet.js"></script>
+<script src="/js/vendor/leaflet-heat.js"></script>
 <style>
   body {{ margin:0; font-family:sans-serif; background:#111; color:#eee; }}
   #kart {{ height:calc(100vh - 60px); }}
@@ -3175,6 +3176,9 @@ def admin_leser_kart():
   #info {{ position:absolute; top:70px; right:10px; z-index:999; background:rgba(0,0,0,.75);
            padding:10px 14px; border-radius:8px; font-size:.85rem; min-width:160px; }}
   #info b {{ display:block; font-size:1.1rem; color:#4fc3f7; }}
+  .vis-btn {{ background:#333; border:1px solid #555; color:#ccc; padding:4px 10px;
+              border-radius:4px; cursor:pointer; font-size:.85rem; }}
+  .vis-btn.aktiv {{ background:#4fc3f7; color:#000; border-color:#4fc3f7; }}
 </style>
 </head><body>
 <div id="topp">
@@ -3184,6 +3188,8 @@ def admin_leser_kart():
       {''.join(f'<option value="{d}"{" selected" if d==dager else ""}>{d} dager</option>' for d in [7,14,30,60,90,180,365])}
     </select>
   </label>
+  <button class="vis-btn" id="btn-heat" onclick="byttVisning('heat')">Heatmap</button>
+  <button class="vis-btn aktiv" id="btn-bobler" onclick="byttVisning('bobler')">Bobler</button>
   <a href="/admin" style="color:#aaa;font-size:.85rem;margin-left:auto">← Admin</a>
 </div>
 <div id="info">
@@ -3199,17 +3205,33 @@ L.tileLayer('https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png',{{
   attribution:'© OpenStreetMap',maxZoom:18
 }}).addTo(kart);
 
+const heatData = punkter.map(p => [p.lat, p.lon, p.antall / maks]);
+const heatLag = L.heatLayer(heatData, {{
+  radius: 35, blur: 25, maxZoom: 10, max: 1.0,
+  gradient: {{0.2:'blue', 0.5:'lime', 0.8:'yellow', 1.0:'red'}}
+}});
+
+const boblerLag = L.layerGroup();
 punkter.forEach(p => {{
   const r = Math.max(8, Math.round(30 * Math.sqrt(p.antall / maks)));
   L.circleMarker([p.lat, p.lon], {{
-    radius: r,
-    color: '#4fc3f7',
-    fillColor: '#4fc3f7',
-    fillOpacity: 0.55,
-    weight: 1,
-    opacity: 0.8
-  }}).addTo(kart).bindPopup(`<b>${{p.antall}}</b> unike enheter<br>${{p.lat.toFixed(1)}}, ${{p.lon.toFixed(1)}}`);
+    radius: r, color: '#4fc3f7', fillColor: '#4fc3f7',
+    fillOpacity: 0.55, weight: 1, opacity: 0.8
+  }}).addTo(boblerLag).bindPopup(`<b>${{p.antall}}</b> unike enheter<br>${{p.lat.toFixed(1)}}, ${{p.lon.toFixed(1)}}`);
 }});
+boblerLag.addTo(kart);
+
+function byttVisning(modus) {{
+  if (modus === 'heat') {{
+    kart.removeLayer(boblerLag);
+    heatLag.addTo(kart);
+  }} else {{
+    kart.removeLayer(heatLag);
+    boblerLag.addTo(kart);
+  }}
+  document.getElementById('btn-heat').classList.toggle('aktiv', modus === 'heat');
+  document.getElementById('btn-bobler').classList.toggle('aktiv', modus === 'bobler');
+}}
 </script>
 </body></html>'''
 
