@@ -174,9 +174,41 @@ STASJON_MAPPING_STAVANGER = {
     1821: 138,   # Uno-X Tau
 }
 
+STASJON_MAPPING_KRISTIANSAND = {
+    4247: 3179,    # Circle K Automat Brennåsen
+    4248: 2241,    # Circle K Automat Sørlandsparken
+    4246: 177,     # Circle K Automat Voiebyen
+    4245: 179,     # Circle K Elvegaten
+    4244: 8962,    # Circle K Truck Dalane
+    1529776: 28664, # Driv Skibåsen
+    4293: 6618,    # Esso Express Kjuttaviga
+    4253: 210,     # Esso Express Krossen
+    4231: 498,     # Esso Express Vågsbygd
+    4234: 213,     # Esso Oddemarka
+    4239: 218,     # Esso Søgne
+    4237: 28368,   # Høllen brygge
+    4252: 226,     # St1 Fidjane vest
+    4251: 1291,    # St1 Fidjane øst
+    4222: 1331,    # St1 Mosby
+    4221: 1340,    # St1 Nodeland
+    4250: 236,     # St1 Sørlandsparken
+    4226: 1164,    # St1 Truck Kristiansand
+    4235: 256,     # St1 Valhalla
+    4233: 255,     # St1 Vige
+    4228: 276,     # Uno-X 7-Eleven Vågsbygd
+    4218: 25231,   # Uno-X Hamresanden
+    4220: 25136,   # Uno-X Rosseland
+    4287: 159,     # Uno-X Skibåsen
+    4229: 158,     # Uno-X Sørlandsparken
+    4227: 263,     # YX Håneskrysset
+    4238: 273,     # YX Søgne (automat)
+    4292: 28592,   # YX Truck Veøy Kristiansand
+}
+
 REGIONER = {
-    'haugalandet': STASJON_MAPPING_HAUGALANDET,
-    'stavanger':   STASJON_MAPPING_STAVANGER,
+    'haugalandet':  STASJON_MAPPING_HAUGALANDET,
+    'stavanger':    STASJON_MAPPING_STAVANGER,
+    'kristiansand': STASJON_MAPPING_KRISTIANSAND,
 }
 
 FUEL_NAVN = {1: 'diesel', 2: 'bensin'}

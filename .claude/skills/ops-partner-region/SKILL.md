@@ -6,7 +6,7 @@ allowed-tools: Bash, Read
 
 Vis stasjonsliste for et distrikt og kjør partner1-sync for det distriktet på Pi.
 
-Argument: $ARGUMENTS (regionsnavn — Haugalandet, Stavanger eller Bergen)
+Argument: $ARGUMENTS (regionsnavn — Haugalandet, Stavanger, Bergen eller Kristiansand)
 
 ## Bakgrunn
 
@@ -201,5 +201,45 @@ Regler:
 **Stavanger:**
 - 1857 Esso Sele Servicesenter (matched til "Voll", usikker)
 - 1867 Esso Express Tanke Svilands gate 33 (for lav confidence)
+
+**Kristiansand:**
+- 4300 Circle K Truck Mjåvann (ingen match, nærmeste er Veøy Kristiansand 0.546 km)
+- 4289 Driv Mjåvann (ingen match, nærmeste er Veøy Kristiansand 0.503 km)
+- 4297 YX Truck Rosseland (samme DS-ID 25136 som Uno-X Rosseland — duplikat)
+- 1529712 Norsk Olje Barstølveien (usikker match til DS "Scania" ID 25344)
+- 4288 Preem Kristiansand (usikker match til DS "Kemtek Langemyr" ID 28624)
+
+### Kristiansand (28 stasjoner)
+
+| Vår ID  | Drivstoffappen-ID | Navn |
+|---------|-------------------|------|
+| 4247    | 3179              | Circle K Automat Brennåsen |
+| 4248    | 2241              | Circle K Automat Sørlandsparken |
+| 4246    | 177               | Circle K Automat Voiebyen |
+| 4245    | 179               | Circle K Elvegaten |
+| 4244    | 8962              | Circle K Truck Dalane |
+| 1529776 | 28664             | Driv Skibåsen |
+| 4293    | 6618              | Esso Express Kjuttaviga |
+| 4253    | 210               | Esso Express Krossen |
+| 4231    | 498               | Esso Express Vågsbygd |
+| 4234    | 213               | Esso Oddemarka |
+| 4239    | 218               | Esso Søgne |
+| 4237    | 28368             | Høllen brygge |
+| 4252    | 226               | St1 Fidjane vest |
+| 4251    | 1291              | St1 Fidjane øst |
+| 4222    | 1331              | St1 Mosby |
+| 4221    | 1340              | St1 Nodeland |
+| 4250    | 236               | St1 Sørlandsparken |
+| 4226    | 1164              | St1 Truck Kristiansand |
+| 4235    | 256               | St1 Valhalla |
+| 4233    | 255               | St1 Vige |
+| 4228    | 276               | Uno-X 7-Eleven Vågsbygd |
+| 4218    | 25231             | Uno-X Hamresanden |
+| 4220    | 25136             | Uno-X Rosseland |
+| 4287    | 159               | Uno-X Skibåsen |
+| 4229    | 158               | Uno-X Sørlandsparken |
+| 4227    | 263               | YX Håneskrysset |
+| 4238    | 273               | YX Søgne (automat) |
+| 4292    | 28592             | YX Truck Veøy Kristiansand |
 
 Oppgave: $ARGUMENTS
