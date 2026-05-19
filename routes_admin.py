@@ -8,12 +8,12 @@ import secrets
 import logging
 from datetime import datetime, timedelta, timezone
 from functools import wraps
+from zoneinfo import ZoneInfo
 
 import httpx
 from flask import Blueprint, request, session, redirect, jsonify
 
-from datetime import datetime, timezone
-from zoneinfo import ZoneInfo
+_oslo = ZoneInfo('Europe/Oslo')
 
 from db import (finn_bruker_id, hent_alle_brukere, slett_bruker, har_rolle, sett_roller_bruker,
                 opprett_invitasjon, hent_siste_prisoppdateringer, slett_pris,
@@ -33,7 +33,8 @@ from db import (finn_bruker_id, hent_alle_brukere, slett_bruker, har_rolle, sett
                 hent_endringsforslag, slett_endringsforslag, antall_ubehandlede_endringsforslag,
                 hent_ventende_stasjoner, antall_ventende_stasjoner, godkjenn_stasjon,
                 unike_enheter_per_dag, unike_brukere_per_dag, sett_drivstofftyper, hent_api_nøkler,
-                opprett_api_nøkkel, sett_api_nøkkel_aktiv)
+                opprett_api_nøkkel, sett_api_nøkkel_aktiv,
+                fra_db_ts, til_oslo)
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -732,11 +733,10 @@ def admin_steder():
 @krever_moderator
 def prislogg():
     oppdateringer = hent_siste_prisoppdateringer(limit=200)
-    _oslo = ZoneInfo('Europe/Oslo')
     def _lokal(ts_str):
         if not ts_str:
             return '–'
-        return datetime.fromisoformat(ts_str).replace(tzinfo=timezone.utc).astimezone(_oslo).strftime('%Y-%m-%d %H:%M')
+        return til_oslo(ts_str).strftime('%Y-%m-%d %H:%M')
     rader = []
     for p in oppdateringer:
         def fmt(v):
@@ -1391,10 +1391,11 @@ def admin_nyhet():
     gjenstaar = ''
     if tekst and utloper:
         try:
-            utloper_dt = datetime.fromisoformat(utloper)
-            if datetime.now() < utloper_dt:
+            utloper_dt = datetime.fromisoformat(utloper).replace(tzinfo=_oslo)
+            nå = datetime.now(_oslo)
+            if nå < utloper_dt:
                 aktiv = True
-                delta = utloper_dt - datetime.now()
+                delta = utloper_dt - nå
                 timer = int(delta.total_seconds() // 3600)
                 minutter = int((delta.total_seconds() % 3600) // 60)
                 gjenstaar = f'{timer}t {minutter}m'
@@ -1562,11 +1563,10 @@ def oversikt():
     brukere_dag = unike_brukere_per_dag(30)
     brukere_dag_labels = [r['dato'][5:].replace('-', '.') for r in brukere_dag]
     brukere_dag_values = [r['antall'] for r in brukere_dag]
-    _oslo = ZoneInfo('Europe/Oslo')
     time_labels = []
     time_values = []
     for ts, cnt in stats['besok_per_time']:
-        lokal = datetime.fromisoformat(ts).replace(tzinfo=timezone.utc).astimezone(_oslo)
+        lokal = til_oslo(ts)
         time_labels.append(lokal.strftime('%H:%M'))
         time_values.append(cnt)
     # Nye brukere per time siste 48t
@@ -1574,7 +1574,7 @@ def oversikt():
     bruker_48_labels = []
     bruker_48_values = []
     for ts, cnt in bruker_48t:
-        lokal = datetime.fromisoformat(ts).replace(tzinfo=timezone.utc).astimezone(_oslo)
+        lokal = til_oslo(ts)
         bruker_48_labels.append(lokal.strftime('%d.%m %H:00'))
         bruker_48_values.append(cnt)
     # Prisoppdateringer per time siste 24t
@@ -1584,7 +1584,7 @@ def oversikt():
     pris_uke_values = []
     dag_navn = ['man', 'tir', 'ons', 'tor', 'fre', 'lør', 'søn']
     for ts, cnt in pris_uke:
-        lokal = datetime.fromisoformat(ts).replace(tzinfo=timezone.utc).astimezone(_oslo)
+        lokal = til_oslo(ts)
         if lokal.hour == 0:
             label = dag_navn[lokal.weekday()] + ' ' + lokal.strftime('%d.%m')
         else:
@@ -1596,7 +1596,7 @@ def oversikt():
     pris_48_labels = []
     pris_48_values = []
     for ts, cnt in pris_48t:
-        lokal = datetime.fromisoformat(ts).replace(tzinfo=timezone.utc).astimezone(_oslo)
+        lokal = til_oslo(ts)
         pris_48_labels.append(lokal.strftime('%d.%m %H:00'))
         pris_48_values.append(cnt)
     return f'''<!DOCTYPE html>
@@ -1981,7 +1981,7 @@ def admin_kart():
             tell['gammel7'] += 1
             continue
         try:
-            ts = datetime.fromisoformat(t.replace(' ', 'T')).replace(tzinfo=timezone.utc)
+            ts = fra_db_ts(t)
             timer = (nå - ts).total_seconds() / 3600
         except Exception:
             tell['gammel7'] += 1
@@ -2953,8 +2953,9 @@ def admin_ocr_bilder():
     PAGE_SIZE = 20
 
     base_select = '''SELECT o.id, COALESCE(b.brukernavn, 'bruker ' || o.bruker_id), o.tidspunkt, o.kilde, o.claude_resultat,
-        o.lagret_priser, o.bilde_original, o.bilde_crop, o.stasjon_id, o.claude_ms
-        FROM ocr_statistikk o LEFT JOIN brukere b ON b.id = o.bruker_id'''
+        o.lagret_priser, o.bilde_original, o.bilde_crop, o.stasjon_id, o.claude_ms, s.navn
+        FROM ocr_statistikk o LEFT JOIN brukere b ON b.id = o.bruker_id
+        LEFT JOIN stasjoner s ON s.id = o.stasjon_id'''
 
     with get_conn() as conn:
         if filtre == 'feil':
@@ -2976,7 +2977,7 @@ def admin_ocr_bilder():
     felt_liste = ('bensin', 'diesel', 'bensin98', 'diesel_avgiftsfri')
     kort_html = []
     for r in rows:
-        ocr_id, bruker, tidspunkt, kilde, claude_json, lagret_json, bilde_orig, bilde_crop, st_id, ms = r
+        ocr_id, bruker, tidspunkt, kilde, claude_json, lagret_json, bilde_orig, bilde_crop, st_id, ms, st_navn = r
         ai = json.loads(claude_json) if claude_json else {}
         lagret = json.loads(lagret_json) if lagret_json else None
         bekreftet_felt = set()
@@ -3040,7 +3041,7 @@ def admin_ocr_bilder():
 <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start">
   <div class="bilde-gruppe">{img_html}</div>
   <div style="flex:1;min-width:200px">
-    <div style="color:#9ca3af;font-size:0.85em">{dato} · {html.escape(str(bruker))} · st.{st_id or "?"} · {html.escape(str(modell))} · {ms or "?"}ms{crop_info}</div>
+    <div style="color:#9ca3af;font-size:0.85em">{dato} · {html.escape(str(bruker))} · {html.escape(str(st_navn)) if st_navn else f"st.{st_id or '?'}"} · {html.escape(str(modell))} · {ms or "?"}ms{crop_info}</div>
     <div style="color:#d1d5db;font-size:0.85em">{html.escape(str(kjede or ""))} · confidence: {confidence}</div>
     <div style="margin-top:6px;font-family:monospace;font-size:0.9em">{pris_html}</div>
   </div>

@@ -1,4 +1,5 @@
 import { getInnstillinger } from './settings.js';
+import { fraDbTidspunkt } from './utils.js';
 
 let map = null;
 let userMarker = null;
@@ -150,7 +151,7 @@ function prisIkon(s) {
 
 function prisAlderTimer(tidspunkt) {
     if (!tidspunkt) return null;
-    const ts = new Date(tidspunkt.replace(' ', 'T') + 'Z');
+    const ts = fraDbTidspunkt(tidspunkt);
     return (Date.now() - ts.getTime()) / 3600000;
 }
 

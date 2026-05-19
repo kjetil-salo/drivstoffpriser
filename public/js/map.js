@@ -1,5 +1,6 @@
 import { getInnstillinger } from './settings.js';
 import { getKjedeLogo, getKjedeInitials, getKjedeFarge } from './kjede.js';
+import { fraDbTidspunkt } from './utils.js';
 
 let map = null;
 let userMarker = null;
@@ -295,7 +296,7 @@ function prisIkon(s) {
 
 function prisAlderTimer(tidspunkt) {
     if (!tidspunkt) return null;
-    const ts = new Date(tidspunkt.replace(' ', 'T') + 'Z');
+    const ts = fraDbTidspunkt(tidspunkt);
     return (Date.now() - ts.getTime()) / 3600000;
 }
 
@@ -335,13 +336,21 @@ function lagMarker(s, billigsteTyper = []) {
 }
 
 function fargeIkon(farge, stor = false) {
-    const size = stor ? [31, 51] : [25, 41];
-    const anchor = stor ? [15, 51] : [12, 41];
-    return L.icon({
-        iconUrl: `https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-${farge}.png`,
-        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-        iconSize: size, iconAnchor: anchor,
-        popupAnchor: [1, -34], shadowSize: [41, 41],
+    const farger = { green: '#22c55e', orange: '#f97316', red: '#ef4444', grey: '#9ca3af' };
+    const fill = farger[farge] ?? farger.grey;
+    const w = stor ? 31 : 25;
+    const h = stor ? 51 : 41;
+    const r = w / 2;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+        <path d="M${r} 0C${(r*0.45).toFixed(1)} 0 0 ${(r*0.45).toFixed(1)} 0 ${r}C0 ${(r*1.75).toFixed(1)} ${r} ${h} ${r} ${h}C${r} ${h} ${w} ${(r*1.75).toFixed(1)} ${w} ${r}C${w} ${(r*0.45).toFixed(1)} ${(r*1.55).toFixed(1)} 0 ${r} 0Z" fill="${fill}" stroke="rgba(0,0,0,0.25)" stroke-width="1"/>
+        <circle cx="${r}" cy="${r}" r="${(r*0.38).toFixed(1)}" fill="white" opacity="0.9"/>
+    </svg>`;
+    return L.divIcon({
+        className: '',
+        html: svg,
+        iconSize: [w, h],
+        iconAnchor: [r, h],
+        popupAnchor: [0, -h],
     });
 }
 

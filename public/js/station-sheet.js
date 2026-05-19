@@ -3,6 +3,7 @@ import { getInnstillinger, getEffektivPris, harRabattKort } from './settings.js'
 import { getKjedeFarge, getKjedeInitials, getKjedeLogo } from './kjede.js';
 import { initOcr, visOcrForRolle, skjulOcrPreview, loggOcrVedLagring, loggOcrVedBekreftelse } from './ocr.js';
 import { erFavoritt, toggleFavoritt } from './favoritter.js';
+import { fraDbTidspunkt, prisAlderKlasse } from './utils.js';
 
 let aktivStasjon = null;
 let onPrisOppdatert = null;
@@ -710,14 +711,6 @@ function formatPris(v) {
     return v.toFixed(2).replace('.', ',');
 }
 
-function prisAlderKlasse(tidspunkt) {
-    if (!tidspunkt) return 'alder-ingen';
-    const timer = (Date.now() - new Date(tidspunkt.replace(' ', 'T') + 'Z').getTime()) / 3600000;
-    if (timer < 8) return 'alder-fersk';
-    if (timer < 24) return 'alder-gammel';
-    if (timer < 48) return 'alder-utdatert';
-    return 'alder-kritisk';
-}
 
 function formatPrisInput(v) {
     return v.toFixed(2).replace('.', ',');
@@ -784,7 +777,7 @@ function avstandTekst(m) {
 
 function formaterPrisTid(tidStr) {
     try {
-        const d = new Date(tidStr.replace(' ', 'T') + 'Z');
+        const d = fraDbTidspunkt(tidStr);
         const diffMs = Date.now() - d.getTime();
         const min = Math.floor(diffMs / 60000);
         const timer = Math.floor(diffMs / 3600000);
@@ -803,7 +796,7 @@ function formaterPrisTid(tidStr) {
 
 function formaterTid(tidStr) {
     try {
-        const d = new Date(tidStr.replace(' ', 'T') + 'Z');
+        const d = fraDbTidspunkt(tidStr);
         const diffMs = Date.now() - d.getTime();
         const min = Math.floor(diffMs / 60000);
         const timer = Math.floor(diffMs / 3600000);

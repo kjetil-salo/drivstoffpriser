@@ -760,11 +760,11 @@ html, body {
   background: var(--color-card-bg);
   border: 1px solid var(--border-color-medium);
   border-radius: var(--radius-md);
-  padding: 8px 12px;
-  margin-bottom: 3px;
+  padding: 6px 10px;
+  margin-bottom: 2px;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .stasjon-kort.billigst-kort {
@@ -793,19 +793,19 @@ html, body {
 
 
 
-.sk-pris-rad.sort-aktiv {
+.sk-pris-chip.sort-aktiv {
   border-color: var(--color-accent);
   background: var(--color-accent-soft);
 }
 
-.sk-pris-rad.sort-aktiv .sk-pris-label {
+.sk-pris-chip.sort-aktiv .sk-pris-label {
   font-weight: 800;
   color: var(--color-accent);
 }
 
 .sk-badge {
-  width: 40px;
-  height: 40px;
+  width: 34px;
+  height: 34px;
   border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
@@ -853,22 +853,34 @@ html, body {
 
 .sk-priser {
   display: flex;
-  gap: var(--space-xs);
-  margin-top: var(--space-xs);
+  gap: 2px;
+  margin-top: 3px;
   font-size: var(--font-sm);
+  flex-wrap: wrap;
+  align-items: center;
 }
 
-.sk-pris-rad {
-  display: flex;
-  flex-direction: column;
+.sk-pris-chip {
+  display: inline-flex;
   align-items: center;
-  width: 72px;
-  flex-shrink: 0;
-  flex-grow: 0;
-  padding: 3px 6px;
+  gap: 3px;
+  padding: 2px 5px;
   border-radius: var(--radius-sm);
   border: 1.5px solid transparent;
+  white-space: nowrap;
 }
+
+.sk-pris-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.sk-pris-dot.alder-fersk    { background: var(--color-success); }
+.sk-pris-dot.alder-gammel   { background: var(--color-fuel); }
+.sk-pris-dot.alder-utdatert { background: var(--color-muted); }
+.sk-pris-dot.alder-kritisk  { background: var(--color-danger, #ef4444); }
+.sk-pris-dot.alder-ingen    { display: none; }
 
 .sk-pris-label {
   font-size: var(--font-xs);
@@ -894,7 +906,7 @@ html, body {
 .sk-pris-verdi {
   font-weight: 700;
   color: var(--color-fuel);
-  font-size: var(--font-md);
+  font-size: var(--font-sm);
   white-space: nowrap;
 }
 
@@ -978,6 +990,22 @@ html, body {
   background: rgba(59,130,246,0.25);
 }
 
+.sk-endre-btn {
+  background: rgba(245,158,11,0.12);
+  border: 1px solid rgba(245,158,11,0.35);
+  border-radius: var(--radius-sm);
+  color: var(--color-fuel);
+  padding: 5px 7px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+.sk-endre-btn:active {
+  background: rgba(245,158,11,0.25);
+}
+
 .sk-fav-btn {
   background: transparent;
   border: 1px solid rgba(148,163,184,0.2);
@@ -1057,6 +1085,7 @@ html, body {
 .alder-fersk { color: var(--color-success); }
 .alder-gammel { color: var(--color-fuel); }
 .alder-utdatert { color: var(--color-muted); }
+.alder-kritisk { color: var(--color-danger, #ef4444); }
 .alder-ingen { color: var(--color-muted); }
 
 .pris-alder-tekst {
@@ -1067,6 +1096,7 @@ html, body {
 .pris-alder-tekst.alder-fersk { color: var(--color-success); }
 .pris-alder-tekst.alder-gammel { color: var(--color-fuel); }
 .pris-alder-tekst.alder-utdatert { color: var(--color-muted); }
+.pris-alder-tekst.alder-kritisk { color: var(--color-danger, #ef4444); }
 .pris-alder-tekst.alder-ingen { display: none; }
 
 .pris-alder-dot {
@@ -1082,21 +1112,6 @@ html, body {
 .pris-alder-dot.alder-kritisk  { background: var(--color-danger, #ef4444); }
 .pris-alder-dot.alder-ingen    { display: none; }
 
-.sk-endre-btn {
-  background: transparent;
-  border: 1px solid var(--border-color-medium);
-  border-radius: var(--radius-sm);
-  color: var(--color-muted);
-  font-size: var(--font-xs);
-  padding: 4px 10px;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: all var(--transition-base);
-}
-.sk-endre-btn:hover {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
-}
 
 /* ── Bottom Tabs ─────────────────────────────────── */
 #tabs {
@@ -1969,6 +1984,86 @@ html, body {
   display: none !important;
 }
 
+/* ── Tid-hjul (power users) ─────────────────── */
+.tid-hjul-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+  padding-bottom: 14px;
+}
+
+.tid-hjul-container {
+  position: relative;
+  width: 62px;
+  height: 132px;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+}
+
+.tid-hjul-liste {
+  height: 100%;
+  overflow-y: scroll;
+  scroll-snap-type: y mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.tid-hjul-liste::-webkit-scrollbar { display: none; }
+
+.tid-hjul-item {
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  scroll-snap-align: center;
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--color-muted);
+  user-select: none;
+}
+
+.tid-hjul-ghost { visibility: hidden; }
+
+/* Highlight-stripe i midten */
+.tid-hjul-container::before {
+  content: '';
+  position: absolute;
+  top: 44px; height: 44px;
+  left: 0; right: 0;
+  border-top: 1.5px solid var(--border-color-medium);
+  border-bottom: 1.5px solid var(--border-color-medium);
+  pointer-events: none;
+  z-index: 2;
+  transition: border-color 0.2s;
+}
+
+/* Fade øverst og nederst */
+.tid-hjul-container::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    var(--color-card-bg) 0%,
+    transparent 28%,
+    transparent 72%,
+    var(--color-card-bg) 100%
+  );
+  pointer-events: none;
+  z-index: 1;
+}
+
+.tid-hjul-container.aktiv::before {
+  border-color: #f59e0b;
+}
+
+.tid-hjul-enhet {
+  font-size: var(--font-sm);
+  color: var(--color-muted);
+}
+
+#sheet-tid-siden[hidden] { display: none !important; }
+
 .pris-input-rad {
   position: relative;
 }
@@ -2519,10 +2614,27 @@ html, body {
   margin-top: 2rem;
 }
 
+.stat-priser-kontroll {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+}
+
+.stat-tidsvindu-velger {
+  flex-shrink: 0;
+}
+
+.stat-radius-eigen-input {
+  width: 4rem;
+}
+
 .stat-omrade-toggle {
   display: flex;
   gap: var(--space-xs);
-  margin-bottom: var(--space-sm);
+  flex-wrap: wrap;
+  margin-bottom: 0;
 }
 
 .stat-toggle-knapp {

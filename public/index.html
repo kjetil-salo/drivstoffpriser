@@ -123,20 +123,31 @@
     <div id="statistikk-innhold" class="statistikk-container">
       <h2 class="statistikk-tittel">Statistikk</h2>
 
-      <h3 class="stat-seksjon-tittel">Priser siste 24 timer</h3>
+      <h3 id="stat-priser-tittel" class="stat-seksjon-tittel">Priser siste 24 timer</h3>
 
-      <div id="stat-omrade-toggle" class="stat-omrade-toggle" role="group" aria-label="Område for prisstatistikk">
-        <button id="stat-toggle-norge" class="stat-toggle-knapp aktiv" aria-pressed="true">Norge</button>
-        <button id="stat-toggle-naerhet" class="stat-toggle-knapp" aria-pressed="false">📍 Nærhet</button>
-        <div id="stat-radius-velger" class="stat-radius-velger" hidden>
-          <label for="stat-radius-select" class="sr-only">Radius</label>
-          <select id="stat-radius-select" class="stat-radius-select">
-            <option value="10">10 km</option>
-            <option value="25" selected>25 km</option>
-            <option value="50">50 km</option>
-            <option value="100">100 km</option>
+      <div class="stat-priser-kontroll">
+        <div id="stat-omrade-toggle" class="stat-omrade-toggle" role="group" aria-label="Område for prisstatistikk">
+          <button id="stat-toggle-norge" class="stat-toggle-knapp aktiv" aria-pressed="true">Norge</button>
+          <button id="stat-toggle-naerhet" class="stat-toggle-knapp" aria-pressed="false">📍 Nærhet</button>
+          <div id="stat-radius-velger" class="stat-radius-velger" hidden>
+            <label for="stat-radius-select" class="sr-only">Radius</label>
+            <select id="stat-radius-select" class="stat-radius-select">
+              <option value="10">10 km</option>
+              <option value="25" selected>25 km</option>
+              <option value="50">50 km</option>
+              <option value="100">100 km</option>
+              <option value="egen">Eigen</option>
+            </select>
+            <input id="stat-radius-egen" type="text" inputmode="decimal" placeholder="km" class="stat-radius-select stat-radius-eigen-input" hidden aria-label="Eigen radius i kilometer">
+            <span id="stat-gps-status" class="stat-gps-status" aria-live="polite"></span>
+          </div>
+        </div>
+        <div class="stat-tidsvindu-velger">
+          <label for="stat-tidsvindu-select" class="sr-only">Tidsvindu</label>
+          <select id="stat-tidsvindu-select" class="stat-radius-select">
+            <option value="24" selected>24 timer</option>
+            <option value="8">8 timer</option>
           </select>
-          <span id="stat-gps-status" class="stat-gps-status" aria-live="polite"></span>
         </div>
       </div>
 
@@ -539,9 +550,22 @@
             </div>
           </div>
         </div>
+        <div id="sheet-tid-siden" hidden>
+          <div class="tid-hjul-wrapper">
+            <div class="tid-hjul-container" id="hjul-timer-container">
+              <div class="tid-hjul-liste" id="hjul-timer" role="listbox" aria-label="Timer tilbake"></div>
+            </div>
+            <span class="tid-hjul-enhet">t</span>
+            <div class="tid-hjul-container" id="hjul-minutter-container">
+              <div class="tid-hjul-liste" id="hjul-minutter" role="listbox" aria-label="Minutter tilbake"></div>
+            </div>
+            <span class="tid-hjul-enhet">min siden</span>
+          </div>
+        </div>
         <div id="sheet-edit-status" role="status" aria-live="polite"></div>
         <div class="modal-btns">
           <button id="sheet-edit-avbryt" class="btn-avbryt">Avbryt</button>
+          <button id="sheet-edit-bekreft-alle" class="btn-lagre">Bekreft</button>
         </div>
       </div>
 

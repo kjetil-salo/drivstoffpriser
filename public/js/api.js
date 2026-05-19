@@ -101,11 +101,13 @@ export async function settDrivstofftyper(stasjonId, typer) {
     return resp.json();
 }
 
-export async function oppdaterPris(stasjonId, bensin, diesel, bensin98, diesel_avgiftsfri) {
+export async function oppdaterPris(stasjonId, bensin, diesel, bensin98, diesel_avgiftsfri, minutter_siden = 0) {
+    const body = { stasjon_id: stasjonId, bensin, diesel, bensin98, diesel_avgiftsfri };
+    if (minutter_siden > 0) body.minutter_siden = minutter_siden;
     const resp = await fetch('/api/pris', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ stasjon_id: stasjonId, bensin, diesel, bensin98, diesel_avgiftsfri }),
+        body: JSON.stringify(body),
     });
     if (resp.status === 401) return { status: 401 };
     if (!resp.ok) {

@@ -1,4 +1,5 @@
 import { getKjedeFarge, getKjedeInitials, getKjedeLogo } from './kjede.js';
+import { fraDbTidspunkt } from './utils.js';
 
 // ── State ─────────────────────────────────────────
 let posisjon = null;
@@ -160,7 +161,7 @@ async function hentOgVis() {
 function prioritet(s) {
     const ts = nyesteTidspunkt(s);
     if (!ts) return 0;
-    const alder = (Date.now() - new Date(ts + 'Z')) / 3600000;
+    const alder = (Date.now() - fraDbTidspunkt(ts).getTime()) / 3600000;
     if (alder > 24) return 1;
     if (alder > 6)  return 2;
     return 3;
@@ -226,7 +227,7 @@ function lagKort(s) {
 
     const ts = nyesteTidspunkt(s);
     const alderTekst = ts ? formaterAlder(ts) : null;
-    const gammel = !ts || (Date.now() - new Date(ts + 'Z')) > 24 * 3600000;
+    const gammel = !ts || (Date.now() - fraDbTidspunkt(ts).getTime()) > 24 * 3600000;
 
     li.innerHTML = `
       <div class="b-kort-topp">
@@ -263,7 +264,7 @@ function lagRader(s) {
         s.har_diesel !== false            ? { type: 'diesel',            label: 'Diesel',   v: s.diesel,            ts: s.diesel_tidspunkt }            : null,
         s.har_diesel_avgiftsfri !== false ? { type: 'diesel_avgiftsfri', label: 'Avg.fri',  v: s.diesel_avgiftsfri, ts: s.diesel_avgiftsfri_tidspunkt } : null,
     ].filter(Boolean).map(({ type, label, v, ts }) => {
-        const alder = ts ? (Date.now() - new Date(ts + 'Z')) / 3600000 : Infinity;
+        const alder = ts ? (Date.now() - fraDbTidspunkt(ts).getTime()) / 3600000 : Infinity;
         const dot = alder < 6 ? 'b-dot-fersk' : alder < 24 ? 'b-dot-ok' : 'b-dot-gammel';
         const pris = v != null ? v.toFixed(2) : '–';
         const harPrisRad = v != null;
@@ -441,7 +442,7 @@ function nyesteTidspunkt(s) {
 }
 
 function formaterAlder(ts) {
-    const diff = Date.now() - new Date(ts + 'Z');
+    const diff = Date.now() - fraDbTidspunkt(ts).getTime();
     const dager = Math.floor(diff / 86400000);
     const timer = Math.floor(diff / 3600000);
     const min   = Math.floor(diff / 60000);

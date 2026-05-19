@@ -1,21 +1,24 @@
 import { getInnstillinger, getEffektivPris, harRabattKort, getRabattVisning } from './settings.js';
 import { getKjedeFarge, getKjedeInitials, getKjedeLogo } from './kjede.js';
 import { erFavoritt, toggleFavoritt, hentFavoritter } from './favoritter.js';
+import { fraDbTidspunkt, prisAlderKlasse, prisAlderTekst, prisAlderTekstKort } from './utils.js';
 
 let aktivSort = 'avstand';
 let sisteStasjoner = [];
 let sisteOnKlikk = null;
+let sisteOnEndrePris = null;
 let visGamle = localStorage.getItem('liste_vis_gamle') === '1';
 let visFavoritter = false;
 const MAKS_TOPPLISTE_ALDER_TIMER = 24 * 7;
 
 document.addEventListener('favoritt-endret', () => {
-    if (sisteStasjoner.length) visListe(sisteStasjoner, sisteOnKlikk);
+    if (sisteStasjoner.length) visListe(sisteStasjoner, sisteOnKlikk, sisteOnEndrePris);
 });
 
-export function visListe(stasjoner, onKlikk) {
+export function visListe(stasjoner, onKlikk, onEndrePris) {
     sisteStasjoner = stasjoner;
     sisteOnKlikk = onKlikk;
+    if (onEndrePris) sisteOnEndrePris = onEndrePris;
 
     const container = document.getElementById('liste');
     const info = document.getElementById('liste-info');
@@ -86,7 +89,7 @@ export function visListe(stasjoner, onKlikk) {
         ? `<div class="favoritter-tom">Ingen favoritter i nærheten.<br>Trykk ♥ på en stasjon for å lagre den.</div>`
         : '';
 
-    container.innerHTML = tomFavoritterHtml + sortert.map(s => kortHtml(s, billigste, s.id === billigsteId)).join('');
+    container.innerHTML = tomFavoritterHtml + sortert.map(s => kortHtml(s, billigste, billigsteId.has(s.id))).join('');
 
     container.querySelectorAll('.stasjon-kort').forEach(kort => {
         const id = parseInt(kort.dataset.id, 10);
@@ -116,6 +119,15 @@ export function visListe(stasjoner, onKlikk) {
             toggleFavoritt(id);
         });
     });
+
+    container.querySelectorAll('.sk-endre-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const id = parseInt(btn.dataset.endreId, 10);
+            const stasjon = stasjoner.find(s => s.id === id);
+            if (stasjon && sisteOnEndrePris) sisteOnEndrePris(stasjon);
+        });
+    });
 }
 
 export function oppdaterKort(stasjon, onKlikk) {
@@ -125,7 +137,7 @@ export function oppdaterKort(stasjon, onKlikk) {
     const billigste = finnBilligste(sisteStasjoner, inn);
     const billigsteId = finnBilligsteId(sisteStasjoner, inn, aktivSort);
     const nytt = document.createElement('div');
-    nytt.innerHTML = kortHtml(stasjon, billigste, stasjon.id === billigsteId);
+    nytt.innerHTML = kortHtml(stasjon, billigste, billigsteId.has(stasjon.id));
     const nyttKort = nytt.firstElementChild;
     nyttKort.addEventListener('click', () => onKlikk(stasjon));
     const favBtn = nyttKort.querySelector('.sk-fav-btn');
@@ -142,6 +154,13 @@ export function oppdaterKort(stasjon, onKlikk) {
             document.dispatchEvent(new CustomEvent('vis-pa-kart', { detail: stasjon }));
         });
     }
+    const endreBtn = nyttKort.querySelector('.sk-endre-btn');
+    if (endreBtn) {
+        endreBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (sisteOnEndrePris) sisteOnEndrePris(stasjon);
+        });
+    }
     kort.replaceWith(nyttKort);
 }
 
@@ -149,18 +168,22 @@ function finnBilligste(stasjoner, inn) {
     const billigste = {};
     for (const type of ['bensin', 'bensin98', 'diesel', 'diesel_avgiftsfri']) {
         if (!inn[type]) continue;
-        let min = Infinity, minId = null;
+        let min = Infinity;
+        const minIds = new Set();
         for (const s of stasjoner) {
             const pris = aktuellPris(s, type);
-            if (pris != null && pris < min) { min = pris; minId = s.id; }
+            if (pris == null) continue;
+            if (pris < min) { min = pris; minIds.clear(); minIds.add(s.id); }
+            else if (pris === min) { minIds.add(s.id); }
         }
-        if (minId !== null) billigste[type] = minId;
+        if (minIds.size) billigste[type] = minIds;
     }
     return billigste;
 }
 
 function finnBilligsteId(stasjoner, inn, felt) {
-    let minPris = Infinity, minId = null;
+    let minPris = Infinity;
+    const minIds = new Set();
     for (const s of stasjoner) {
         const priser = felt && felt !== 'avstand'
             ? (inn[felt] ? [aktuellPris(s, felt)].filter(v => v != null) : [])
@@ -172,17 +195,20 @@ function finnBilligsteId(stasjoner, inn, felt) {
               ].filter(v => v != null);
         if (!priser.length) continue;
         const min = Math.min(...priser);
-        if (min < minPris) { minPris = min; minId = s.id; }
+        if (min < minPris) { minPris = min; minIds.clear(); minIds.add(s.id); }
+        else if (min === minPris) { minIds.add(s.id); }
     }
-    return minId;
+    return minIds;
 }
 
-function sorter(stasjoner, felt, billigsteId) {
+function sorter(stasjoner, felt, billigsteIds) {
     return [...stasjoner].sort((a, b) => {
         // Billigste øverst kun ved prissortering
         if (felt !== 'avstand') {
-            if (a.id === billigsteId) return -1;
-            if (b.id === billigsteId) return 1;
+            const aBilligst = billigsteIds.has(a.id);
+            const bBilligst = billigsteIds.has(b.id);
+            if (aBilligst && !bBilligst) return -1;
+            if (bBilligst && !aBilligst) return 1;
         }
         if (felt === 'avstand') return (a.avstand_m ?? Infinity) - (b.avstand_m ?? Infinity);
         const av = aktuellPris(a, felt) ?? Infinity;
@@ -196,7 +222,7 @@ function harFerskPris(s) {
         if (s[type] == null) continue;
         const ts = s[`${type}_tidspunkt`];
         if (!ts) continue;
-        const alderTimer = (Date.now() - new Date(ts.replace(' ', 'T') + 'Z').getTime()) / 3600000;
+        const alderTimer = (Date.now() - fraDbTidspunkt(ts).getTime()) / 3600000;
         if (alderTimer <= 24) return true;
     }
     return false;
@@ -206,7 +232,7 @@ function aktuellPris(s, type) {
     if (!s || s[type] == null) return null;
     const ts = s[`${type}_tidspunkt`];
     if (!ts) return null;
-    const alderTimer = (Date.now() - new Date(ts.replace(' ', 'T') + 'Z').getTime()) / 3600000;
+    const alderTimer = (Date.now() - fraDbTidspunkt(ts).getTime()) / 3600000;
     if (alderTimer > MAKS_TOPPLISTE_ALDER_TIMER) return null;
     return getEffektivPris(s[type], s.kjede, getInnstillinger());
 }
@@ -224,49 +250,16 @@ function avstandTekst(m) {
     return m < 1000 ? `${m} m` : `${(m / 1000).toFixed(1)} km`;
 }
 
-function prisAlderTekst(tidspunkt) {
-    if (!tidspunkt) return null;
-    const d = new Date(tidspunkt.replace(' ', 'T') + 'Z');
-    const diffMs = Date.now() - d.getTime();
-    const min = Math.floor(diffMs / 60000);
-    const timer = Math.floor(diffMs / 3600000);
-    if (min < 1) return 'akkurat nå';
-    if (min < 60) return `${min} min siden`;
-    if (timer < 3) { const restMin = min - timer * 60; return `${timer} t${restMin > 0 ? ` ${restMin} min` : ''} siden`; }
-    if (timer < 24) return `${timer} t siden`;
-    return 'over 24 t';
-}
-
-function prisAlderTekstKort(tidspunkt) {
-    if (!tidspunkt) return null;
-    const d = new Date(tidspunkt.replace(' ', 'T') + 'Z');
-    const diffMs = Date.now() - d.getTime();
-    const min = Math.floor(diffMs / 60000);
-    const timer = Math.floor(diffMs / 3600000);
-    if (min < 1) return 'nå';
-    if (min < 60) return `${min} min`;
-    if (timer < 24) return `${timer} t`;
-    return `>${Math.floor(timer / 24)}d`;
-}
-
-function prisAlderKlasse(tidspunkt) {
-    if (!tidspunkt) return 'alder-ingen';
-    const timer = (Date.now() - new Date(tidspunkt.replace(' ', 'T') + 'Z').getTime()) / 3600000;
-    if (timer < 8) return 'alder-fersk';
-    if (timer < 24) return 'alder-gammel';
-    return 'alder-utdatert';
-}
-
 
 function kortHtml(s, billigste = {}, erHovedBilligst = false) {
     const inn = getInnstillinger();
     const harRabatt = harRabattKort(s.kjede, inn);
     const rabattVisning = getRabattVisning(s.kjede, inn);
     const rader = [
-        inn.bensin              ? { label: '95',     råpris: s.bensin,              v: formatPris(getEffektivPris(s.bensin, s.kjede, inn)),              billigst: billigste.bensin              === s.id, type: 'bensin',              ts: s.bensin_tidspunkt              } : null,
-        inn.bensin98            ? { label: '98',     råpris: s.bensin98,            v: formatPris(getEffektivPris(s.bensin98, s.kjede, inn)),            billigst: billigste.bensin98            === s.id, type: 'bensin98',            ts: s.bensin98_tidspunkt            } : null,
-        inn.diesel              ? { label: 'Diesel', råpris: s.diesel,              v: formatPris(getEffektivPris(s.diesel, s.kjede, inn)),              billigst: billigste.diesel              === s.id, type: 'diesel',              ts: s.diesel_tidspunkt              } : null,
-        inn.diesel_avgiftsfri   ? { label: 'Avg.fri', råpris: s.diesel_avgiftsfri,  v: formatPris(getEffektivPris(s.diesel_avgiftsfri, s.kjede, inn)),  billigst: billigste.diesel_avgiftsfri   === s.id, type: 'diesel_avgiftsfri',   ts: s.diesel_avgiftsfri_tidspunkt   } : null,
+        inn.bensin              ? { label: '95',     råpris: s.bensin,              v: formatPris(getEffektivPris(s.bensin, s.kjede, inn)),              billigst: billigste.bensin?.has(s.id)              ?? false, type: 'bensin',              ts: s.bensin_tidspunkt              } : null,
+        inn.bensin98            ? { label: '98',     råpris: s.bensin98,            v: formatPris(getEffektivPris(s.bensin98, s.kjede, inn)),            billigst: billigste.bensin98?.has(s.id)            ?? false, type: 'bensin98',            ts: s.bensin98_tidspunkt            } : null,
+        inn.diesel              ? { label: 'Diesel', råpris: s.diesel,              v: formatPris(getEffektivPris(s.diesel, s.kjede, inn)),              billigst: billigste.diesel?.has(s.id)              ?? false, type: 'diesel',              ts: s.diesel_tidspunkt              } : null,
+        inn.diesel_avgiftsfri   ? { label: 'Avg.fri', råpris: s.diesel_avgiftsfri,  v: formatPris(getEffektivPris(s.diesel_avgiftsfri, s.kjede, inn)),  billigst: billigste.diesel_avgiftsfri?.has(s.id)   ?? false, type: 'diesel_avgiftsfri',   ts: s.diesel_avgiftsfri_tidspunkt   } : null,
     ].filter(Boolean);
     const kjedeEllerNavn = s.kjede || s.navn;
     const logoUrl = getKjedeLogo(kjedeEllerNavn);
@@ -275,8 +268,8 @@ function kortHtml(s, billigste = {}, erHovedBilligst = false) {
     const eNavn = escapeHtml(s.navn);
     const eKjede = escapeHtml(s.kjede);
     const badgeHtml = `<div class="sk-badge" style="background:${farge};position:relative">` +
-        `<span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:#fff">${escapeHtml(initials)}</span>` +
-        (logoUrl ? `<img src="${logoUrl}" alt="${eKjede}" style="position:relative;width:28px;height:28px;object-fit:contain;background:#fff;border-radius:6px;padding:2px" onerror="this.style.display='none'">` : '') +
+        `<span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:800;color:#fff">${escapeHtml(initials)}</span>` +
+        (logoUrl ? `<img src="${logoUrl}" alt="${eKjede}" style="position:relative;width:28px;height:28px;object-fit:contain" onerror="this.style.display='none'">` : '') +
         `</div>`;
     const kortKlasse = erHovedBilligst ? ' billigst-kort' : '';
     const bannerHtml = erHovedBilligst ? '<div class="sk-billigst-banner">★ billigste stasjon</div>' : '';
@@ -290,17 +283,20 @@ function kortHtml(s, billigste = {}, erHovedBilligst = false) {
                 <span class="sk-avstand">${avstandTekst(s.avstand_m)}</span>
             </div>
             <div class="sk-priser">
-                ${rader.map(r => `<div class="sk-pris-rad${r.type === aktivSort ? ' sort-aktiv' : ''}">
+                ${rader.map(r => `<div class="sk-pris-chip${r.type === aktivSort ? ' sort-aktiv' : ''}"${r.v && r.ts ? ` title="${prisAlderTekst(r.ts)}"` : ''}>
+                    ${r.ts ? `<span class="sk-pris-dot ${prisAlderKlasse(r.ts)}" aria-hidden="true"></span>` : ''}
                     <span class="sk-pris-label">${r.label}</span>
                     <span class="sk-pris-verdi ${r.v ? (r.billigst ? 'billigst' : '') : 'ingen'}">${r.v ?? '–'}${harRabatt && r.v ? '<span class="sk-din-pris"> din</span>' : ''}</span>
-                    ${r.v && r.ts ? `<span class="pris-alder-tekst ${prisAlderKlasse(r.ts)}" title="${prisAlderTekst(r.ts)}">${prisAlderTekstKort(r.ts)}</span>` : ''}
                 </div>`).join('')}
             </div>
         </div>
         <div class="sk-hoyre">
-            ${s.brukeropprettet ? `<a class="sk-gmaps-btn" href="https://www.google.com/maps?q=${s.lat},${s.lon}" target="_blank" rel="noopener" aria-label="Åpne ${s.navn} i Google Maps" onclick="event.stopPropagation()">
+            ${s.brukeropprettet ? `<a class="sk-gmaps-btn" href="https://www.google.com/maps?q=${s.lat},${s.lon}" target="_blank" rel="noopener" aria-label="Åpne ${eNavn} i Google Maps" onclick="event.stopPropagation()">
                 <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
             </a>` : ''}
+            ${(window.__innlogget || window.__anonymTillatt) ? `<button class="sk-endre-btn" aria-label="Endre pris for ${eNavn}" data-endre-id="${s.id}">
+                <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            </button>` : ''}
             <button class="sk-fav-btn${erFavoritt(s.id) ? ' aktiv' : ''}" aria-label="${erFavoritt(s.id) ? 'Fjern fra favoritter' : 'Legg til i favoritter'}" aria-pressed="${erFavoritt(s.id)}" data-fav-id="${s.id}">
                 <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
             </button>

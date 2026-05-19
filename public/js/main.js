@@ -2,7 +2,7 @@ import { hentStasjoner } from './api.js';
 import { hentPosisjon, startFollowWatch } from './location.js';
 import { initMap, sentrerKart, panTilPosisjon, visUserPosisjon, oppdaterUserMarker, registrerBrukerDrag, visStasjoner, oppdaterStasjonPriser, initKartBevegelse, refreshKartInnstillinger, getKartSenter, visRutePris, fjernRutePris } from './map.js';
 import { visListe, oppdaterKort } from './list.js';
-import { initSheet, visStasjonSheet, oppdaterSheetStasjon, lukkSheet, refreshSheetInnstillinger } from './station-sheet.js';
+import { initSheet, visStasjonSheet, oppdaterSheetStasjon, lukkSheet, refreshSheetInnstillinger, åpneEditModus } from './station-sheet.js';
 import { initHurtigpris, åpneHurtigKamera } from './hurtigpris.js';
 import { initSearch } from './search.js';
 import { initInnstillinger, getInnstillinger, triggerInstallPrompt, erInstallbar, applyServerPreferences, initRabattkortModal } from './settings.js';
@@ -24,6 +24,19 @@ function lagrePosisjon(pos) {
     try {
         localStorage.setItem(LAGRET_POS_KEY, JSON.stringify({ lat: pos.lat, lon: pos.lon }));
     } catch {}
+}
+
+let _serverPosTid = 0;
+function lagreServerPos(lat, lon) {
+    if (!window.__innlogget) return;
+    const nå = Date.now();
+    if (nå - _serverPosTid < 30000) return;
+    _serverPosTid = nå;
+    fetch('/api/bruker/siste-pos', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lat, lon }),
+    }).catch(() => {});
 }
 
 // ── State ─────────────────────────────────────────
@@ -158,6 +171,9 @@ window.__erAdmin = meg.er_admin || false;
 window.__roller = meg.roller || [];
 window.__anonymTillatt = meg.anonym_innlegging || false;
 if (meg.innlogget && meg.preferences) applyServerPreferences(meg.preferences);
+const serverPos = (meg.innlogget && meg.preferences?.siste_pos?.lat != null && meg.preferences?.siste_pos?.lon != null)
+    ? { lat: meg.preferences.siste_pos.lat, lon: meg.preferences.siste_pos.lon }
+    : null;
 
 const authLenke = document.getElementById('auth-lenke');
 
@@ -261,7 +277,7 @@ initAddStation((nyStasjon) => {
     };
     stasjoner.push(s);
     visStasjoner(stasjoner, visStasjonSheet);
-    if (viewListe.style.display !== 'none') visListe(stasjoner, visStasjonSheet);
+    if (viewListe.style.display !== 'none') visListe(stasjoner, visStasjonSheet, åpneEditModus);
     sentrerKart(s.lat, s.lon, 16);
 });
 
@@ -284,7 +300,7 @@ const _qLon = parseFloat(_qp.get('lon'));
 const _fraAdmin = !isNaN(_qLat) && !isNaN(_qLon);
 const _stasjonId = _qp.get('stasjon') ? parseInt(_qp.get('stasjon')) : null;
 const lagretPos = hentLagretPos();
-initMap('map', _fraAdmin ? { lat: _qLat, lon: _qLon } : lagretPos);
+initMap('map', _fraAdmin ? { lat: _qLat, lon: _qLon } : (lagretPos || serverPos));
 
 initRuteplanlegger({
     getStartPos: () => userPos || hentLagretPos() || getKartSenter(),
@@ -294,7 +310,7 @@ initRuteplanlegger({
 });
 
 // ── Velkomst-overlay ──────────────────────────────
-if (!lagretPos && !_fraAdmin) {
+if (!lagretPos && !serverPos && !_fraAdmin) {
     velkomst.removeAttribute('hidden');
     document.getElementById('velkomst-posisjon-btn').addEventListener('click', () => {
         velkomst.setAttribute('hidden', '');
@@ -309,7 +325,7 @@ if (!lagretPos && !_fraAdmin) {
 // ── Innstillinger ─────────────────────────────────
 let sisteRadius = getInnstillinger().radius;
 const _onInnstillingerChange = async (ny) => {
-    if (viewListe.style.display !== 'none') visListe(stasjoner, visStasjonSheet);
+    if (viewListe.style.display !== 'none') visListe(stasjoner, visStasjonSheet, åpneEditModus);
     refreshKartInnstillinger();
     refreshSheetInnstillinger();
 
@@ -320,7 +336,7 @@ const _onInnstillingerChange = async (ny) => {
             try {
                 stasjoner = await hentStasjoner(pos.lat, pos.lon);
                 visStasjoner(stasjoner, visStasjonSheet);
-                if (viewListe.style.display !== 'none') visListe(stasjoner, visStasjonSheet);
+                if (viewListe.style.display !== 'none') visListe(stasjoner, visStasjonSheet, åpneEditModus);
             } catch {}
         }
     }
@@ -339,7 +355,7 @@ initKartBevegelse(async (lat, lon) => {
         stasjoner = nye;
         locStatus.textContent = '';
         visStasjoner(stasjoner, visStasjonSheet);
-        if (viewListe.style.display !== 'none') visListe(stasjoner, visStasjonSheet);
+        if (viewListe.style.display !== 'none') visListe(stasjoner, visStasjonSheet, åpneEditModus);
     } catch (e) {
         if (e.utenfor) locStatus.textContent = 'Kun tilgjengelig i Norge';
     }
@@ -353,16 +369,17 @@ initSearch(async (sted) => {
         stasjoner = await hentStasjoner(sted.lat, sted.lon);
         locStatus.textContent = '';
         lagrePosisjon({ lat: sted.lat, lon: sted.lon });
+        lagreServerPos(sted.lat, sted.lon);
         velkomst.setAttribute('hidden', '');
         visStasjoner(stasjoner, visStasjonSheet);
-        if (viewListe.style.display !== 'none') visListe(stasjoner, visStasjonSheet);
+        if (viewListe.style.display !== 'none') visListe(stasjoner, visStasjonSheet, åpneEditModus);
     } catch (e) {
         locStatus.textContent = e.utenfor ? 'Kun tilgjengelig i Norge' : 'Feil ved henting av stasjoner';
     }
 });
 
-// Last stasjoner ved oppstart — fra URL-params (admin-lenke) eller lagret posisjon
-const _oppstartPos = _fraAdmin ? { lat: _qLat, lon: _qLon } : lagretPos;
+// Last stasjoner ved oppstart — fra URL-params (admin-lenke), localStorage eller server
+const _oppstartPos = _fraAdmin ? { lat: _qLat, lon: _qLon } : (lagretPos || serverPos);
 if (_oppstartPos) {
     if (_fraAdmin) sentrerKart(_qLat, _qLon, 16);
     locStatus.textContent = 'Henter stasjoner …';
@@ -370,7 +387,7 @@ if (_oppstartPos) {
         stasjoner = s;
         locStatus.textContent = '';
         visStasjoner(stasjoner, visStasjonSheet);
-        if (viewListe.style.display !== 'none') visListe(stasjoner, visStasjonSheet);
+        if (viewListe.style.display !== 'none') visListe(stasjoner, visStasjonSheet, åpneEditModus);
         if (_stasjonId) {
             const stasjon = stasjoner.find(st => st.id === _stasjonId);
             if (stasjon) visStasjonSheet(stasjon);
@@ -399,7 +416,7 @@ function byttTab(tab) {
         viewListe.style.display = 'block';
         tabListe.classList.add('active');
         tabListe.setAttribute('aria-selected', 'true');
-        visListe(stasjoner, visStasjonSheet);
+        visListe(stasjoner, visStasjonSheet, åpneEditModus);
     } else if (tab === 'statistikk') {
         viewStatistikk.style.display = 'block';
         tabStatistikk.classList.add('active');
@@ -413,7 +430,7 @@ tabKart.addEventListener('click', () => byttTab('kart'));
 tabListe.addEventListener('click', () => byttTab('liste'));
 tabStatistikk.addEventListener('click', () => byttTab('statistikk'));
 
-byttTab(localStorage.getItem('aktivTab') || 'kart');
+byttTab(_fraAdmin ? 'kart' : (localStorage.getItem('aktivTab') || 'kart'));
 
 // Keyboard-navigasjon for tabs (WAI-ARIA tab pattern)
 const tabListe_ = [tabKart, tabListe, tabStatistikk];
@@ -506,6 +523,7 @@ function startLokasjon() {
         async (pos) => {
             userPos = pos;
             lagrePosisjon(pos);
+            lagreServerPos(pos.lat, pos.lon);
             locBtn.disabled = false;
             locStatus.textContent = `±${Math.round(pos.accuracy)} m`;
             visUserPosisjon(pos);
@@ -515,7 +533,7 @@ function startLokasjon() {
                 stasjoner = await hentStasjoner(pos.lat, pos.lon);
                 locStatus.textContent = '';
                 visStasjoner(stasjoner, visStasjonSheet);
-                if (viewListe.style.display !== 'none') visListe(stasjoner, visStasjonSheet);
+                if (viewListe.style.display !== 'none') visListe(stasjoner, visStasjonSheet, åpneEditModus);
             } catch (e) {
                 locStatus.textContent = e.utenfor ? 'Kun tilgjengelig i Norge' : 'Feil ved henting av stasjoner';
             }
