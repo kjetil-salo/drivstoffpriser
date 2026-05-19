@@ -40,7 +40,9 @@ logging.basicConfig(
 log = logging.getLogger('drivstoffappen_sync')
 
 BASE_URL = "https://api.drivstoffappen.no"
-CLIENT_ID = "com.raskebiler.drivstoff.appen.ios"
+CLIENT_ID = "com.drivstoff.appen.ios"
+USER_AGENT = "Drivstoffappen/3.5.4 (com.raskebiler.drivstoff.appen; build:689; iOS 26.4.2) Alamofire/5.12.0"
+REQUESTER_ID = "47C44FEA-48B3-4054-9282-D91DB913AD8C"
 RESEND_FROM = "Drivstoffprisene <noreply@ksalo.no>"
 VARSLE_TIL = "k@vikebo.com"
 
@@ -194,7 +196,13 @@ def _utled_api_nøkkel(token: str) -> str:
 
 
 def _hent_og_lagre_dump(api_key: str) -> list[dict]:
-    headers = {'X-API-KEY': api_key, 'X-CLIENT-ID': CLIENT_ID}
+    headers = {
+        'X-API-KEY': api_key,
+        'X-CLIENT-ID': CLIENT_ID,
+        'User-Agent': USER_AGENT,
+        'X-Requester-Id': REQUESTER_ID,
+        'Accept-Language': 'nb-NO;q=1.0, nn-NO;q=0.9',
+    }
     req = urllib.request.Request(f"{BASE_URL}/api/v1/stations", headers=headers)
     with urllib.request.urlopen(req, timeout=60) as resp:
         alle = json.loads(resp.read())
