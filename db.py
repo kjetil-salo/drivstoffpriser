@@ -1326,12 +1326,12 @@ def logg_leser_pos(device_id: str, lat: float, lon: float):
 
 
 def hent_leser_kart_data(dager: int = 30) -> list[dict]:
-    """Aggregerer leserposisjoner per 0.5-grads-rute, siste N dager. Returnerer {lat, lon, antall}."""
+    """Aggregerer leserposisjoner per 0.1-grads-rute (~11 km), siste N dager. Returnerer {lat, lon, antall}."""
     with get_conn() as conn:
         rader = conn.execute(
             """SELECT
-                ROUND(ROUND(lat / 0.5) * 0.5, 1) AS lat_r,
-                ROUND(ROUND(lon / 0.5) * 0.5, 1) AS lon_r,
+                ROUND(ROUND(lat / 0.1) * 0.1, 1) AS lat_r,
+                ROUND(ROUND(lon / 0.1) * 0.1, 1) AS lon_r,
                 COUNT(DISTINCT device_id)          AS antall
                FROM leser_posisjoner
                WHERE ts >= datetime('now', ?)
