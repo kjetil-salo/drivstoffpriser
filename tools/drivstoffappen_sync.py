@@ -191,13 +191,23 @@ def _utled_api_nøkkel(token: str) -> str:
     return hashlib.md5(b[1:] + b[:1]).hexdigest()
 
 
-def _hent_stasjoner(api_key: str, drivstoff_ids: list[int]) -> list[dict]:
+def _hent_stasjoner(api_key: str, drivstoff_ids: list[int]) -> tuple[list[dict], int]:
+    """Returnerer (filtrerte stasjoner, antall stasjoner i hele dumpen med gyldig pris < 24t)."""
     headers = {'X-API-KEY': api_key, 'X-CLIENT-ID': CLIENT_ID}
     req = urllib.request.Request(f"{BASE_URL}/api/v1/stations", headers=headers)
     with urllib.request.urlopen(req, timeout=60) as resp:
         alle = json.loads(resp.read())
+    grense_ms = (datetime.now(timezone.utc).timestamp() - 86400) * 1000
+    partner_24t = sum(
+        1 for s in alle
+        if any(
+            p.get('price') is not None and (p.get('lastUpdated') or 0) > grense_ms
+            for p in s.get('prices', [])
+            if p.get('fuelTypeId') in (1, 2)
+        )
+    )
     ids_set = set(drivstoff_ids)
-    return [s for s in alle if s['id'] in ids_set]
+    return [s for s in alle if s['id'] in ids_set], partner_24t
 
 
 def _vaar_siste_tidspunkt(conn, stasjon_id: int, kolonne: str) -> datetime | None:
@@ -278,6 +288,7 @@ def kjør(prosent: float = 100, region: str | None = None):
         'hoppet_over': 0,
         'avvist_validering': 0,
         'feil': 0,
+        'partner_stasjoner_24t': 0,
     }
     linjer: list[str] = []
 
@@ -293,7 +304,9 @@ def kjør(prosent: float = 100, region: str | None = None):
     drivstoff_id_til_vaar = {v: k for k, v in mapping.items()}
 
     try:
-        stasjoner = _hent_stasjoner(api_key, list(mapping.values()))
+        stasjoner, partner_24t = _hent_stasjoner(api_key, list(mapping.values()))
+        stats['partner_stasjoner_24t'] = partner_24t
+        log.info(f'Drivstoffappen-dump: {partner_24t} stasjoner med priser siste 24t')
     except Exception as e:
         log.error(f'Henting feilet: {e}')
         stats['feil'] += 1
@@ -431,16 +444,20 @@ def kjør(prosent: float = 100, region: str | None = None):
 def _logg_stats(stats: dict):
     try:
         with get_conn() as conn:
+            cols = {r[1] for r in conn.execute("PRAGMA table_info(drivstoffappen_sync)").fetchall()}
+            if 'partner_stasjoner_24t' not in cols:
+                conn.execute("ALTER TABLE drivstoffappen_sync ADD COLUMN partner_stasjoner_24t INTEGER")
             conn.execute(
                 "INSERT INTO drivstoffappen_sync "
-                "(stasjoner_sjekket, priser_skrevet, hoppet_over, avvist_validering, feil) "
-                "VALUES (?, ?, ?, ?, ?)",
+                "(stasjoner_sjekket, priser_skrevet, hoppet_over, avvist_validering, feil, partner_stasjoner_24t) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
                 (
                     stats['stasjoner_sjekket'],
                     stats['priser_skrevet'],
                     stats['hoppet_over'],
                     stats['avvist_validering'],
                     stats['feil'],
+                    stats['partner_stasjoner_24t'],
                 ),
             )
     except Exception as e:

@@ -30,7 +30,7 @@ except ImportError:  # pragma: no cover - produksjon har Pillow, fallback bruker
 from db import (get_stasjoner_med_priser, lagre_pris, bekreft_pris, logg_visning,
                 antall_stasjoner_med_pris, finn_bruker_id, DB_PATH,
                 opprett_stasjon, hent_billigste_priser_24t,
-                antall_prisoppdateringer_24t, meld_stasjon_nedlagt,
+                antall_prisoppdateringer_24t, partner_stasjoner_24t, meld_stasjon_nedlagt,
                 get_conn, hent_innstilling, hent_toppliste, hent_toppliste_uke,
                 hent_min_plassering, logg_blogg_visning,
                 legg_til_endringsforslag, unike_enheter_per_dag,
@@ -745,6 +745,7 @@ def statistikk():
         'billigst': billigst,
         'dyrest': dyrest,
         'antall_oppdateringer_24t': antall_oppdateringer,
+        'partner_stasjoner_24t': partner_stasjoner_24t(),
     })
 
 

@@ -445,6 +445,12 @@ export async function lastStatistikk({ force = false } = {}) {
         const data = await respStat.json();
 
         document.getElementById('stat-antall').textContent = data.antall_oppdateringer_24t;
+        const partnerRad = document.getElementById('stat-partner-rad');
+        const partnerAntall = document.getElementById('stat-partner-antall');
+        if (partnerRad && partnerAntall && data.partner_stasjoner_24t != null) {
+            partnerAntall.textContent = data.partner_stasjoner_24t;
+            partnerRad.hidden = false;
+        }
 
         visPrisKort('stat-billigst-bensin', data.billigst.bensin);
         visPrisKort('stat-billigst-bensin98', data.billigst.bensin98);

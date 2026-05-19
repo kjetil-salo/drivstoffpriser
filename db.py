@@ -1029,6 +1029,19 @@ def antall_prisoppdateringer_24t() -> int:
         ).fetchone()[0]
 
 
+def partner_stasjoner_24t() -> int | None:
+    """Antall stasjoner i Drivstoffappens dump med priser siste 24t, fra siste sync-kjøring."""
+    with get_conn() as conn:
+        cols = {r[1] for r in conn.execute("PRAGMA table_info(drivstoffappen_sync)").fetchall()}
+        if 'partner_stasjoner_24t' not in cols:
+            return None
+        row = conn.execute(
+            "SELECT partner_stasjoner_24t FROM drivstoffappen_sync "
+            "WHERE partner_stasjoner_24t IS NOT NULL ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+        return row[0] if row else None
+
+
 def antall_stasjoner_med_pris() -> int:
     with get_conn() as conn:
         return conn.execute(
