@@ -69,6 +69,7 @@ STASJON_MAPPING = {
     35: 1094,   # Uno-X 7-Eleven Øyrane torg
     11: 28414,  # Haltbakk Express Ostereidet
     1882: 1351, # St1 Randabergveien
+    1887: 221,  # Esso Tjensvollkrysset
 }
 
 FUEL_NAVN = {1: 'diesel', 2: 'bensin'}
