@@ -53,7 +53,7 @@ SQLite på Raspberry Pi, ~2000 daglige brukere. Kunden merker nedetid.
 5. Verifiser alle akseptansekriterier
 
 **2b. Code review**
-1. Kjør `/agent-code-review` som agent på de endrede filene
+1. Spawn `code-review`-agenten med de endrede filene som argument
 2. Resultat: GODKJENT / BETINGET GODKJENT / AVVIST
 3. Ved BETINGET/AVVIST: fiks og send til ny review
 4. Ikke gå videre til neste fase før GODKJENT

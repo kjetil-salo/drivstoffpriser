@@ -8,7 +8,7 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
-EXCLUDE_USERS = (1, 5, 2422, 3998)
+EXCLUDE_USERS = (1, 5, 2422, 3998, 4677)  # 4677 = partner1 (maskinbruker)
 TARGET_MUNICIPALITIES = {
     "Bergen",
     "Askøy",
@@ -82,17 +82,18 @@ def build_result(target_date):
     con = sqlite3.connect("/app/data/drivstoff.db")
     con.row_factory = sqlite3.Row
     cache = load_cache()
+    excl_marks = ",".join("?" for _ in EXCLUDE_USERS)
 
     station_rows = [
         dict(r)
         for r in con.execute(
-            """
+            f"""
             SELECT DISTINCT p.stasjon_id, s.navn, s.lat, s.lon
             FROM priser p
             JOIN stasjoner s ON s.id = p.stasjon_id
             WHERE date(p.tidspunkt, 'localtime') = ?
               AND p.bruker_id IS NOT NULL
-              AND p.bruker_id NOT IN (?, ?, ?, ?)
+              AND p.bruker_id NOT IN ({excl_marks})
               AND s.lat BETWEEN ? AND ?
               AND s.lon BETWEEN ? AND ?
             ORDER BY s.id
@@ -141,12 +142,11 @@ def build_result(target_date):
             LEFT JOIN brukere b ON b.id = p.bruker_id
             WHERE date(p.tidspunkt, 'localtime') = ?
               AND p.bruker_id IS NOT NULL
-              AND p.bruker_id NOT IN (?, ?, ?, ?)
+              AND p.bruker_id NOT IN ({excl_marks})
               AND p.stasjon_id IN ({marks})
             GROUP BY p.bruker_id, contributor
             ORDER BY updates DESC, stations DESC, p.bruker_id
-            """
-            ,
+            """,
             (target_date, *EXCLUDE_USERS, *station_ids),
         )
     ]
@@ -164,7 +164,7 @@ def build_result(target_date):
             JOIN stasjoner s ON s.id = p.stasjon_id
             WHERE date(p.tidspunkt, 'localtime') = ?
               AND p.bruker_id IS NOT NULL
-              AND p.bruker_id NOT IN (?, ?, ?, ?)
+              AND p.bruker_id NOT IN ({excl_marks})
               AND p.stasjon_id IN ({marks})
             GROUP BY p.stasjon_id, s.navn
             ORDER BY updates DESC, contributors DESC, s.navn

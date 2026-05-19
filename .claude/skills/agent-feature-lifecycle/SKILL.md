@@ -78,13 +78,13 @@ For HVER fase, gjenta dette mønsteret:
 - Verifiser akseptansekriteriene fra planen
 
 **3b. Code review**
-- Kjør `/agent-code-review` som agent på de endrede filene
+- Spawn `code-review`-agenten med de endrede filene som argument
 - Resultat: GODKJENT / BETINGET GODKJENT / AVVIST
 - Ved BETINGET/AVVIST: fiks og send til ny review
 - Ikke gå videre til neste fase før GODKJENT
 
 **3c. Test**
-- Kjør `agent-test`-skillen som agent
+- Spawn `test`-agenten med feature-navn eller endrede filer som argument
 - Velger riktig nivå (pytest / Playwright) basert på hva som ble endret
 - Rapporterer funn — fikser dem ikke
 - Ved FEILET: fiks og kjør ny test-agent
