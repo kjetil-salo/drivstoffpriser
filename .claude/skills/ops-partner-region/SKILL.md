@@ -145,7 +145,28 @@ Bbox-definisjoner (fra `routes_admin.py`):
 
 ## Manuell sync på Pi
 
-Kjør full sync for alle stasjoner (cronjobben tar alt):
+Hvis argument inneholder et prosenttall (f.eks. "Stavanger 20%"), parse ut prosenten og kjør et wrapper-script som patcher `STASJON_MAPPING` til bare region-stasjoner og kaller `kjør(prosent=N)`.
+
+Eksempel — Stavanger 20%:
+
+```bash
+cat > /tmp/region_sync.py << 'EOF'
+import sys
+sys.path.insert(0, '/app')
+sys.path.insert(0, '/app/tools')
+import drivstoffappen_sync as s
+
+# Lim inn riktig stasjonsliste fra tabellen over
+REGION = { <vaar_id>: <drivstoffappen_id>, ... }
+
+s.STASJON_MAPPING = REGION
+s.kjør(prosent=20)  # bytt prosent etter argument
+EOF
+scp /tmp/region_sync.py raspberrypi:/tmp/region_sync.py
+ssh raspberrypi "docker cp /tmp/region_sync.py drivstoffpriser-drivstoffpriser-1:/tmp/region_sync.py && docker exec drivstoffpriser-drivstoffpriser-1 python3 /tmp/region_sync.py"
+```
+
+Uten prosent — full sync for regionen:
 
 ```bash
 ssh raspberrypi "docker exec drivstoffpriser-drivstoffpriser-1 python3 /app/tools/drivstoffappen_sync.py"
