@@ -174,6 +174,19 @@ ssh raspberrypi "docker exec drivstoffpriser-drivstoffpriser-1 python3 /app/tool
 
 Outputtet viser SKREVET / SKIP / AVVIST per stasjon.
 
+Etter kjøring: parse logg-linjene og vis en tabell over ALLE sjekket stasjoner med status til slutt:
+
+| Stasjon | Bensin | Diesel | Tidspunkt | |
+|---------|--------|--------|-----------|--|
+| Circle K Ulset | 22,49 | 23,49 | 10:44 | ✓ |
+| Esso Nyborg | 21,99 | 22,99 | 08:12 | — |
+
+Regler:
+- Én rad per stasjon som dukker opp i loggen (både `lagret` og `SKIP`-linjer)
+- `lagret`-linjer: parse bensin/diesel/ts, siste kolonne = `✓`
+- `SKIP`-linjer: vis navn og prisen som ble hoppet over, siste kolonne = `—`
+- Avslutningsvis: `N skrevet, M hoppet over` fra siste INFO-linje
+
 ## Stasjonene som IKKE er med (tvilsomme matcher — ikke lagt til)
 
 **Haugalandet:**
