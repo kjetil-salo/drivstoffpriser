@@ -47,6 +47,7 @@ VARSLE_TIL = "k@vikebo.com"
 PRIS_MIN = 14.0
 PRIS_MAX = 37.0
 PARTNER_BRUKERNAVN = 'partner1'
+DUMP_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data', 'drivstoffappen_live.json')
 
 # Vår DB-id → Drivstoffappen-id
 # Basis-liste — kjøres av cron-jobb
@@ -72,6 +73,7 @@ STASJON_MAPPING = {
     1882: 1351, # St1 Randabergveien
     1887: 221,  # Esso Tjensvollkrysset
     12: 791,    # Circle K Viken
+    41: 53,     # Uno-X Fjøsanger
 }
 
 # Region-tillegg — kun manuell kjøring via --region
@@ -191,23 +193,21 @@ def _utled_api_nøkkel(token: str) -> str:
     return hashlib.md5(b[1:] + b[:1]).hexdigest()
 
 
-def _hent_stasjoner(api_key: str, drivstoff_ids: list[int]) -> tuple[list[dict], int]:
-    """Returnerer (filtrerte stasjoner, antall stasjoner i hele dumpen med gyldig pris < 24t)."""
+def _hent_og_lagre_dump(api_key: str) -> list[dict]:
     headers = {'X-API-KEY': api_key, 'X-CLIENT-ID': CLIENT_ID}
     req = urllib.request.Request(f"{BASE_URL}/api/v1/stations", headers=headers)
     with urllib.request.urlopen(req, timeout=60) as resp:
         alle = json.loads(resp.read())
-    grense_ms = (datetime.now(timezone.utc).timestamp() - 86400) * 1000
-    partner_24t = sum(
-        1 for s in alle
-        if any(
-            p.get('price') is not None and (p.get('lastUpdated') or 0) > grense_ms
-            for p in s.get('prices', [])
-            if p.get('fuelTypeId') in (1, 2)
-        )
-    )
-    ids_set = set(drivstoff_ids)
-    return [s for s in alle if s['id'] in ids_set], partner_24t
+    with open(DUMP_PATH, 'w', encoding='utf-8') as f:
+        json.dump({'generert': datetime.now(timezone.utc).isoformat(), 'antall': len(alle), 'stasjoner': alle}, f)
+    log.info(f'Dump lagret: {len(alle)} stasjoner → {DUMP_PATH}')
+    return alle
+
+
+def _les_dump() -> tuple[list[dict], str]:
+    with open(DUMP_PATH, encoding='utf-8') as f:
+        data = json.load(f)
+    return data['stasjoner'], data['generert']
 
 
 def _vaar_siste_tidspunkt(conn, stasjon_id: int, kolonne: str) -> datetime | None:
@@ -266,22 +266,6 @@ def _send_epost(emne: str, kropp: str):
 
 def kjør(prosent: float = 100, region: str | None = None):
     nå = datetime.now(timezone.utc)
-
-    if region:
-        basis = REGIONER.get(region)
-        if basis is None:
-            log.error(f'Ukjent region: {region}. Gyldige: {", ".join(REGIONER)}')
-            return
-        mapping = basis
-        log.info(f'Region {region}: {len(mapping)} stasjoner')
-    else:
-        mapping = STASJON_MAPPING
-        if prosent < 100:
-            k = max(1, round(len(STASJON_MAPPING) * prosent / 100))
-            utvalg = random.sample(list(STASJON_MAPPING.keys()), k)
-            mapping = {vaar: STASJON_MAPPING[vaar] for vaar in utvalg}
-            log.info(f'Tilfeldig utvalg: {k}/{len(STASJON_MAPPING)} stasjoner ({prosent}%)')
-
     stats = {
         'stasjoner_sjekket': 0,
         'priser_skrevet': 0,
@@ -292,26 +276,58 @@ def kjør(prosent: float = 100, region: str | None = None):
     }
     linjer: list[str] = []
 
-    try:
-        token = _hent_token()
-        api_key = _utled_api_nøkkel(token)
-    except Exception as e:
-        log.error(f'Auth feilet: {e}')
-        stats['feil'] += 1
-        _logg_stats(stats)
-        return
+    if region:
+        basis = REGIONER.get(region)
+        if basis is None:
+            log.error(f'Ukjent region: {region}. Gyldige: {", ".join(REGIONER)}')
+            return
+        mapping = basis
+        try:
+            alle_stasjoner, dump_ts = _les_dump()
+            log.info(f'Region {region}: {len(mapping)} stasjoner (dump fra {dump_ts})')
+        except Exception as e:
+            log.error(f'Dump-lesing feilet: {e}')
+            return
+    else:
+        mapping = STASJON_MAPPING
+        if prosent < 100:
+            k = max(1, round(len(STASJON_MAPPING) * prosent / 100))
+            utvalg = random.sample(list(STASJON_MAPPING.keys()), k)
+            mapping = {vaar: STASJON_MAPPING[vaar] for vaar in utvalg}
+            log.info(f'Tilfeldig utvalg: {k}/{len(STASJON_MAPPING)} stasjoner ({prosent}%)')
+
+        try:
+            token = _hent_token()
+            api_key = _utled_api_nøkkel(token)
+        except Exception as e:
+            log.error(f'Auth feilet: {e}')
+            stats['feil'] += 1
+            _logg_stats(stats)
+            return
+
+        try:
+            alle_stasjoner = _hent_og_lagre_dump(api_key)
+        except Exception as e:
+            log.error(f'Henting feilet: {e}')
+            stats['feil'] += 1
+            _logg_stats(stats)
+            return
+
+    grense_ms = (nå.timestamp() - 86400) * 1000
+    partner_24t = sum(
+        1 for s in alle_stasjoner
+        if any(
+            p.get('price') is not None and (p.get('lastUpdated') or 0) > grense_ms
+            for p in s.get('prices', [])
+            if p.get('fuelTypeId') in (1, 2)
+        )
+    )
+    stats['partner_stasjoner_24t'] = partner_24t
+    log.info(f'Drivstoffappen-dump: {partner_24t} stasjoner med priser siste 24t')
 
     drivstoff_id_til_vaar = {v: k for k, v in mapping.items()}
-
-    try:
-        stasjoner, partner_24t = _hent_stasjoner(api_key, list(mapping.values()))
-        stats['partner_stasjoner_24t'] = partner_24t
-        log.info(f'Drivstoffappen-dump: {partner_24t} stasjoner med priser siste 24t')
-    except Exception as e:
-        log.error(f'Henting feilet: {e}')
-        stats['feil'] += 1
-        _logg_stats(stats)
-        return
+    ids_set = set(mapping.values())
+    stasjoner = [s for s in alle_stasjoner if s['id'] in ids_set]
 
     with get_conn() as conn, _get_sync_conn() as sync_conn:
         partner_id = _hent_eller_opprett_partner(conn)
