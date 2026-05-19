@@ -1,0 +1,171 @@
+---
+name: ops-partner-region
+description: Vis stasjoner i et partner1-distrikt (Haugalandet/Stavanger/Bergen) og kjør manuell sync for distriktet på Pi.
+allowed-tools: Bash, Read
+---
+
+Vis stasjonsliste for et distrikt og kjør partner1-sync for det distriktet på Pi.
+
+Argument: $ARGUMENTS (regionsnavn — Haugalandet, Stavanger eller Bergen)
+
+## Bakgrunn
+
+Alle stasjoner under er registrert i `STASJON_MAPPING` i `tools/drivstoffappen_sync.py` og synkes automatisk av cronjobben (`0 5-23 * * *`). Denne skillen brukes for manuell trigring eller for å se hvilke stasjoner som tilhører et distrikt.
+
+Bbox-definisjoner (fra `routes_admin.py`):
+- **Bergen**: lat 60.10–60.88, lon 4.70–5.75
+- **Haugalandet**: lat 59.08–59.65, lon 5.05–5.60
+- **Stavanger**: lat 58.75–59.15, lon 5.40–6.05
+
+## Stasjonslister per region
+
+### Bergen (20 stasjoner)
+
+| Vår ID | Drivstoffappen-ID | Navn |
+|--------|-------------------|------|
+| 1      | 433               | Esso Frekhaug |
+| 2      | 2190              | Circle K Automat Knarvik |
+| 3      | 88                | Esso Nyborg |
+| 4      | 687               | St1 Haukås Nyborg |
+| 11     | 28414             | Haltbakk Express Ostereidet |
+| 12     | 791               | Circle K Viken |
+| 16     | 1278              | St1 Marikollen |
+| 18     | 1324              | St1 Lone |
+| 19     | 25153             | Uno-X Tertnes |
+| 26     | 4064              | Oljeleverandøren Hylkje |
+| 30     | 76                | Circle K Ulset |
+| 32     | 643               | Circle K Haukås |
+| 33     | 644               | Circle K Helleveien |
+| 35     | 1094              | Uno-X 7-Eleven Øyrane torg |
+| 36     | 2093              | St1 Nygård |
+| 42     | 49                | Uno-X Gullgruven (Åsane) |
+| 43     | 121               | Uno-X 7-Eleven Nyborg |
+| 45     | 1222              | St1 Isdalstø |
+| 5690   | 468               | Esso Hundvåg |
+| 1882   | 1351              | St1 Randabergveien |
+| 1887   | 221               | Esso Tjensvollkrysset |
+
+### Haugalandet (34 stasjoner)
+
+| Vår ID  | Drivstoffappen-ID | Navn |
+|---------|-------------------|------|
+| 60      | 245               | St1 Karmsundgata |
+| 61      | 25150             | Uno-X Karmsundgata |
+| 62      | 203               | Esso Express Avaldsnes |
+| 64      | 137               | Uno-X Avaldsnes |
+| 65      | 269               | Uno-X Norheim |
+| 66      | 1548              | Tanken Frakkagjerd |
+| 67      | 3160              | YX Bømlo |
+| 68      | 136               | Uno-X Spannavegen |
+| 69      | 1547              | Tanken Spannaveien |
+| 70      | 3602              | Circle K Automat Karmsundgata |
+| 71      | 199               | Circle K Truck Haugesund |
+| 72      | 257               | Circle K Automat Spannaveien |
+| 73      | 187               | Circle K Kvala |
+| 75      | 4569              | Driv Ekrene |
+| 76      | 216               | Esso Raglamyr |
+| 77      | 207               | Esso Express Gard |
+| 78      | 477               | Esso Karmsundgaten |
+| 80      | 1342              | St1 Norheim |
+| 82      | 25157             | Uno-X Raglamyr |
+| 1236    | 1304              | St1 Haukås Sveio |
+| 1247    | 4406              | Tanken Vikebygd |
+| 1529655 | 8792              | Tanken Isvik |
+| 2001    | 195               | Circle K Skudeneshavn |
+| 2003    | 1545              | Tanken Langåker |
+| 2004    | 3170              | Circle K Automat Kopervik |
+| 2005    | 259               | Circle K Sævelandsvik |
+| 2006    | 1311              | St1 Karmøy |
+| 2007    | 246               | St1 Kopervik |
+| 2008    | 265               | Uno-X Karmøy |
+| 2012    | 3184              | Circle K Truck Gismarvik |
+| 2110    | 1188              | St1 Aksdal |
+| 2113    | 1186              | St1 Eikeskog |
+| 2114    | 884               | YX Truck Aksdal |
+| 19959   | 25158             | Tanken Kvala |
+
+### Stavanger (57 stasjoner)
+
+| Vår ID | Drivstoffappen-ID | Navn |
+|--------|-------------------|------|
+| 1811   | 1282              | St1 Rennesøy |
+| 1815   | 474               | Esso Jørpeland |
+| 1819   | 751               | Circle K Jørpeland |
+| 1821   | 138               | Uno-X Tau |
+| 1830   | 197               | Circle K Tau |
+| 1834   | 183               | Circle K Hana |
+| 1835   | 238               | St1 Forus |
+| 1836   | 181               | Circle K Forus |
+| 1837   | 206               | Esso Forus |
+| 1838   | 145               | Uno-X Forussletta |
+| 1839   | 196               | Circle K Automat Sola |
+| 1840   | 191               | Circle K Lura |
+| 1841   | 217               | Esso Sandnes |
+| 1842   | 3691              | Circle K Automat Hafrsfjord |
+| 1844   | 240               | St1 Hagakrossen |
+| 1845   | 140               | Uno-X Tasta |
+| 1846   | 1167              | St1 Bogafjell |
+| 1847   | 3589              | Uno-X Tananger |
+| 1848   | 1105              | Uno-X 7-Eleven Blåsenborg |
+| 1849   | 775               | Circle K Tjelta |
+| 1850   | 244               | St1 Jærveien |
+| 1851   | 150               | Uno-X Kongeparken |
+| 1852   | 170               | Circle K Åsedalen |
+| 1853   | 28386             | Circle K Truck Ganddal |
+| 1854   | 233               | St1 Ålgård |
+| 1855   | 174               | Circle K Automat Mariero |
+| 1856   | 248               | St1 Lura |
+| 1859   | 148               | Uno-X Klepp |
+| 1860   | 144               | Uno-X Forus |
+| 1861   | 1542              | Esso Express Løkkeveien |
+| 1871   | 147               | Uno-X Kverneland |
+| 1872   | 149               | Uno-X Hove |
+| 1874   | 1326              | St1 Madlakrossen |
+| 1875   | 801               | Circle K Hommersåk |
+| 1876   | 186               | Circle K Klepp |
+| 1878   | 184               | Circle K Haugesundsgaten |
+| 1879   | 169               | Circle K Ålgård |
+| 1880   | 250               | St1 Solakrossen |
+| 1883   | 242               | St1 Haugåsveien |
+| 1884   | 219               | Esso Express Sola |
+| 1885   | 544               | Esso Revheimsveien |
+| 1886   | 204               | Esso Bekkefaret |
+| 1890   | 453               | Esso Hillevåg |
+| 1891   | 142               | Uno-X Madlaveien |
+| 1892   | 141               | Uno-X Sola |
+| 1893   | 139               | Uno-X Randaberg |
+| 1895   | 143               | Uno-X Mariero |
+| 1897   | 28648             | Circle K Truck Risavika |
+| 1904   | 4063              | St1 Risavika |
+| 1906   | 20813             | Circle K Automat Sandnesporten |
+| 1908   | 146               | Uno-X Lura |
+| 1909   | 28286             | Uno-X Hinna |
+| 3091   | 194               | Circle K Randaberg |
+| 5661   | 2865              | Circle K Automat Hundvåg |
+
+## Manuell sync på Pi
+
+Kjør full sync for alle stasjoner (cronjobben tar alt):
+
+```bash
+ssh raspberrypi "docker exec drivstoffpriser-drivstoffpriser-1 python3 /app/tools/drivstoffappen_sync.py"
+```
+
+Outputtet viser SKREVET / SKIP / AVVIST per stasjon.
+
+## Stasjonene som IKKE er med (tvilsomme matcher — ikke lagt til)
+
+**Haugalandet:**
+- 63 LPG Steinsvik AS (LPG-stasjon)
+- 74 Circle K Truck Scania sør (nærmeste i Drivstoffappen er Mer-ladestasjon)
+- 79 LPG Karmøy (ladestasjon)
+- 81 Haugaland Olje Husøy (annen brand i Drivstoffappen)
+- 83 Tanken Helganes (for lav confidence)
+- 2010 Knapphus Bokn Føresvik (for lav confidence)
+- 1475085 Knapphus Energi Avaldsnes (for lav confidence)
+
+**Stavanger:**
+- 1857 Esso Sele Servicesenter (matched til "Voll", usikker)
+- 1867 Esso Express Tanke Svilands gate 33 (for lav confidence)
+
+Oppgave: $ARGUMENTS

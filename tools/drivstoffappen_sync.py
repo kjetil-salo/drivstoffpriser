@@ -71,10 +71,102 @@ STASJON_MAPPING = {
     1882: 1351, # St1 Randabergveien
     1887: 221,  # Esso Tjensvollkrysset
     12: 791,    # Circle K Viken
+    # Haugalandet
+    70: 3602,   # Circle K Automat Karmsundgata
+    2004: 3170, # Circle K Automat Kopervik
+    72: 257,    # Circle K Automat Spannaveien
+    73: 187,    # Circle K Kvala
+    2001: 195,  # Circle K Skudeneshavn
+    2005: 259,  # Circle K Sævelandsvik
+    2012: 3184, # Circle K Truck Gismarvik
+    71: 199,    # Circle K Truck Haugesund
+    75: 4569,   # Driv Ekrene
+    62: 203,    # Esso Express Avaldsnes
+    77: 207,    # Esso Express Gard
+    78: 477,    # Esso Karmsundgaten
+    76: 216,    # Esso Raglamyr
+    2110: 1188, # St1 Aksdal
+    2113: 1186, # St1 Eikeskog
+    1236: 1304, # St1 Haukås Sveio
+    60: 245,    # St1 Karmsundgata
+    2006: 1311, # St1 Karmøy
+    2007: 246,  # St1 Kopervik
+    80: 1342,   # St1 Norheim
+    66: 1548,   # Tanken Frakkagjerd
+    1529655: 8792, # Tanken Isvik
+    19959: 25158,  # Tanken Kvala
+    2003: 1545, # Tanken Langåker
+    1247: 4406, # Tanken Vikebygd
+    69: 1547,   # Tanken Spannaveien
+    64: 137,    # Uno-X Avaldsnes
+    61: 25150,  # Uno-X Karmsundgata
+    2008: 265,  # Uno-X Karmøy
+    65: 269,    # Uno-X Norheim
+    82: 25157,  # Uno-X Raglamyr
+    68: 136,    # Uno-X Spannavegen
+    67: 3160,   # YX Bømlo
+    2114: 884,  # YX Truck Aksdal
+    # Stavanger
+    1842: 3691,  # Circle K Automat Hafrsfjord
+    5661: 2865,  # Circle K Automat Hundvåg
+    1869: 189,   # Circle K Automat Lagårdsveien
+    1855: 174,   # Circle K Automat Mariero
+    1906: 20813, # Circle K Automat Sandnesporten
+    1839: 196,   # Circle K Automat Sola
+    1836: 181,   # Circle K Forus
+    1834: 183,   # Circle K Hana
+    1878: 184,   # Circle K Haugesundsgaten
+    1875: 801,   # Circle K Hommersåk
+    1819: 751,   # Circle K Jørpeland
+    1876: 186,   # Circle K Klepp
+    1840: 191,   # Circle K Lura
+    3091: 194,   # Circle K Randaberg
+    1830: 197,   # Circle K Tau
+    1849: 775,   # Circle K Tjelta
+    1853: 28386, # Circle K Truck Ganddal
+    1897: 28648, # Circle K Truck Risavika
+    1879: 169,   # Circle K Ålgård
+    1852: 170,   # Circle K Åsedalen
+    1886: 204,   # Esso Bekkefaret
+    1861: 1542,  # Esso Express Løkkeveien
+    1884: 219,   # Esso Express Sola
+    1837: 206,   # Esso Forus
+    1890: 453,   # Esso Hillevåg
+    1815: 474,   # Esso Jørpeland
+    1885: 544,   # Esso Revheimsveien
+    1841: 217,   # Esso Sandnes
+    1846: 1167,  # St1 Bogafjell
+    1835: 238,   # St1 Forus
+    1844: 240,   # St1 Hagakrossen
+    1883: 242,   # St1 Haugåsveien
+    1850: 244,   # St1 Jærveien
+    1856: 248,   # St1 Lura
+    1874: 1326,  # St1 Madlakrossen
+    1811: 1282,  # St1 Rennesøy
+    1904: 4063,  # St1 Risavika
+    1880: 250,   # St1 Solakrossen
+    1854: 233,   # St1 Ålgård
+    1848: 1105,  # Uno-X 7-Eleven Blåsenborg
+    1860: 144,   # Uno-X Forus
+    1838: 145,   # Uno-X Forussletta
+    1909: 28286, # Uno-X Hinna
+    1872: 149,   # Uno-X Hove
+    1859: 148,   # Uno-X Klepp
+    1851: 150,   # Uno-X Kongeparken
+    1871: 147,   # Uno-X Kverneland
+    1908: 146,   # Uno-X Lura
+    1891: 142,   # Uno-X Madlaveien
+    1895: 143,   # Uno-X Mariero
+    1893: 139,   # Uno-X Randaberg
+    1892: 141,   # Uno-X Sola
+    1847: 3589,  # Uno-X Tananger
+    1845: 140,   # Uno-X Tasta
+    1821: 138,   # Uno-X Tau
 }
 
 FUEL_NAVN = {1: 'diesel', 2: 'bensin'}
-FORSINKELSE_SEK = 5 * 60  # ignorer priser yngre enn 5 min
+FORSINKELSE_SEK = 5 * 60       # ignorer priser yngre enn 5 min
+MAX_ALDER_SEK = 12 * 3600      # ignorer priser eldre enn 12 timer
 
 
 def _hent_token() -> str:
@@ -151,8 +243,16 @@ def _send_epost(emne: str, kropp: str):
         log.error(f'Epost feilet: {e}')
 
 
-def kjør():
+def kjør(prosent: float = 100):
     nå = datetime.now(timezone.utc)
+
+    mapping = STASJON_MAPPING
+    if prosent < 100:
+        k = max(1, round(len(STASJON_MAPPING) * prosent / 100))
+        utvalg = random.sample(list(STASJON_MAPPING.keys()), k)
+        mapping = {vaar: STASJON_MAPPING[vaar] for vaar in utvalg}
+        log.info(f'Tilfeldig utvalg: {k}/{len(STASJON_MAPPING)} stasjoner ({prosent}%)')
+
     stats = {
         'stasjoner_sjekket': 0,
         'priser_skrevet': 0,
@@ -171,10 +271,10 @@ def kjør():
         _logg_stats(stats)
         return
 
-    drivstoff_id_til_vaar = {v: k for k, v in STASJON_MAPPING.items()}
+    drivstoff_id_til_vaar = {v: k for k, v in mapping.items()}
 
     try:
-        stasjoner = _hent_stasjoner(api_key, list(STASJON_MAPPING.values()))
+        stasjoner = _hent_stasjoner(api_key, list(mapping.values()))
     except Exception as e:
         log.error(f'Henting feilet: {e}')
         stats['feil'] += 1
@@ -207,10 +307,19 @@ def kjør():
                 if pris is None or not last_updated_ms:
                     continue
 
-                # Ignorer priser yngre enn 5 min (kan fortsatt være i bevegelse)
                 nå_ms = nå.timestamp() * 1000
-                if (nå_ms - last_updated_ms) < FORSINKELSE_SEK * 1000:
+                alder_ms = nå_ms - last_updated_ms
+
+                # Ignorer priser yngre enn 5 min (kan fortsatt være i bevegelse)
+                if alder_ms < FORSINKELSE_SEK * 1000:
                     log.debug(f'{stasjonsnavn}: {kolonne} for fersk (< 5 min), hopper over')
+                    stats['hoppet_over'] += 1
+                    continue
+
+                # Ignorer priser eldre enn 12 timer
+                if alder_ms > MAX_ALDER_SEK * 1000:
+                    alder_t = int(alder_ms / 3_600_000)
+                    log.debug(f'{stasjonsnavn}: {kolonne} for gammel ({alder_t}t), hopper over')
                     stats['hoppet_over'] += 1
                     continue
 
@@ -320,4 +429,9 @@ def _logg_stats(stats: dict):
 
 
 if __name__ == '__main__':
-    kjør()
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--prosent', type=float, default=100,
+                        help='Prosent av stasjoner som skal sjekkes (f.eks. 20 = ~20%%)')
+    args = parser.parse_args()
+    kjør(prosent=args.prosent)

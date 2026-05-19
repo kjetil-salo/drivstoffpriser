@@ -40,7 +40,9 @@ Disse stasjonene er mappet per siste oppdatering:
 | 5690   | 468               | Esso Hundvåg |
 | 12     | 791               | Circle K Viken |
 
-**Oppdater alltid denne tabellen** hvis du bruker `/ops-partner-stasjon` og legger til nye stasjoner.
+Se `/ops-partner-region` for komplett stasjonsliste per region (Bergen / Haugalandet / Stavanger).
+
+**Oppdater alltid disse tabellene** hvis du bruker `/ops-partner-stasjon` og legger til nye stasjoner.
 
 ## Hent live-statistikk fra Pi
 
