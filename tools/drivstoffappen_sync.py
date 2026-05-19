@@ -40,7 +40,7 @@ logging.basicConfig(
 log = logging.getLogger('drivstoffappen_sync')
 
 BASE_URL = "https://api.drivstoffappen.no"
-CLIENT_ID = "com.drivstoff.appen.ios"
+CLIENT_ID = "com.raskebiler.drivstoff.appen.ios"
 USER_AGENT = "Drivstoffappen/3.5.4 (com.raskebiler.drivstoff.appen; build:689; iOS 26.4.2) Alamofire/5.12.0"
 REQUESTER_ID = "47C44FEA-48B3-4054-9282-D91DB913AD8C"
 RESEND_FROM = "Drivstoffprisene <noreply@ksalo.no>"

@@ -59,7 +59,7 @@ x-client-id: com.drivstoff.appen.ios
 | Header / egenskap | Ekte app | `drivstoffappen_sync.py` |
 |---|---|---|
 | `user-agent` | `Drivstoffappen/3.5.4 (...) Alamofire/5.12.0` | ✓ lagt til 2026-05-19 |
-| `x-client-id` | `com.drivstoff.appen.ios` | ✓ rettet 2026-05-19 (var `com.raskebiler.drivstoff.appen.ios`) |
+| `x-client-id` | `com.drivstoff.appen.ios` | `com.raskebiler.drivstoff.appen.ios` — v1 krever gammel verdi, v3 bruker ny |
 | `x-requester-id` | device UUID | ✓ lagt til 2026-05-19 |
 | `accept-language` | `nb-NO;q=1.0, nn-NO;q=0.9` | ✓ lagt til 2026-05-19 |
 | `x-api-key` | statisk: `0afa1c404183c35622f380f78f2e5eec` | utledet fra v1-session-token |
