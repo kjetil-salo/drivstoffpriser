@@ -38,6 +38,7 @@ Disse stasjonene er mappet per siste oppdatering:
 | 1882   | 1351              | St1 Randabergveien |
 | 1887   | 221               | Esso Tjensvollkrysset |
 | 5690   | 468               | Esso Hundvåg |
+| 12     | 791               | Circle K Viken |
 
 **Oppdater alltid denne tabellen** hvis du bruker `/ops-partner-stasjon` og legger til nye stasjoner.
 
