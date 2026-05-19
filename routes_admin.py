@@ -34,7 +34,8 @@ from db import (finn_bruker_id, hent_alle_brukere, slett_bruker, har_rolle, sett
                 hent_ventende_stasjoner, antall_ventende_stasjoner, godkjenn_stasjon,
                 unike_enheter_per_dag, unike_brukere_per_dag, sett_drivstofftyper, hent_api_nøkler,
                 opprett_api_nøkkel, sett_api_nøkkel_aktiv,
-                fra_db_ts, til_oslo)
+                fra_db_ts, til_oslo, partner_stasjoner_24t, hent_partner_vs_egne_per_dag,
+                hent_leser_kart_data)
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -115,13 +116,13 @@ def _send_forslag_svar(epost: str, brukernavn: str, stasjonsnavn: str, godkjent:
     ekstra_html = f'<p>{ekstra}</p>' if ekstra else ''
     try:
         resend.Emails.send({
-            'from': 'Drivstoffpriser <noreply@ksalo.no>',
+            'from': 'drivstoffprisene.no <noreply@ksalo.no>',
             'to': epost,
             'subject': overskrift,
             'html': (f'<p>Hei{(" " + brukernavn) if brukernavn else ""}!</p>'
                      f'<p>{ingress}</p>'
                      f'{ekstra_html}'
-                     f'<p>Mvh,<br>Drivstoffpriser</p>'),
+                     f'<p>Mvh,<br>drivstoffprisene.no</p>'),
         })
     except Exception as e:
         logging.getLogger('drivstoff').error(f'Forslag-svar til {epost} feilet: {e}')
@@ -136,7 +137,7 @@ def _send_takk_for_rapport(eposter: list[str], stasjonsnavn: str):
     for epost in eposter:
         try:
             resend.Emails.send({
-                'from': 'Drivstoffpriser <noreply@ksalo.no>',
+                'from': 'drivstoffprisene.no <noreply@ksalo.no>',
                 'to': epost,
                 'subject': 'Takk for rapporten!',
                 'html': f'<p>Hei!</p>'
@@ -400,6 +401,11 @@ def admin():
     <div class="tile-ikon">&#128506;&#65039;</div>
     <div class="tile-tittel">Kart</div>
     <div class="tile-info">{stasjoner_antall} stasjoner med pris</div>
+  </a>
+  <a href="/admin/leser-kart" class="tile">
+    <div class="tile-ikon">&#128205;</div>
+    <div class="tile-tittel">Leser-kart</div>
+    <div class="tile-info">Geografisk spredning av lesere</div>
   </a>
 {admin_tiles}
 </div>
@@ -1552,6 +1558,8 @@ def priser_historikk():
 def oversikt():
     stats = get_statistikk()
     med_pris = antall_stasjoner_med_pris()
+    partner_24t = partner_stasjoner_24t()
+    partner_vs_egne = hent_partner_vs_egne_per_dag(7)
     brukere = antall_brukere()
     blogg_stats = hent_blogg_stats()
     blogg_totalt = sum(r['antall'] for r in blogg_stats)
@@ -1632,6 +1640,7 @@ def oversikt():
   <h1>Drivstoffpriser – statistikk</h1>
   <div class="kort-rad">
     <div class="kort"><div class="kort-tal">{med_pris}</div><div class="kort-label">Stasjoner med pris</div></div>
+    {'<div class="kort"><div class="kort-tal">' + str(partner_24t) + '</div><div class="kort-label">Drivstoffappen – st. m/pris 24t</div></div>' if partner_24t is not None else ''}
     <div class="kort"><div class="kort-tal">{stats['prisendringer']}</div><div class="kort-label">Prisregistreringer totalt</div></div>
     <div class="kort"><div class="kort-tal">{stats['totalt']}</div><div class="kort-label">Sidevisninger totalt</div></div>
     <div class="kort"><div class="kort-tal">{stats['unike_enheter']}</div><div class="kort-label">Unike enheter</div></div>
@@ -1675,6 +1684,10 @@ def oversikt():
       <span id="prognose-meta" style="font-size:0.75rem;color:#475569"></span>
     </div>
     <canvas id="historikkgraf" style="width:100%;max-height:220px"></canvas>
+  </div>
+  <div class="seksjon">
+    <h2>Prisoppdateringer: egne brukere vs Drivstoffappen – siste 7 dager</h2>
+    <canvas id="partnervsegenegraf" style="width:100%;max-height:240px"></canvas>
   </div>
   <div class="seksjon">
     <h2>Unike bidragsytere per dag – siste 30 dager (ekskl. Kjetil)</h2>
@@ -1918,6 +1931,27 @@ async function oppdaterHistorikk() {{
 
 oppdaterHistorikk();
 setInterval(oppdaterHistorikk, 60_000);
+
+new Chart(document.getElementById('partnervsegenegraf'), {{
+  type: 'bar',
+  data: {{
+    labels: {json.dumps(partner_vs_egne['labels'])},
+    datasets: [
+      {{ label: 'Egne brukere', data: {json.dumps(partner_vs_egne['egne'])},
+        backgroundColor: 'rgba(59,130,246,0.7)', borderColor: 'rgba(59,130,246,1)', borderWidth: 1 }},
+      {{ label: 'Drivstoffappen', data: {json.dumps(partner_vs_egne['partner'])},
+        backgroundColor: 'rgba(245,158,11,0.7)', borderColor: 'rgba(245,158,11,1)', borderWidth: 1 }}
+    ]
+  }},
+  options: {{
+    responsive: true,
+    plugins: {{ legend: {{ labels: {{ color: '#e5e7eb' }} }} }},
+    scales: {{
+      x: {{ ticks: {{ color: '#94a3b8' }}, grid: {{ color: '#1f2937' }} }},
+      y: {{ beginAtZero: true, ticks: {{ color: '#94a3b8' }}, grid: {{ color: '#1f2937' }} }}
+    }}
+  }}
+}});
 
 const brukererdagChart = new Chart(document.getElementById('brukererdaggraf'), {{
   type: 'bar',
@@ -2890,6 +2924,7 @@ def admin_toppliste():
 
 
 @admin_bp.route('/admin/kilde-statistikk')
+@krever_innlogging
 @krever_admin
 def kilde_statistikk():
     from db import get_conn
@@ -3112,6 +3147,69 @@ document.querySelectorAll('.ocr-thumb').forEach(img => {{
 }});
 overlay.addEventListener('click', () => overlay.classList.remove('vis'));
 document.addEventListener('keydown', e => {{ if(e.key==='Escape') overlay.classList.remove('vis'); }});
+</script>
+</body></html>'''
+
+
+@admin_bp.route('/admin/leser-kart')
+@krever_innlogging
+@krever_admin
+def admin_leser_kart():
+    import json
+    dager = request.args.get('dager', 30, type=int)
+    dager = max(1, min(365, dager))
+    punkter = hent_leser_kart_data(dager=dager)
+    maks = max((p['antall'] for p in punkter), default=1)
+    punkter_js = json.dumps(punkter)
+    return f'''<!DOCTYPE html><html lang="no"><head><meta charset="UTF-8">
+<title>Leser-kart – Drivstoffprisene admin</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="/css/leaflet.css">
+<script src="/js/vendor/leaflet.js"></script>
+<style>
+  body {{ margin:0; font-family:sans-serif; background:#111; color:#eee; }}
+  #kart {{ height:calc(100vh - 60px); }}
+  #topp {{ height:60px; display:flex; align-items:center; gap:16px; padding:0 16px; background:#1a1a2e; }}
+  #topp h1 {{ font-size:1.1rem; margin:0; }}
+  select,label {{ font-size:.9rem; color:#ccc; }}
+  #info {{ position:absolute; top:70px; right:10px; z-index:999; background:rgba(0,0,0,.75);
+           padding:10px 14px; border-radius:8px; font-size:.85rem; min-width:160px; }}
+  #info b {{ display:block; font-size:1.1rem; color:#4fc3f7; }}
+</style>
+</head><body>
+<div id="topp">
+  <h1>Leser-kart</h1>
+  <label>Periode:
+    <select onchange="window.location='/admin/leser-kart?dager='+this.value">
+      {''.join(f'<option value="{d}"{" selected" if d==dager else ""}>{d} dager</option>' for d in [7,14,30,60,90,180,365])}
+    </select>
+  </label>
+  <a href="/admin" style="color:#aaa;font-size:.85rem;margin-left:auto">← Admin</a>
+</div>
+<div id="info">
+  <b id="antall-ruter">{len(punkter)}</b> rutenett-celler med lesere<br>
+  Siste {dager} dager · maks {maks:,} per celle
+</div>
+<div id="kart"></div>
+<script>
+const punkter = {punkter_js};
+const maks = {maks};
+const kart = L.map('kart', {{center:[65,15],zoom:5,preferCanvas:true}});
+L.tileLayer('https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png',{{
+  attribution:'© OpenStreetMap',maxZoom:18
+}}).addTo(kart);
+
+punkter.forEach(p => {{
+  const r = Math.max(8, Math.round(30 * Math.sqrt(p.antall / maks)));
+  L.circleMarker([p.lat, p.lon], {{
+    radius: r,
+    color: '#4fc3f7',
+    fillColor: '#4fc3f7',
+    fillOpacity: 0.55,
+    weight: 1,
+    opacity: 0.8
+  }}).addTo(kart).bindPopup(`<b>${{p.antall}}</b> unike enheter<br>${{p.lat.toFixed(1)}}, ${{p.lon.toFixed(1)}}`);
+}});
 </script>
 </body></html>'''
 

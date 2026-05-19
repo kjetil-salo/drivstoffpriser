@@ -313,6 +313,17 @@ def _migrer_db():
         if 'preferences' not in bruker_kolonner2:
             conn.execute("ALTER TABLE brukere ADD COLUMN preferences TEXT")
 
+        if 'leser_posisjoner' not in tabeller:
+            conn.execute('''CREATE TABLE leser_posisjoner (
+                id        INTEGER PRIMARY KEY AUTOINCREMENT,
+                device_id TEXT NOT NULL,
+                lat       REAL NOT NULL,
+                lon       REAL NOT NULL,
+                ts        TEXT DEFAULT (datetime('now'))
+            )''')
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_leser_pos_device_ts ON leser_posisjoner(device_id, ts)')
+            conn.execute('CREATE INDEX IF NOT EXISTS idx_leser_pos_latlon ON leser_posisjoner(lat, lon)')
+
 
 def sjekk_rate_limit(type: str, nokkel: str, maks: int, vindu_sekunder: int) -> bool:
     """Returner True hvis nokkel har nådd maks antall hendelser i vindu_sekunder."""
@@ -1042,6 +1053,34 @@ def partner_stasjoner_24t() -> int | None:
         return row[0] if row else None
 
 
+def hent_partner_vs_egne_per_dag(dager: int = 7) -> dict:
+    """Daglige prisoppdateringer: Drivstoffappen (priser_skrevet) vs egne brukere, siste N dager."""
+    with get_conn() as conn:
+        partner_rader = conn.execute(
+            f"""SELECT date(tidspunkt, 'localtime') AS dato, SUM(priser_skrevet) AS antall
+               FROM drivstoffappen_sync
+               WHERE tidspunkt > datetime('now', '-{dager} days')
+               GROUP BY dato ORDER BY dato"""
+        ).fetchall()
+        egne_rader = conn.execute(
+            f"""SELECT date(p.tidspunkt, 'localtime') AS dato, COUNT(*) AS antall
+               FROM priser p
+               LEFT JOIN brukere b ON b.id = p.bruker_id
+               WHERE p.tidspunkt > datetime('now', '-{dager} days')
+               AND (b.brukernavn IS NULL OR b.brukernavn NOT LIKE 'partner:%')
+               GROUP BY dato ORDER BY dato"""
+        ).fetchall()
+    alle_datoer = sorted(set(r[0] for r in partner_rader) | set(r[0] for r in egne_rader))
+    partner_map = {r[0]: r[1] for r in partner_rader}
+    egne_map = {r[0]: r[1] for r in egne_rader}
+    labels = [d[5:].replace('-', '.') for d in alle_datoer]
+    return {
+        'labels': labels,
+        'partner': [partner_map.get(d, 0) for d in alle_datoer],
+        'egne': [egne_map.get(d, 0) for d in alle_datoer],
+    }
+
+
 def antall_stasjoner_med_pris() -> int:
     with get_conn() as conn:
         return conn.execute(
@@ -1266,6 +1305,41 @@ def hent_blogg_stats() -> list:
             'SELECT slug, COUNT(*) as antall FROM blogg_visninger GROUP BY slug ORDER BY antall DESC'
         ).fetchall()
         return [dict(r) for r in rows]
+
+
+def logg_leser_pos(device_id: str, lat: float, lon: float):
+    """Logger avrundet posisjon (≈1km grid) for leserstatistikk. Maks én logg per device per time."""
+    if not device_id:
+        return
+    if not (math.isfinite(lat) and math.isfinite(lon)):
+        return
+    if sjekk_rate_limit('leser_pos', device_id, maks=1, vindu_sekunder=3600):
+        return
+    lat_r = round(lat, 2)
+    lon_r = round(lon, 2)
+    with get_conn() as conn:
+        conn.execute(
+            'INSERT INTO leser_posisjoner (device_id, lat, lon) VALUES (?, ?, ?)',
+            (device_id, lat_r, lon_r)
+        )
+    logg_rate_limit('leser_pos', device_id)
+
+
+def hent_leser_kart_data(dager: int = 30) -> list[dict]:
+    """Aggregerer leserposisjoner per 0.5-grads-rute, siste N dager. Returnerer {lat, lon, antall}."""
+    with get_conn() as conn:
+        rader = conn.execute(
+            """SELECT
+                ROUND(ROUND(lat / 0.5) * 0.5, 1) AS lat_r,
+                ROUND(ROUND(lon / 0.5) * 0.5, 1) AS lon_r,
+                COUNT(DISTINCT device_id)          AS antall
+               FROM leser_posisjoner
+               WHERE ts >= datetime('now', ?)
+               GROUP BY lat_r, lon_r
+               ORDER BY antall DESC""",
+            (f'-{dager} days',)
+        ).fetchall()
+    return [{'lat': r[0], 'lon': r[1], 'antall': r[2]} for r in rader]
 
 
 def logg_visning(device_id: str, user_agent: str):

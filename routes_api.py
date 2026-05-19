@@ -39,7 +39,8 @@ from db import (get_stasjoner_med_priser, lagre_pris, bekreft_pris, logg_visning
                 har_rolle, hent_kjede_snitt_24t,
                 sjekk_rate_limit, logg_rate_limit, hent_anonym_bruker_id,
                 mask_stasjon_priser_for_tilganger,
-                hent_preferences, sett_preferences, sett_siste_pos)
+                hent_preferences, sett_preferences, sett_siste_pos,
+                logg_leser_pos)
 
 logger = logging.getLogger('drivstoff')
 
@@ -352,6 +353,13 @@ def stasjoner():
     radius_m = max(100, min(round(radius_km * 1000), 100_000))
     limit = 50 if radius_km >= 50 else 30
     data = get_stasjoner_med_priser(lat, lon, radius_m=radius_m, limit=limit)
+
+    try:
+        device_id = (request.cookies.get('device_id', '') or '')[:64]
+        logg_leser_pos(device_id, lat, lon)
+    except Exception:
+        pass
+
     return jsonify({'stasjoner': data})
 
 
@@ -1335,11 +1343,11 @@ def personvern():
 </style></head><body><div class="container">
 <a class="tilbake" href="/">&#8592; Tilbake til appen</a>
 <h1>Personvern</h1>
-<p class="undertittel">Sist oppdatert: 24. mars 2026</p>
+<p class="undertittel">Sist oppdatert: 19. mai 2026</p>
 
 <div class="kort">
   <h2>Kort oppsummert</h2>
-  <p>Drivstoffpriser er et hobbyprosjekt som samler inn s&#229; lite data som mulig. Du trenger ikke opprette konto for &#229; bruke appen. Uten innlogging forblir posisjonen din kun i nettleseren.</p>
+  <p>Drivstoffpriser er et hobbyprosjekt som samler inn s&#229; lite data som mulig. Du trenger ikke opprette konto for &#229; bruke appen.</p>
 </div>
 
 <div class="kort">
@@ -1363,14 +1371,14 @@ def personvern():
 
 <div class="kort">
   <h2>Posisjon / GPS</h2>
-  <p><strong>Uten innlogging:</strong> Posisjonen lagres kun lokalt i nettleseren (localStorage) og sendes ikke til serveren.</p>
-  <p><strong>Med innlogging:</strong> Sist s&#248;kte sted lagres p&#229; brukerkontoen din slik at appen husker posisjonen p&#229; tvers av enheter. Posisjonen brukes utelukkende til dette form&#229;let og logges ikke.</p>
+  <p><strong>Uten innlogging:</strong> N&#229;r du s&#248;ker etter stasjoner n&#230;r deg, sendes en avrundet posisjon (ca. 1 km n&#248;yaktighet) til serveren og lagres for geografisk statistikk. Posisjonen knyttes til en anonym enhets-ID og brukes kun til aggregert analyse av hvor appen brukes. Ingen n&#248;yaktig GPS-posisjon lagres.</p>
+  <p><strong>Med innlogging:</strong> Sist s&#248;kte sted lagres p&#229; brukerkontoen din slik at appen husker posisjonen p&#229; tvers av enheter. I tillegg logges avrundet posisjon for geografisk statistikk p&#229; samme m&#229;te som for uinnloggede brukere.</p>
 </div>
 
 <div class="kort">
   <h2>Informasjonskapsler (cookies)</h2>
   <ul>
-    <li><strong>device_id</strong> &#8212; tilfeldig ID for anonym bes&#248;ksstatistikk. Utl&#248;per etter 2 &#229;r.</li>
+    <li><strong>device_id</strong> &#8212; tilfeldig ID for anonym bes&#248;ks- og posisjonsstatistikk. Utl&#248;per etter 2 &#229;r.</li>
     <li><strong>session</strong> &#8212; brukes kun n&#229;r du er innlogget. Utl&#248;per etter 90 dager.</li>
   </ul>
   <p>Ingen tredjeparts-cookies eller sporingsteknologi brukes.</p>
