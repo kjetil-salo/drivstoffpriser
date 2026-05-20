@@ -1,12 +1,12 @@
 ---
 name: ops-partner-region
-description: Vis stasjoner i et partner1-distrikt (Haugalandet/Stavanger/Jæren/Bergen/Kristiansand) og kjør manuell sync for distriktet på Pi.
+description: Vis stasjoner i et partner1-distrikt (Haugalandet/Stavanger/Jæren/Bergen/Kristiansand/Førde) og kjør manuell sync for distriktet på Pi.
 allowed-tools: Bash, Read
 ---
 
 Vis stasjonsliste for et distrikt og kjør partner1-sync for det distriktet på Pi.
 
-Argument: $ARGUMENTS (regionsnavn — Haugalandet, Stavanger, Jæren, Bergen eller Kristiansand)
+Argument: $ARGUMENTS (regionsnavn — Haugalandet, Stavanger, Jæren, Bergen, Kristiansand eller Førde)
 
 ## Bakgrunn
 
@@ -17,6 +17,7 @@ Bbox-definisjoner (fra `routes_admin.py`):
 - **Haugalandet**: lat 59.08–59.65, lon 5.05–5.60
 - **Stavanger**: lat 58.75–59.15, lon 5.40–6.05
 - **Jæren**: lat 58.60–58.82, lon 5.35–5.72
+- **Førde**: lat 61.40–61.55, lon 5.75–6.10
 
 ## Stasjonslister per region
 
@@ -258,5 +259,22 @@ Merk: Uno-X Klepp (1859) og Circle K Klepp (1876) er også i Stavanger-mappingen
 | 4227    | 263               | YX Håneskrysset |
 | 4238    | 273               | YX Søgne (automat) |
 | 4292    | 28592             | YX Truck Veøy Kristiansand |
+
+### Førde (10 stasjoner)
+
+| Vår ID | Drivstoffappen-ID | Navn |
+|--------|-------------------|------|
+| 3810   | 28301             | Circle K Truck Førde |
+| 3804   | 79                | Esso Førde |
+| 3812   | 24503             | Knapphus Energi Øyrane |
+| 3819   | 21676             | Oljeleverandøren Førde |
+| 3818   | 1233              | St1 Truck Firda billag |
+| 3815   | 47                | Uno-X Førde |
+| 3813   | 2307              | YX Coop Førde (automat) |
+| 3803   | 25194             | YX Express Hafstadvegen (automat) |
+| 3805   | 117               | YX Førde |
+| 3816   | 1071              | YX Jølstraholmen |
+
+**Merk:** Esso Førde (3804) og YX Express Hafstadvegen (3803) ligger bare ~60 m fra hverandre — de er to separate stasjoner (ulike merker: Esso vs. YX), bekreftet av Drivstoffappen.
 
 Oppgave: $ARGUMENTS

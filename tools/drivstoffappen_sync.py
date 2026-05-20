@@ -188,6 +188,19 @@ STASJON_MAPPING_JAEREN = {
     1877: 193,   # Circle K Nærbø
 }
 
+STASJON_MAPPING_FØRDE = {
+    3810: 28301,  # Circle K Truck Førde
+    3804: 79,     # Esso Førde
+    3812: 24503,  # Knapphus Energi Øyrane
+    3819: 21676,  # Oljeleverandøren Førde
+    3818: 1233,   # St1 Truck Firda billag
+    3815: 47,     # Uno-X Førde
+    3813: 2307,   # YX Coop Førde (automat)
+    3803: 25194,  # YX Express Hafstadvegen (automat)
+    3805: 117,    # YX Førde
+    3816: 1071,   # YX Jølstraholmen
+}
+
 STASJON_MAPPING_KRISTIANSAND = {
     4247: 3179,    # Circle K Automat Brennåsen
     4248: 2241,    # Circle K Automat Sørlandsparken
@@ -224,6 +237,7 @@ REGIONER = {
     'stavanger':    STASJON_MAPPING_STAVANGER,
     'jaeren':       STASJON_MAPPING_JAEREN,
     'kristiansand': STASJON_MAPPING_KRISTIANSAND,
+    'førde':        STASJON_MAPPING_FØRDE,
 }
 
 FUEL_NAVN = {1: 'diesel', 2: 'bensin'}
