@@ -301,10 +301,10 @@ def admin():
     <div class="tile-tittel">Billigst p&#229; vei</div>
     <div class="tile-info">Finn pris langs rute</div>
   </a>
-  <a href="/admin/import" class="tile">
-    <div class="tile-ikon">&#128229;</div>
-    <div class="tile-tittel">Import</div>
-    <div class="tile-info">Partnerdata</div>
+  <a href="/admin/partner-sync" class="tile">
+    <div class="tile-ikon">&#128257;</div>
+    <div class="tile-tittel">Partner sync</div>
+    <div class="tile-info">Partnerintegrasjoner</div>
   </a>
   <a href="/admin/api-nokler" class="tile">
     <div class="tile-ikon">&#128273;</div>
@@ -2875,6 +2875,141 @@ def admin_import_opprett_stasjon():
     if duplikat:
         return jsonify({'stasjon_id': duplikat['id'], 'navn': duplikat['navn'], 'eksisterer': True})
     return jsonify({'stasjon_id': stasjon_id, 'navn': navn})
+
+
+@admin_bp.route('/admin/partner-sync')
+@krever_innlogging
+@krever_admin
+def admin_partner_sync():
+    return '''<!DOCTYPE html><html lang="no"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Partner sync – Admin</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:system-ui,sans-serif;background:#0f172a;color:#e5e7eb;padding:2rem 1rem}
+  .container{max-width:640px;margin:0 auto}
+  h1{font-size:1.3rem;margin-bottom:2rem;color:#f1f5f9}
+  nav{margin-bottom:1.5rem;font-size:0.85rem}
+  nav a{color:#94a3b8}
+  .seksjon{background:#111827;border:1px solid #1f2937;border-radius:12px;padding:1.5rem;margin-bottom:1.5rem}
+  .seksjon-tittel{font-size:0.95rem;font-weight:600;color:#f1f5f9;margin-bottom:1.25rem;padding-bottom:0.75rem;border-bottom:1px solid #1f2937}
+  .distrikt-rad{display:flex;align-items:center;gap:1rem;padding:0.65rem 0;border-bottom:1px solid #1f2937}
+  .distrikt-rad:last-child{border-bottom:none;padding-bottom:0}
+  .distrikt-rad:first-of-type{padding-top:0}
+  .distrikt-navn{flex:1;font-size:0.9rem}
+  .sync-btn{background:#1f2937;border:1px solid #374151;border-radius:6px;color:#e5e7eb;font-size:0.82rem;padding:6px 14px;cursor:pointer;transition:background 0.15s;white-space:nowrap}
+  .sync-btn:hover{background:#374151}
+  .sync-btn:disabled{opacity:0.5;cursor:not-allowed}
+  .sync-status{font-size:0.82rem;min-width:80px;text-align:right}
+  .sync-status.ok{color:#22c55e}
+  .sync-status.feil{color:#ef4444}
+  .spinner{display:inline-block;width:14px;height:14px;border:2px solid #3b82f6;border-top-color:transparent;border-radius:50%;animation:spin 0.6s linear infinite;vertical-align:middle}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .badge{font-size:0.75rem;color:#64748b;margin-left:0.4rem}
+</style></head><body><div class="container">
+<nav><a href="/admin">&larr; Admin</a></nav>
+<h1>Partner sync</h1>
+
+<div class="seksjon">
+  <div class="seksjon-tittel">Partner 1</div>
+
+  <div class="distrikt-rad">
+    <span class="distrikt-navn">Bergen og omegn<span class="badge">cron</span></span>
+    <button class="sync-btn" id="btn-basis" onclick="sync(null, 'basis')">Sync</button>
+    <span class="sync-status" id="status-basis"></span>
+  </div>
+  <div class="distrikt-rad">
+    <span class="distrikt-navn">Haugalandet</span>
+    <button class="sync-btn" id="btn-haugalandet" onclick="sync(\'haugalandet\', \'haugalandet\')">Sync</button>
+    <span class="sync-status" id="status-haugalandet"></span>
+  </div>
+  <div class="distrikt-rad">
+    <span class="distrikt-navn">Stavanger</span>
+    <button class="sync-btn" id="btn-stavanger" onclick="sync(\'stavanger\', \'stavanger\')">Sync</button>
+    <span class="sync-status" id="status-stavanger"></span>
+  </div>
+  <div class="distrikt-rad">
+    <span class="distrikt-navn">Kristiansand</span>
+    <button class="sync-btn" id="btn-kristiansand" onclick="sync(\'kristiansand\', \'kristiansand\')">Sync</button>
+    <span class="sync-status" id="status-kristiansand"></span>
+  </div>
+</div>
+
+</div>
+<script>
+async function sync(region, key) {
+  const btn = document.getElementById('btn-' + key);
+  const statusEl = document.getElementById('status-' + key);
+  btn.disabled = true;
+  statusEl.className = 'sync-status';
+  statusEl.innerHTML = '<span class="spinner"></span>';
+
+  try {
+    const resp = await fetch('/admin/partner-sync/kjor', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({region})
+    });
+    const data = await resp.json();
+    if (resp.ok) {
+      const tekst = data.stasjoner_sjekket !== undefined
+        ? `${data.priser_skrevet} / ${data.stasjoner_sjekket}`
+        : 'OK';
+      statusEl.textContent = tekst;
+      statusEl.className = 'sync-status ok';
+    } else {
+      statusEl.textContent = data.error || 'Feil';
+      statusEl.className = 'sync-status feil';
+    }
+  } catch(e) {
+    statusEl.textContent = 'Nettverksfeil';
+    statusEl.className = 'sync-status feil';
+  }
+  btn.disabled = false;
+}
+</script>
+</body></html>'''
+
+
+@admin_bp.route('/admin/partner-sync/kjor', methods=['POST'])
+@krever_innlogging
+@krever_admin
+def admin_partner_sync_kjor():
+    import subprocess
+    import sys
+
+    data = request.get_json(silent=True) or {}
+    region = data.get('region')
+
+    gyldige_regioner = {None, 'haugalandet', 'stavanger', 'kristiansand'}
+    if region not in gyldige_regioner:
+        return jsonify({'error': 'Ugyldig region'}), 400
+
+    script = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tools', 'drivstoffappen_sync.py')
+    cmd = [sys.executable, script]
+    if region:
+        cmd += ['--region', region]
+
+    try:
+        res = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        if res.returncode != 0:
+            feil = (res.stderr or res.stdout or 'Script returnerte feil').strip()
+            log = logging.getLogger('drivstoff')
+            log.error(f'partner-sync/{region} feilet: {feil}')
+            return jsonify({'error': feil[:300]}), 500
+
+        from db import get_conn
+        with get_conn() as conn:
+            row = conn.execute(
+                "SELECT priser_skrevet, stasjoner_sjekket FROM drivstoffappen_sync ORDER BY rowid DESC LIMIT 1"
+            ).fetchone()
+        if row:
+            return jsonify({'ok': True, 'priser_skrevet': row[0], 'stasjoner_sjekket': row[1]})
+        return jsonify({'ok': True})
+    except subprocess.TimeoutExpired:
+        return jsonify({'error': 'Tidsavbrudd (120s)'}), 504
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @admin_bp.route('/admin/toppliste')
