@@ -2949,6 +2949,11 @@ def admin_partner_sync():
     <button class="sync-btn" id="btn-forde" onclick="sync(\'forde\', \'forde\')">Sync</button>
     <span class="sync-status" id="status-forde"></span>
   </div>
+  <div class="distrikt-rad">
+    <span class="distrikt-navn">Bergen by</span>
+    <button class="sync-btn" id="btn-bergenby" onclick="sync(\'bergenby\', \'bergenby\')">Sync</button>
+    <span class="sync-status" id="status-bergenby"></span>
+  </div>
 </div>
 
 </div>
@@ -2997,7 +3002,7 @@ def admin_partner_sync_kjor():
     data = request.get_json(silent=True) or {}
     region = data.get('region')
 
-    gyldige_regioner = {None, 'haugalandet', 'stavanger', 'jaeren', 'kristiansand', 'forde'}
+    gyldige_regioner = {None, 'haugalandet', 'stavanger', 'jaeren', 'kristiansand', 'forde', 'bergenby'}
     if region not in gyldige_regioner:
         return jsonify({'error': 'Ugyldig region'}), 400
 

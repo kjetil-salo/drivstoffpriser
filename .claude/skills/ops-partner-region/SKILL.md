@@ -1,12 +1,12 @@
 ---
 name: ops-partner-region
-description: Vis stasjoner i et partner1-distrikt (Haugalandet/Stavanger/Jæren/Bergen/Kristiansand/Førde) og kjør manuell sync for distriktet på Pi.
+description: Vis stasjoner i et partner1-distrikt (Haugalandet/Stavanger/Jæren/Bergen/Kristiansand/Førde/BergenBy) og kjør manuell sync for distriktet på Pi.
 allowed-tools: Bash, Read
 ---
 
 Vis stasjonsliste for et distrikt og kjør partner1-sync for det distriktet på Pi.
 
-Argument: $ARGUMENTS (regionsnavn — Haugalandet, Stavanger, Jæren, Bergen, Kristiansand eller Førde)
+Argument: $ARGUMENTS (regionsnavn — Haugalandet, Stavanger, Jæren, Bergen, Kristiansand, Førde eller BergenBy)
 
 ## Bakgrunn
 
@@ -276,5 +276,49 @@ Merk: Uno-X Klepp (1859) og Circle K Klepp (1876) er også i Stavanger-mappingen
 | 3816   | 1071              | YX Jølstraholmen |
 
 **Merk:** Esso Førde (3804) og YX Express Hafstadvegen (3803) ligger bare ~60 m fra hverandre — de er to separate stasjoner (ulike merker: Esso vs. YX), bekreftet av Drivstoffappen.
+
+### Bergen by (37 stasjoner)
+
+Regionsnøkkel: `bergenby`. Dekker Bergen sentrum, Sotra, Askøy og Flesland. Bounding box: lat 60.25–60.50, lon 4.85–5.45. Stasjoner i base STASJON_MAPPING (daglig cron) er ikke med her.
+
+| Vår ID  | Drivstoffappen-ID | Navn |
+|---------|-------------------|------|
+| 5       | 1219              | St1 Sandviken |
+| 6       | 1090              | Uno-X 7-Eleven Natland |
+| 7       | 3490              | Circle K Automat Sædalen |
+| 8       | 1088              | Uno-X 7-Eleven Kleppestø |
+| 9       | 28393             | Haltbakk express Askøy |
+| 10      | 508               | St1 Storetveit |
+| 13      | 66                | Circle K Ravnanger |
+| 14      | 476               | Esso Kanalveien |
+| 17      | 119               | Uno-X 7-Eleven Drotningsvik |
+| 20      | 1383              | St1 Varden |
+| 21      | 2059              | Circle K Automat Fyllingsdalen |
+| 22      | 2104              | Circle K Automat Godvik |
+| 29      | 50                | Uno-X Hauglandshella |
+| 31      | 56                | Circle K Automat Askøy |
+| 38      | 486               | Esso Laksevåg |
+| 52      | 415               | Esso Express Landåstorget |
+| 137     | 743               | Circle K Flesland |
+| 140     | 1339              | St1 Nesttun |
+| 142     | 527               | Esso Nesttun |
+| 143     | 822               | Circle K Sandsli |
+| 144     | 1214              | St1 Blomsterdalen |
+| 149     | 25178             | Haltbakk Express Søfteland |
+| 151     | 55                | Uno-X Kokstad |
+| 153     | 665               | Circle K Nesttun |
+| 154     | 1320              | St1 Laguneparken |
+| 162     | 54                | Uno-X Søreide |
+| 668911  | 4134              | Oljeleverandøren Drotningsvik |
+| 1275    | 372               | Esso Ågotnes |
+| 1281    | 986               | YX Skogsvåg |
+| 1283    | 6143              | Circle K Skogsvåg |
+| 1287    | 1027              | Uno-X 7-Eleven Kolltveit |
+| 1289    | 753               | Circle K Fjell |
+| 1290    | 52                | Uno-X Straume |
+| 1292    | 109               | St1 Straume |
+| 1529676 | 28372             | Oljeleverandøren Lønningsflaten |
+| 1529716 | 28677             | Haltbakk Kokstad |
+| 9500    | 28643             | Oljeleverandøren Fjøsanger |
 
 Oppgave: $ARGUMENTS

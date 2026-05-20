@@ -201,6 +201,46 @@ STASJON_MAPPING_FØRDE = {
     3816: 1071,   # YX Jølstraholmen
 }
 
+STASJON_MAPPING_BERGENBY = {
+    31: 56,         # Circle K Automat Askøy
+    21: 2059,       # Circle K Automat Fyllingsdalen
+    22: 2104,       # Circle K Automat Godvik
+    7: 3490,        # Circle K Automat Sædalen
+    1289: 753,      # Circle K Fjell
+    137: 743,       # Circle K Flesland
+    153: 665,       # Circle K Nesttun
+    13: 66,         # Circle K Ravnanger
+    143: 822,       # Circle K Sandsli
+    1283: 6143,     # Circle K Skogsvåg
+    52: 415,        # Esso Express Landåstorget
+    14: 476,        # Esso Kanalveien
+    38: 486,        # Esso Laksevåg
+    142: 527,       # Esso Nesttun
+    1275: 372,      # Esso Ågotnes
+    149: 25178,     # Haltbakk Express Søfteland
+    1529716: 28677, # Haltbakk Kokstad
+    9: 28393,       # Haltbakk express Askøy
+    668911: 4134,   # Oljeleverandøren Drotningsvik
+    9500: 28643,    # Oljeleverandøren Fjøsanger
+    1529676: 28372, # Oljeleverandøren Lønningsflaten
+    144: 1214,      # St1 Blomsterdalen
+    154: 1320,      # St1 Laguneparken
+    140: 1339,      # St1 Nesttun
+    5: 1219,        # St1 Sandviken
+    10: 508,        # St1 Storetveit
+    1292: 109,      # St1 Straume
+    20: 1383,       # St1 Varden
+    17: 119,        # Uno-X 7-Eleven Drotningsvik
+    8: 1088,        # Uno-X 7-Eleven Kleppestø
+    1287: 1027,     # Uno-X 7-Eleven Kolltveit
+    6: 1090,        # Uno-X 7-Eleven Natland
+    29: 50,         # Uno-X Hauglandshella
+    151: 55,        # Uno-X Kokstad
+    1290: 52,       # Uno-X Straume
+    162: 54,        # Uno-X Søreide
+    1281: 986,      # YX Skogsvåg
+}
+
 STASJON_MAPPING_KRISTIANSAND = {
     4247: 3179,    # Circle K Automat Brennåsen
     4248: 2241,    # Circle K Automat Sørlandsparken
@@ -238,6 +278,7 @@ REGIONER = {
     'jaeren':       STASJON_MAPPING_JAEREN,
     'kristiansand': STASJON_MAPPING_KRISTIANSAND,
     'forde':        STASJON_MAPPING_FØRDE,
+    'bergenby':     STASJON_MAPPING_BERGENBY,
 }
 
 FUEL_NAVN = {1: 'diesel', 2: 'bensin'}
