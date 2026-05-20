@@ -237,7 +237,7 @@ REGIONER = {
     'stavanger':    STASJON_MAPPING_STAVANGER,
     'jaeren':       STASJON_MAPPING_JAEREN,
     'kristiansand': STASJON_MAPPING_KRISTIANSAND,
-    'førde':        STASJON_MAPPING_FØRDE,
+    'forde':        STASJON_MAPPING_FØRDE,
 }
 
 FUEL_NAVN = {1: 'diesel', 2: 'bensin'}

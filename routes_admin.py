@@ -291,21 +291,23 @@ def admin():
     stasjoner_antall = antall_stasjoner_med_pris()
     if er_admin:
         brukere_antall = antall_brukere()
-        admin_tiles = f'''
+        statistikk_tile = '''
   <a href="/admin/oversikt" class="tile">
     <div class="tile-ikon">&#128202;</div>
     <div class="tile-tittel">Statistikk</div>
     <div class="tile-info">Visninger og trender</div>
-  </a>
-  <a href="/admin/rutepris" class="tile">
-    <div class="tile-ikon">&#128663;</div>
-    <div class="tile-tittel">Billigst p&#229; vei</div>
-    <div class="tile-info">Finn pris langs rute</div>
-  </a>
+  </a>'''
+        partner_tile = '''
   <a href="/admin/partner-sync" class="tile">
     <div class="tile-ikon">&#128257;</div>
     <div class="tile-tittel">Partner sync</div>
     <div class="tile-info">Partnerintegrasjoner</div>
+  </a>'''
+        rest_admin_tiles = f'''
+  <a href="/admin/rutepris" class="tile">
+    <div class="tile-ikon">&#128663;</div>
+    <div class="tile-tittel">Billigst p&#229; vei</div>
+    <div class="tile-info">Finn pris langs rute</div>
   </a>
   <a href="/admin/api-nokler" class="tile">
     <div class="tile-ikon">&#128273;</div>
@@ -322,14 +324,15 @@ def admin():
     <div class="tile-tittel">Nyhet</div>
     <div class="tile-info">Splash-melding</div>
   </a>
-
   <a href="/admin/innstillinger" class="tile">
     <div class="tile-ikon">&#9881;&#65039;</div>
     <div class="tile-tittel">Innstillinger</div>
     <div class="tile-info">Toggles og funksjoner</div>
   </a>'''
     else:
-        admin_tiles = ''
+        statistikk_tile = ''
+        partner_tile = ''
+        rest_admin_tiles = ''
     return f'''<!DOCTYPE html><html lang="no"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Admin – Drivstoffpriser</title>
@@ -368,6 +371,18 @@ def admin():
     <div class="tile-tittel">Prislogg</div>
     <div class="tile-info">Siste prisoppdateringer</div>
   </a>
+  <a href="/admin/kart" class="tile">
+    <div class="tile-ikon">&#128506;&#65039;</div>
+    <div class="tile-tittel">Kart</div>
+    <div class="tile-info">{stasjoner_antall} stasjoner med pris</div>
+  </a>
+{statistikk_tile}
+  <a href="/admin/leser-kart" class="tile">
+    <div class="tile-ikon">&#127760;</div>
+    <div class="tile-tittel">Leser-kart</div>
+    <div class="tile-info">Geografisk spredning av lesere</div>
+  </a>
+{partner_tile}
   <a href="/admin/steder" class="tile" {('style="border-color:#f59e0b"' if ventende_antall else '')}>
     <div class="tile-ikon">&#128205;</div>
     <div class="tile-tittel">Nye stasjoner</div>
@@ -398,17 +413,7 @@ def admin():
     <div class="tile-tittel">OCR-bilder</div>
     <div class="tile-info">Bilder, AI-resultat og fasit</div>
   </a>
-  <a href="/admin/kart" class="tile">
-    <div class="tile-ikon">&#128506;&#65039;</div>
-    <div class="tile-tittel">Kart</div>
-    <div class="tile-info">{stasjoner_antall} stasjoner med pris</div>
-  </a>
-  <a href="/admin/leser-kart" class="tile">
-    <div class="tile-ikon">&#128205;</div>
-    <div class="tile-tittel">Leser-kart</div>
-    <div class="tile-info">Geografisk spredning av lesere</div>
-  </a>
-{admin_tiles}
+{rest_admin_tiles}
 </div>
 </div></body></html>'''
 
@@ -2939,6 +2944,11 @@ def admin_partner_sync():
     <button class="sync-btn" id="btn-kristiansand" onclick="sync(\'kristiansand\', \'kristiansand\')">Sync</button>
     <span class="sync-status" id="status-kristiansand"></span>
   </div>
+  <div class="distrikt-rad">
+    <span class="distrikt-navn">Førde</span>
+    <button class="sync-btn" id="btn-forde" onclick="sync(\'forde\', \'forde\')">Sync</button>
+    <span class="sync-status" id="status-forde"></span>
+  </div>
 </div>
 
 </div>
@@ -2987,7 +2997,7 @@ def admin_partner_sync_kjor():
     data = request.get_json(silent=True) or {}
     region = data.get('region')
 
-    gyldige_regioner = {None, 'haugalandet', 'stavanger', 'jaeren', 'kristiansand'}
+    gyldige_regioner = {None, 'haugalandet', 'stavanger', 'jaeren', 'kristiansand', 'forde'}
     if region not in gyldige_regioner:
         return jsonify({'error': 'Ugyldig region'}), 400
 
