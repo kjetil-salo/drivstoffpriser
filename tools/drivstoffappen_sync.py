@@ -71,11 +71,13 @@ STASJON_MAPPING = {
     36: 2093,   # St1 Nygård
     5690: 468,  # Esso Hundvåg
     35: 1094,   # Uno-X 7-Eleven Øyrane torg
-    11: 28414,  # Haltbakk Express Ostereidet
     1882: 1351, # St1 Randabergveien
     1887: 221,  # Esso Tjensvollkrysset
     12: 791,    # Circle K Viken
     41: 53,     # Uno-X Fjøsanger
+    155: 1216,  # St1 Bønes
+    27: 314,   # Uno-X Fyllingsdalen
+    39: 592,   # Esso Vestkanten
 }
 
 # Region-tillegg — kun manuell kjøring via --region

@@ -3158,9 +3158,17 @@ def admin_leser_kart():
     import json
     dager = request.args.get('dager', 30, type=int)
     dager = max(1, min(365, dager))
+    vis = request.args.get('vis', 'bobler')
+    if vis not in ('heat', 'bobler'):
+        vis = 'bobler'
     punkter = hent_leser_kart_data(dager=dager)
     maks = max((p['antall'] for p in punkter), default=1)
     punkter_js = json.dumps(punkter)
+    dag_label = lambda d: '1 dag' if d == 1 else f'{d} dager'
+    periode_options = ''.join(
+        f'<option value="{d}"{" selected" if d==dager else ""}>{dag_label(d)}</option>'
+        for d in [1, 7, 14, 30, 60, 90, 180, 365]
+    )
     return f'''<!DOCTYPE html><html lang="no"><head><meta charset="UTF-8">
 <title>Leser-kart – Drivstoffprisene admin</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -3184,17 +3192,17 @@ def admin_leser_kart():
 <div id="topp">
   <h1>Leser-kart</h1>
   <label>Periode:
-    <select onchange="window.location='/admin/leser-kart?dager='+this.value">
-      {''.join(f'<option value="{d}"{" selected" if d==dager else ""}>{d} dager</option>' for d in [7,14,30,60,90,180,365])}
+    <select onchange="byttPeriode(this.value)">
+      {periode_options}
     </select>
   </label>
-  <button class="vis-btn" id="btn-heat" onclick="byttVisning('heat')">Heatmap</button>
-  <button class="vis-btn aktiv" id="btn-bobler" onclick="byttVisning('bobler')">Bobler</button>
+  <button class="vis-btn{' aktiv' if vis == 'heat' else ''}" id="btn-heat" onclick="byttVisning('heat')">Heatmap</button>
+  <button class="vis-btn{' aktiv' if vis == 'bobler' else ''}" id="btn-bobler" onclick="byttVisning('bobler')">Bobler</button>
   <a href="/admin" style="color:#aaa;font-size:.85rem;margin-left:auto">← Admin</a>
 </div>
 <div id="info">
   <b id="antall-ruter">{len(punkter)}</b> rutenett-celler med lesere<br>
-  Siste {dager} dager · maks {maks:,} per celle
+  Siste {dager} {'dag' if dager == 1 else 'dager'} · maks {maks:,} per celle
 </div>
 <div id="kart"></div>
 <script>
@@ -3219,9 +3227,16 @@ punkter.forEach(p => {{
     fillOpacity: 0.55, weight: 1, opacity: 0.8
   }}).addTo(boblerLag).bindPopup(`<b>${{p.antall}}</b> unike enheter<br>${{p.lat.toFixed(1)}}, ${{p.lon.toFixed(1)}}`);
 }});
-boblerLag.addTo(kart);
+
+let visNaa = '{vis}';
+if (visNaa === 'heat') {{
+  heatLag.addTo(kart);
+}} else {{
+  boblerLag.addTo(kart);
+}}
 
 function byttVisning(modus) {{
+  visNaa = modus;
   if (modus === 'heat') {{
     kart.removeLayer(boblerLag);
     heatLag.addTo(kart);
@@ -3231,6 +3246,10 @@ function byttVisning(modus) {{
   }}
   document.getElementById('btn-heat').classList.toggle('aktiv', modus === 'heat');
   document.getElementById('btn-bobler').classList.toggle('aktiv', modus === 'bobler');
+}}
+
+function byttPeriode(dager) {{
+  window.location = '/admin/leser-kart?dager=' + dager + '&vis=' + visNaa;
 }}
 </script>
 </body></html>'''
