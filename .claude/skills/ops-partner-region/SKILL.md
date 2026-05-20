@@ -1,12 +1,12 @@
 ---
 name: ops-partner-region
-description: Vis stasjoner i et partner1-distrikt (Haugalandet/Stavanger/Bergen) og kjør manuell sync for distriktet på Pi.
+description: Vis stasjoner i et partner1-distrikt (Haugalandet/Stavanger/Jæren/Bergen/Kristiansand) og kjør manuell sync for distriktet på Pi.
 allowed-tools: Bash, Read
 ---
 
 Vis stasjonsliste for et distrikt og kjør partner1-sync for det distriktet på Pi.
 
-Argument: $ARGUMENTS (regionsnavn — Haugalandet, Stavanger, Bergen eller Kristiansand)
+Argument: $ARGUMENTS (regionsnavn — Haugalandet, Stavanger, Jæren, Bergen eller Kristiansand)
 
 ## Bakgrunn
 
@@ -16,6 +16,7 @@ Bbox-definisjoner (fra `routes_admin.py`):
 - **Bergen**: lat 60.10–60.88, lon 4.70–5.75
 - **Haugalandet**: lat 59.08–59.65, lon 5.05–5.60
 - **Stavanger**: lat 58.75–59.15, lon 5.40–6.05
+- **Jæren**: lat 58.60–58.82, lon 5.35–5.72
 
 ## Stasjonslister per region
 
@@ -208,6 +209,22 @@ Regler:
 - 4297 YX Truck Rosseland (samme DS-ID 25136 som Uno-X Rosseland — duplikat)
 - 1529712 Norsk Olje Barstølveien (usikker match til DS "Scania" ID 25344)
 - 4288 Preem Kristiansand (usikker match til DS "Kemtek Langemyr" ID 28624)
+
+### Jæren (9 stasjoner)
+
+Merk: Uno-X Klepp (1859) og Circle K Klepp (1876) er også i Stavanger-mappingen.
+
+| Vår ID | Drivstoffappen-ID | Navn |
+|--------|-------------------|------|
+| 1859   | 148               | Uno-X Klepp |
+| 1876   | 186               | Circle K Klepp |
+| 1910   | 1539              | Tanken Kåsen |
+| 1881   | 230               | St1 Bryne |
+| 1889   | 205               | Esso Bryne |
+| 1862   | 151               | Uno-X Bryne |
+| 1888   | 152               | Uno-X Nærbø |
+| 1863   | 2861              | Circle K Automat Nærbø |
+| 1877   | 193               | Circle K Nærbø |
 
 ### Kristiansand (28 stasjoner)
 

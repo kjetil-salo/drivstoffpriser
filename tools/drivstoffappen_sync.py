@@ -176,6 +176,18 @@ STASJON_MAPPING_STAVANGER = {
     1821: 138,   # Uno-X Tau
 }
 
+STASJON_MAPPING_JAEREN = {
+    1859: 148,   # Uno-X Klepp
+    1876: 186,   # Circle K Klepp
+    1910: 1539,  # Tanken Kåsen
+    1881: 230,   # St1 Bryne
+    1889: 205,   # Esso Bryne
+    1862: 151,   # Uno-X Bryne
+    1888: 152,   # Uno-X Nærbø
+    1863: 2861,  # Circle K Automat Nærbø
+    1877: 193,   # Circle K Nærbø
+}
+
 STASJON_MAPPING_KRISTIANSAND = {
     4247: 3179,    # Circle K Automat Brennåsen
     4248: 2241,    # Circle K Automat Sørlandsparken
@@ -210,6 +222,7 @@ STASJON_MAPPING_KRISTIANSAND = {
 REGIONER = {
     'haugalandet':  STASJON_MAPPING_HAUGALANDET,
     'stavanger':    STASJON_MAPPING_STAVANGER,
+    'jaeren':       STASJON_MAPPING_JAEREN,
     'kristiansand': STASJON_MAPPING_KRISTIANSAND,
 }
 

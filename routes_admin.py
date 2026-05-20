@@ -44,6 +44,7 @@ REGIONER_RECT = [
     ("Bergen",              "#2196F3", 60.10, 60.88, 4.70, 5.75),
     ("Haugalandet",         "#9C27B0", 59.08, 59.65, 5.05, 5.60),
     ("Stavanger",           "#E91E63", 58.75, 59.15, 5.40, 6.05),
+    ("Jæren",               "#FFC107", 58.60, 58.82, 5.35, 5.72),
     ("Grenland",            "#FF5722", 58.95, 59.40, 9.35, 9.90),
     ("Kongsberg",           "#795548", 59.55, 59.80, 9.50, 9.85),
     ("Drammen",             "#607D8B", 59.55, 59.85, 10.00, 10.40),
@@ -2929,6 +2930,11 @@ def admin_partner_sync():
     <span class="sync-status" id="status-stavanger"></span>
   </div>
   <div class="distrikt-rad">
+    <span class="distrikt-navn">Jæren</span>
+    <button class="sync-btn" id="btn-jaeren" onclick="sync(\'jaeren\', \'jaeren\')">Sync</button>
+    <span class="sync-status" id="status-jaeren"></span>
+  </div>
+  <div class="distrikt-rad">
     <span class="distrikt-navn">Kristiansand</span>
     <button class="sync-btn" id="btn-kristiansand" onclick="sync(\'kristiansand\', \'kristiansand\')">Sync</button>
     <span class="sync-status" id="status-kristiansand"></span>
@@ -2981,7 +2987,7 @@ def admin_partner_sync_kjor():
     data = request.get_json(silent=True) or {}
     region = data.get('region')
 
-    gyldige_regioner = {None, 'haugalandet', 'stavanger', 'kristiansand'}
+    gyldige_regioner = {None, 'haugalandet', 'stavanger', 'jaeren', 'kristiansand'}
     if region not in gyldige_regioner:
         return jsonify({'error': 'Ugyldig region'}), 400
 

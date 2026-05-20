@@ -305,6 +305,9 @@ export function åpneEditModus(stasjon) {
 }
 
 export function lukkSheet() {
+    if (_stagedPriser.size > 0 && sheet.classList.contains('edit-modus')) {
+        if (!confirm('Du har ulagrede priser. Lukk likevel?')) return;
+    }
     sheet.classList.remove('open');
     sheet.classList.remove('edit-modus');
     sheet.style.bottom = '';
