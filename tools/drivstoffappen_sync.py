@@ -48,7 +48,7 @@ VARSLE_TIL = "k@vikebo.com"
 
 PRIS_MIN = 14.0
 PRIS_MAX = 37.0
-PARTNER_BRUKERNAVN = 'partner1'
+PARTNER_BRUKERNAVN = 'partner:partner1'
 DUMP_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'data', 'drivstoffappen_live.json')
 
 # Vår DB-id → Drivstoffappen-id
@@ -241,6 +241,31 @@ STASJON_MAPPING_BERGENBY = {
     1281: 986,      # YX Skogsvåg
 }
 
+STASJON_MAPPING_ASKOY_SOTRA_OYGARDEN = {
+    # Øygarden
+    2632: 2212,     # Circle K Automat Tjeldstø
+    1285: 919,      # YX Rong
+    1529682: 4793,  # Herdla
+    # Askøy
+    31: 56,         # Circle K Automat Askøy
+    8: 1088,        # Uno-X 7-Eleven Kleppestø
+    9: 28393,       # Haltbakk express Askøy
+    13: 66,         # Circle K Ravnanger
+    29: 50,         # Uno-X Hauglandshella
+    44: 4133,       # Fromreide (Kjerrgarden)
+    # Sotra/Fjell
+    1289: 753,      # Circle K Fjell
+    1283: 6143,     # Circle K Skogsvåg
+    1281: 986,      # YX Skogsvåg
+    1287: 1027,     # Uno-X 7-Eleven Kolltveit
+    1290: 52,       # Uno-X Straume
+    1292: 109,      # St1 Straume
+    1275: 372,      # Esso Ågotnes
+    # Sund
+    1529665: 28359, # Joker Bakkasund
+    152: 2258,      # Spar Steinsland
+}
+
 STASJON_MAPPING_KRISTIANSAND = {
     4247: 3179,    # Circle K Automat Brennåsen
     4248: 2241,    # Circle K Automat Sørlandsparken
@@ -273,12 +298,13 @@ STASJON_MAPPING_KRISTIANSAND = {
 }
 
 REGIONER = {
-    'haugalandet':  STASJON_MAPPING_HAUGALANDET,
-    'stavanger':    STASJON_MAPPING_STAVANGER,
-    'jaeren':       STASJON_MAPPING_JAEREN,
-    'kristiansand': STASJON_MAPPING_KRISTIANSAND,
-    'forde':        STASJON_MAPPING_FØRDE,
-    'bergenby':     STASJON_MAPPING_BERGENBY,
+    'haugalandet':          STASJON_MAPPING_HAUGALANDET,
+    'stavanger':            STASJON_MAPPING_STAVANGER,
+    'jaeren':               STASJON_MAPPING_JAEREN,
+    'kristiansand':         STASJON_MAPPING_KRISTIANSAND,
+    'forde':                STASJON_MAPPING_FØRDE,
+    'bergenby':             STASJON_MAPPING_BERGENBY,
+    'askoy_sotra_oygarden': STASJON_MAPPING_ASKOY_SOTRA_OYGARDEN,
 }
 
 FUEL_NAVN = {1: 'diesel', 2: 'bensin'}

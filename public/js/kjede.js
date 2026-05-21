@@ -1,6 +1,7 @@
-export const KJEDE_NAVN = ['Best', 'Bunker Oil', 'Circle K', 'Din-X', 'Driv', 'Esso', 'Fuel4You', 'Haltbakk Express', 'Haslestad Energi', 'Knapphus', 'MH24', 'Oljeleverandøren', 'Preem', 'St1', 'TANK', 'Tanken', 'Trønder Oil', 'Uno-X', 'YX'];
+export const KJEDE_NAVN = ['Automat1', 'Best', 'Bunker Oil', 'Circle K', 'Din-X', 'Driv', 'Esso', 'Fuel4You', 'Haltbakk Express', 'Haslestad Energi', 'Knapphus', 'MH24', 'Oljeleverandøren', 'Preem', 'St1', 'TANK', 'Tanken', 'Trønder Oil', 'Uno-X', 'YX'];
 
 const KJEDE_DOMENER = [
+    { match: ['automat1', 'automat 1'],        logo: 'automat1',             farge: '#e80000' },
     { match: ['circle k', 'circlek'],          logo: 'circlek',              farge: '#f97316' },
     { match: ['din-x', 'dinx', 'din x'],       logo: 'din-x',                farge: '#d45d00' },
     { match: ['uno-x', 'unox', 'uno x'],       logo: 'uno-x',                farge: '#e8181b' },

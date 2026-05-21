@@ -1,12 +1,12 @@
 ---
 name: ops-partner-region
-description: Vis stasjoner i et partner1-distrikt (Haugalandet/Stavanger/Jæren/Bergen/Kristiansand/Førde/BergenBy) og kjør manuell sync for distriktet på Pi.
+description: Vis stasjoner i et partner1-distrikt (Haugalandet/Stavanger/Jæren/Bergen/Kristiansand/Førde/BergenBy/AskøySotraØygarden) og kjør manuell sync for distriktet på Pi.
 allowed-tools: Bash, Read
 ---
 
 Vis stasjonsliste for et distrikt og kjør partner1-sync for det distriktet på Pi.
 
-Argument: $ARGUMENTS (regionsnavn — Haugalandet, Stavanger, Jæren, Bergen, Kristiansand, Førde eller BergenBy)
+Argument: $ARGUMENTS (regionsnavn — Haugalandet, Stavanger, Jæren, Bergen, Kristiansand, Førde, BergenBy eller AskøySotraØygarden)
 
 ## Bakgrunn
 
@@ -320,5 +320,41 @@ Regionsnøkkel: `bergenby`. Dekker Bergen sentrum, Sotra, Askøy og Flesland. Bo
 | 1529676 | 28372             | Oljeleverandøren Lønningsflaten |
 | 1529716 | 28677             | Haltbakk Kokstad |
 | 9500    | 28643             | Oljeleverandøren Fjøsanger |
+
+### Askøy/Sotra/Øygarden (18 stasjoner)
+
+Regionsnøkkel: `askoy_sotra_oygarden`. Dekker Askøy, Sotra (Fjell/Sund) og Øygarden. Bounding box: lat 60.10–60.75, lon 4.70–5.35.
+
+| Vår ID  | Drivstoffappen-ID | Navn |
+|---------|-------------------|------|
+| 8       | 1088              | Uno-X 7-Eleven Kleppestø (Askøy) |
+| 9       | 28393             | Haltbakk express Askøy |
+| 13      | 66                | Circle K Ravnanger (Askøy) |
+| 29      | 50                | Uno-X Hauglandshella (Askøy) |
+| 31      | 56                | Circle K Automat Askøy |
+| 44      | 4133              | Fromreide (Kjerrgarden, Askøy) |
+| 152     | 2258              | Spar Steinsland (Sund) |
+| 1275    | 372               | Esso Ågotnes (Sotra) |
+| 1281    | 986               | YX Skogsvåg (Sotra) |
+| 1283    | 6143              | Circle K Skogsvåg (Sotra) |
+| 1285    | 919               | YX Rong (Øygarden) |
+| 1287    | 1027              | Uno-X 7-Eleven Kolltveit (Sotra) |
+| 1289    | 753               | Circle K Fjell (Sotra) |
+| 1290    | 52                | Uno-X Straume (Sotra) |
+| 1292    | 109               | St1 Straume (Sotra) |
+| 2632    | 2212              | Circle K Automat Tjeldstø (Øygarden) |
+| 1529665 | 28359             | Joker Bakkasund (Sund) |
+| 1529682 | 4793              | Herdla (Askøy) |
+
+**Ikke med (ingen Drivstoffappen-match):**
+- 159 Klepsvik & Sønn (båtdrivstoff, ingen match innen 1 km)
+- 1293 Møvik kai (kai/marina, ingen match)
+- 1529786 Oljelevrandøren Rådal (feil match — nærmeste er Laguneparken 0.95 km)
+
+**Ikke med (muligens marinedrivstoff):**
+- 1294 Bensinstasjon/Bildøy Marina
+- 1278 Brattholmen marina
+- 1942 Steinsland kai
+- 1295 Hjeltefjorden Drivstoff (matchet mot "Blommen Marine")
 
 Oppgave: $ARGUMENTS
