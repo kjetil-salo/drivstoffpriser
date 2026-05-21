@@ -444,7 +444,8 @@ export async function lastStatistikk({ force = false } = {}) {
         if (!respStat.ok) return;
         const data = await respStat.json();
 
-        document.getElementById('stat-antall').textContent = data.antall_oppdateringer_24t;
+        document.getElementById('stat-antall-priser').textContent = data.antall_oppdateringer_7d;
+        document.getElementById('stat-antall-stasjoner').textContent = data.antall_stasjoner_14d;
 
         visPrisKort('stat-billigst-bensin', data.billigst.bensin);
         visPrisKort('stat-billigst-bensin98', data.billigst.bensin98);

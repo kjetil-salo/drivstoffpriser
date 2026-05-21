@@ -30,7 +30,8 @@ except ImportError:  # pragma: no cover - produksjon har Pillow, fallback bruker
 from db import (get_stasjoner_med_priser, lagre_pris, bekreft_pris, logg_visning,
                 antall_stasjoner_med_pris, finn_bruker_id, DB_PATH,
                 opprett_stasjon, hent_billigste_priser_24t,
-                antall_prisoppdateringer_24t, partner_stasjoner_24t, meld_stasjon_nedlagt,
+                antall_prisoppdateringer_24t, antall_prisoppdateringer_7d, antall_stasjoner_aktive_14d,
+                partner_stasjoner_24t, meld_stasjon_nedlagt,
                 get_conn, hent_innstilling, hent_toppliste, hent_toppliste_uke,
                 hent_min_plassering, logg_blogg_visning,
                 legg_til_endringsforslag, unike_enheter_per_dag,
@@ -728,7 +729,7 @@ def statistikk():
     timer = request.args.get('timer', 24, type=int)
     timer = max(1, min(48, timer))
     priser_24t = hent_billigste_priser_24t(lat=lat, lon=lon, radius_km=radius, timer=timer)
-    antall_oppdateringer = antall_prisoppdateringer_24t()
+    antall_oppdateringer = antall_prisoppdateringer_7d()
 
     billigst = {'bensin': None, 'diesel': None, 'bensin98': None, 'diesel_avgiftsfri': None}
     dyrest = {'bensin': None, 'diesel': None, 'bensin98': None, 'diesel_avgiftsfri': None}
@@ -752,7 +753,8 @@ def statistikk():
     return jsonify({
         'billigst': billigst,
         'dyrest': dyrest,
-        'antall_oppdateringer_24t': antall_oppdateringer,
+        'antall_oppdateringer_7d': antall_oppdateringer,
+        'antall_stasjoner_14d': antall_stasjoner_aktive_14d(),
         'partner_stasjoner_24t': partner_stasjoner_24t(),
     })
 

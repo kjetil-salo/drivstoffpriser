@@ -2,7 +2,7 @@
 
 Mobilapp/PWA for drivstoffpriser i Norge. Viser stasjoner fra OpenStreetMap på kart og i liste, med crowdsourcede priser fra innloggede brukere og moderatorverktøy for kvalitetssikring.
 
-Tilgjengelig på [drivstoff.ksalo.no](https://drivstoff.ksalo.no)
+Tilgjengelig på [drivstoffprisene.no](https://drivstoffprisene.no)
 
 ---
 
@@ -86,11 +86,12 @@ Alle kan se priser. For å rapportere priser trenger du en konto.
 | Lag | Teknologi |
 |-----|-----------|
 | Frontend | Vanilla JS (ES modules), Leaflet.js, OpenStreetMap |
-| Backend | Python 3.12, Flask 3 |
+| Backend | Python 3.13, Flask 3 |
 | Database | SQLite med WAL-modus |
 | Kartdata | OpenStreetMap via Overpass API (daglig bakgrunnsoppdatering) |
 | Geocoding | Photon (komoot.io) |
-| OCR | Tesseract.js i frontend + backend-endepunkt for gjenkjenning/logging |
+| OCR | Gemini (primær) + Claude Haiku (fallback) via backend-endepunkt |
+| Ruteplanlegging | GraphHopper (standard) med OSRM som fallback |
 | E-post | Resend (passordreset og enkelte adminflyter) |
 | Hosting | Raspberry Pi + Docker + Cloudflare Tunnel — se [docs/infrastruktur.md](docs/infrastruktur.md) |
 | Failover | Fly.io — DB synkes automatisk fra Pi hver 4. time (kl 00, 04, 08, 12, 16, 20) |
@@ -197,6 +198,10 @@ drivstoffpriser/
 | `GET` | `/admin/brukere` | Brukeradministrasjon |
 | `GET` | `/admin/toppliste` | Utvidet toppliste |
 | `GET` | `/admin/import` | Import av partnerdata |
+| `GET` | `/admin/drivstofftyper` | Administrer drivstofftyper per stasjon |
+| `GET` | `/admin/api-nokler` | Administrer API-nøkler for datasamarbeid |
+| `GET` | `/admin/leser-kart` | Anonymt GPS-statistikk-kart med heatmap |
+| `GET` | `/admin/rutepris` | Ruteplanlegging med prisvisning |
 | `POST` | `/admin/invitasjon` | Generer invitasjonslenke |
 | `POST` | `/admin/toggle-registrering` | Åpne/steng registrering |
 | `PUT` | `/api/sync-db` | DB-synk fra Pi til Fly.io (X-Sync-Key) |
@@ -229,7 +234,9 @@ rapporter       -- meldinger om nedlagte stasjoner
 endringsforslag -- forslag til navn/kjede
 rate_limit      -- enkel IP-/nøkkelbasert rate limiting
 blogg_visninger -- logging av bloggtrafikk
-ocr_statistikk  -- logging av OCR-flyt og kvalitet
+ocr_statistikk      -- logging av OCR-flyt, kvalitet og bilder
+drivstoffappen_sync -- logging av partner-sync bidrag per kjøring
+leser_posisjoner    -- anonyme GPS-posisjoner fra brukere (leser-kart)
 ```
 
 Indekser finnes blant annet på `stasjoner(lat, lon)`, `visninger(device_id)`, `visninger(ts)` og `rate_limit(type, nokkel, tidspunkt)`.
@@ -350,4 +357,8 @@ rclone ls r2:drivstoffpriser-backup/daglig/
 | `RESEND_API_KEY` | — | API-nøkkel for Resend (e-post) |
 | `BASE_URL` | `request.host_url` | Base-URL for e-postlenker |
 | `FLY_APP_NAME` | — | Satt på Fly.io for backup-deteksjon |
+| `GRAPHHOPPER_API_KEY` | — | API-nøkkel for GraphHopper ruteplanlegging |
+| `RUTE_MOTOR` | `graphhopper` | `graphhopper` eller `osrm` |
+| `GEMINI_API_KEY` | — | API-nøkkel for Gemini OCR (primær) |
+| `ANTHROPIC_API_KEY` | — | API-nøkkel for Claude Haiku OCR (fallback) |
 | `LOG_LEVEL` | `INFO` | Loggnivå |

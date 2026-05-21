@@ -2610,6 +2610,12 @@ html, body {
   margin-bottom: var(--space-sm);
 }
 
+.stat-oppdatering-rad + .stat-oppdatering-rad {
+  margin-top: var(--space-lg);
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--border-color);
+}
+
 .stat-oppdateringer + .stat-seksjon-tittel {
   margin-top: 2rem;
 }

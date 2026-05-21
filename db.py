@@ -1040,6 +1040,20 @@ def antall_prisoppdateringer_24t() -> int:
         ).fetchone()[0]
 
 
+def antall_prisoppdateringer_7d() -> int:
+    with get_conn() as conn:
+        return conn.execute(
+            "SELECT COUNT(*) FROM priser WHERE tidspunkt > datetime('now', '-7 days')"
+        ).fetchone()[0]
+
+
+def antall_stasjoner_aktive_14d() -> int:
+    with get_conn() as conn:
+        return conn.execute(
+            "SELECT COUNT(DISTINCT stasjon_id) FROM priser WHERE tidspunkt > datetime('now', '-14 days')"
+        ).fetchone()[0]
+
+
 def partner_stasjoner_24t() -> int | None:
     """Antall stasjoner i Drivstoffappens dump med priser siste 24t, fra siste sync-kjøring."""
     with get_conn() as conn:
