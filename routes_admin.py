@@ -3007,7 +3007,7 @@ def admin_partner_sync_kjor():
     data = request.get_json(silent=True) or {}
     region = data.get('region')
 
-    gyldige_regioner = {None, 'haugalandet', 'stavanger', 'jaeren', 'kristiansand', 'forde', 'bergenby'}
+    gyldige_regioner = {None, 'haugalandet', 'stavanger', 'jaeren', 'kristiansand', 'forde', 'bergenby', 'askoy_sotra_oygarden'}
     if region not in gyldige_regioner:
         return jsonify({'error': 'Ugyldig region'}), 400
 
