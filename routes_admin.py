@@ -2954,6 +2954,11 @@ def admin_partner_sync():
     <button class="sync-btn" id="btn-bergenby" onclick="sync(\'bergenby\', \'bergenby\')">Sync</button>
     <span class="sync-status" id="status-bergenby"></span>
   </div>
+  <div class="distrikt-rad">
+    <span class="distrikt-navn">Askøy, Sotra og Øygarden</span>
+    <button class="sync-btn" id="btn-askoy_sotra_oygarden" onclick="sync(\'askoy_sotra_oygarden\', \'askoy_sotra_oygarden\')">Sync</button>
+    <span class="sync-status" id="status-askoy_sotra_oygarden"></span>
+  </div>
 </div>
 
 </div>
