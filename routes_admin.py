@@ -2959,6 +2959,11 @@ def admin_partner_sync():
     <button class="sync-btn" id="btn-askoy_sotra_oygarden" onclick="sync(\'askoy_sotra_oygarden\', \'askoy_sotra_oygarden\')">Sync</button>
     <span class="sync-status" id="status-askoy_sotra_oygarden"></span>
   </div>
+  <div class="distrikt-rad">
+    <span class="distrikt-navn">Møre og Romsdal</span>
+    <button class="sync-btn" id="btn-more_romsdal" onclick="sync(\'more_romsdal\', \'more_romsdal\')">Sync</button>
+    <span class="sync-status" id="status-more_romsdal"></span>
+  </div>
 </div>
 
 </div>
@@ -3007,7 +3012,7 @@ def admin_partner_sync_kjor():
     data = request.get_json(silent=True) or {}
     region = data.get('region')
 
-    gyldige_regioner = {None, 'haugalandet', 'stavanger', 'jaeren', 'kristiansand', 'forde', 'bergenby', 'askoy_sotra_oygarden'}
+    gyldige_regioner = {None, 'haugalandet', 'stavanger', 'jaeren', 'kristiansand', 'forde', 'bergenby', 'askoy_sotra_oygarden', 'more_romsdal'}
     if region not in gyldige_regioner:
         return jsonify({'error': 'Ugyldig region'}), 400
 
@@ -3376,8 +3381,8 @@ L.tileLayer('https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png',{{
 
 const heatData = punkter.map(p => [p.lat, p.lon, p.antall / maks]);
 const heatLag = L.heatLayer(heatData, {{
-  radius: 35, blur: 25, maxZoom: 10, max: 1.0,
-  gradient: {{0.2:'blue', 0.5:'lime', 0.8:'yellow', 1.0:'red'}}
+  radius: 18, blur: 12, maxZoom: 8, max: 1.0, minOpacity: 0.4,
+  gradient: {{0.0:'#000080', 0.3:'#0080ff', 0.5:'#00ffff', 0.7:'#ffff00', 0.9:'#ff8000', 1.0:'#ff0000'}}
 }});
 
 const boblerLag = L.layerGroup();
