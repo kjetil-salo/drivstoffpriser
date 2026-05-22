@@ -2906,6 +2906,8 @@ def admin_partner_sync():
   .sync-btn{background:#1f2937;border:1px solid #374151;border-radius:6px;color:#e5e7eb;font-size:0.82rem;padding:6px 14px;cursor:pointer;transition:background 0.15s;white-space:nowrap}
   .sync-btn:hover{background:#374151}
   .sync-btn:disabled{opacity:0.5;cursor:not-allowed}
+  .prosent-input{width:56px;background:#1f2937;border:1px solid #374151;border-radius:6px;color:#e5e7eb;font-size:0.82rem;padding:5px 8px;text-align:center}
+  .prosent-input::placeholder{color:#4b5563}
   .sync-status{font-size:0.82rem;min-width:80px;text-align:right}
   .sync-status.ok{color:#22c55e}
   .sync-status.feil{color:#ef4444}
@@ -2921,46 +2923,55 @@ def admin_partner_sync():
 
   <div class="distrikt-rad">
     <span class="distrikt-navn">Bergen og omegn<span class="badge">cron</span></span>
+    <input class="prosent-input" id="prosent-basis" type="number" min="1" max="100" placeholder="100">
     <button class="sync-btn" id="btn-basis" onclick="sync(null, 'basis')">Sync</button>
     <span class="sync-status" id="status-basis"></span>
   </div>
   <div class="distrikt-rad">
     <span class="distrikt-navn">Haugalandet</span>
+    <input class="prosent-input" id="prosent-haugalandet" type="number" min="1" max="100" placeholder="100">
     <button class="sync-btn" id="btn-haugalandet" onclick="sync(\'haugalandet\', \'haugalandet\')">Sync</button>
     <span class="sync-status" id="status-haugalandet"></span>
   </div>
   <div class="distrikt-rad">
     <span class="distrikt-navn">Stavanger</span>
+    <input class="prosent-input" id="prosent-stavanger" type="number" min="1" max="100" placeholder="100">
     <button class="sync-btn" id="btn-stavanger" onclick="sync(\'stavanger\', \'stavanger\')">Sync</button>
     <span class="sync-status" id="status-stavanger"></span>
   </div>
   <div class="distrikt-rad">
     <span class="distrikt-navn">Jæren</span>
+    <input class="prosent-input" id="prosent-jaeren" type="number" min="1" max="100" placeholder="100">
     <button class="sync-btn" id="btn-jaeren" onclick="sync(\'jaeren\', \'jaeren\')">Sync</button>
     <span class="sync-status" id="status-jaeren"></span>
   </div>
   <div class="distrikt-rad">
     <span class="distrikt-navn">Kristiansand</span>
+    <input class="prosent-input" id="prosent-kristiansand" type="number" min="1" max="100" placeholder="100">
     <button class="sync-btn" id="btn-kristiansand" onclick="sync(\'kristiansand\', \'kristiansand\')">Sync</button>
     <span class="sync-status" id="status-kristiansand"></span>
   </div>
   <div class="distrikt-rad">
     <span class="distrikt-navn">Førde</span>
+    <input class="prosent-input" id="prosent-forde" type="number" min="1" max="100" placeholder="100">
     <button class="sync-btn" id="btn-forde" onclick="sync(\'forde\', \'forde\')">Sync</button>
     <span class="sync-status" id="status-forde"></span>
   </div>
   <div class="distrikt-rad">
     <span class="distrikt-navn">Bergen by</span>
+    <input class="prosent-input" id="prosent-bergenby" type="number" min="1" max="100" placeholder="100">
     <button class="sync-btn" id="btn-bergenby" onclick="sync(\'bergenby\', \'bergenby\')">Sync</button>
     <span class="sync-status" id="status-bergenby"></span>
   </div>
   <div class="distrikt-rad">
     <span class="distrikt-navn">Askøy, Sotra og Øygarden</span>
+    <input class="prosent-input" id="prosent-askoy_sotra_oygarden" type="number" min="1" max="100" placeholder="100">
     <button class="sync-btn" id="btn-askoy_sotra_oygarden" onclick="sync(\'askoy_sotra_oygarden\', \'askoy_sotra_oygarden\')">Sync</button>
     <span class="sync-status" id="status-askoy_sotra_oygarden"></span>
   </div>
   <div class="distrikt-rad">
     <span class="distrikt-navn">Møre og Romsdal</span>
+    <input class="prosent-input" id="prosent-more_romsdal" type="number" min="1" max="100" placeholder="100">
     <button class="sync-btn" id="btn-more_romsdal" onclick="sync(\'more_romsdal\', \'more_romsdal\')">Sync</button>
     <span class="sync-status" id="status-more_romsdal"></span>
   </div>
@@ -2971,6 +2982,8 @@ def admin_partner_sync():
 async function sync(region, key) {
   const btn = document.getElementById('btn-' + key);
   const statusEl = document.getElementById('status-' + key);
+  const prosentEl = document.getElementById('prosent-' + key);
+  const prosent = prosentEl && prosentEl.value ? parseInt(prosentEl.value, 10) : 100;
   btn.disabled = true;
   statusEl.className = 'sync-status';
   statusEl.innerHTML = '<span class="spinner"></span>';
@@ -2979,7 +2992,7 @@ async function sync(region, key) {
     const resp = await fetch('/admin/partner-sync/kjor', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({region})
+      body: JSON.stringify({region, prosent})
     });
     const data = await resp.json();
     if (resp.ok) {
@@ -3011,15 +3024,22 @@ def admin_partner_sync_kjor():
 
     data = request.get_json(silent=True) or {}
     region = data.get('region')
+    prosent = data.get('prosent', 100)
 
     gyldige_regioner = {None, 'haugalandet', 'stavanger', 'jaeren', 'kristiansand', 'forde', 'bergenby', 'askoy_sotra_oygarden', 'more_romsdal'}
     if region not in gyldige_regioner:
         return jsonify({'error': 'Ugyldig region'}), 400
+    try:
+        prosent = max(1, min(100, int(prosent)))
+    except (TypeError, ValueError):
+        prosent = 100
 
     script = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tools', 'drivstoffappen_sync.py')
     cmd = [sys.executable, script]
     if region:
         cmd += ['--region', region]
+    if prosent < 100:
+        cmd += ['--prosent', str(prosent)]
 
     try:
         res = subprocess.run(cmd, capture_output=True, text=True, timeout=120)

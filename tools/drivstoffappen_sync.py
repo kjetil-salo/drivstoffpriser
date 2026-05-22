@@ -297,6 +297,116 @@ STASJON_MAPPING_KRISTIANSAND = {
     4292: 28592,   # YX Truck Veøy Kristiansand
 }
 
+STASJON_MAPPING_MORE_ROMSDAL = {
+    # --- Kristiansund (11 stasjoner) ---
+    4411:    1432,  # Best Bremsnes (automat)
+    4430:    2146,  # Bunker Oil Kristiansund
+    4422:    2179,  # Circle K Truck Sødalen
+    4420:     795,  # Circle K Viadukten
+    4410:     519,  # Esso Express Løkkemyra
+    1529671: 28407, # Haltbakk Express Frei
+    4415:    1244,  # St1 Autokrysset
+    4427:    3258,  # Uno-X Averøya
+    4418:      37,  # Uno-X Kongens plass
+    4426:    2275,  # Uno-X Løkkemyra
+    4428:   25521,  # Uno-X Truck Frei
+
+    # --- Molde og Romsdal (30 stasjoner) ---
+    4417:    2144,  # Bunker Oil Batnfjorden
+    1529634: 28564, # Bunker Oil Bud
+    9289:    2143,  # Bunker Oil Hjelset
+    1263472: 25242, # Bunker Oil Hollingen
+    7249:    2142,  # Bunker Oil Malmefjorden
+    7240:    3180,  # Bunker Oil Nesjestranda
+    1529701: 2140,  # Bunker Oil Vestnes
+    4419:    3884,  # Circle K Automat Eide
+    7242:     838,  # Circle K Automat Julsundveien
+    7235:     611,  # Circle K Molde
+    5261:     605,  # Circle K Åndalsnes
+    1529724: 21034, # Driv Elnesvågen
+    1181647: 25520, # Driv Tornes
+    1163468: 5673,  # Esso Energi Malmefjorden
+    1529695: 5677,  # Esso Energi Årødalen
+    4425:     576,  # Esso Express Elnesvågen
+    5262:     513,  # Esso Øran
+    5253:   25244,  # SnarKjøp Mittet
+    7232:    1242,  # St1 Bolsønes
+    7233:    1386,  # St1 Vestnes
+    5260:    1240,  # St1 Åndalsnes
+    7237:   22888,  # Uno-X Årødalen
+    7234:     129,  # Uno-X 7-Eleven Reknes
+    7236:      39,  # Uno-X Moldegård
+    7247:     867,  # Uno-X Truck Straumen
+    7248:   28588,  # Uno-X Truck Veøy Molde
+    5256:   28589,  # Uno-X Truck Veøy Åndalsnes
+    1529696: 28649, # YX Joker Eidsbygda
+    1529704: 3168,  # YX Joker Kleive
+    4424:    2247,  # YX Skjelvik
+
+    # --- Ålesund og Sunnmøre (61 stasjoner) ---
+    7148:    3492,  # Best Eidet
+    3673:    2129,  # Bunker Oil Breivika
+    3663:    2132,  # Bunker Oil Ekornes
+    1529722: 2123,  # Bunker Oil Gjerdsvika
+    1529742: 2103,  # Bunker Oil Godøy
+    2606:    2128,  # Bunker Oil Hessa
+    2607:   28658,  # Bunker Oil Lerstad
+    2603:    2126,  # Bunker Oil Mauseidvågen
+    2605:    2102,  # Bunker Oil Nørvevika
+    1529730: 2133,  # Bunker Oil Skodje
+    1504329: 2134,  # Bunker Oil Stette
+    1529734: 2121,  # Bunker Oil Sæbø
+    1529721: 2124,  # Bunker Oil Tjørvåg
+    1381657: 28520, # Bunker Oil Vartdal
+    1529720: 2136,  # Bunker Oil Vatne
+    1529702: 2138,  # Bunker Oil Vigra
+    7160:    2030,  # Circle K Automat Brattvåg
+    3629:    3661,  # Circle K Automat Flisnes
+    3633:    2251,  # Circle K Automat Fosnavåg
+    2593:     748,  # Circle K Automat Hatlane
+    3645:     744,  # Circle K Automat Sykkylven
+    2589:    3659,  # Circle K Automat Valderøy
+    7157:     710,  # Circle K Digerneset
+    2592:     642,  # Circle K Hareid
+    3647:     723,  # Circle K Moa
+    104:    28237,  # Circle K Truck Furene
+    101:      831,  # Circle K Volda
+    97:        65,  # Circle K Ørsta
+    1529660: 28296, # Coop Folkestad Dalsfjord Bensin
+    102:    25476,  # Coop Lauvstad
+    1529778: 25449, # Drivstoff Åsevika Rovde
+    3653:     564,  # Esso Spjelkavik
+    2586:     595,  # Esso Vigra
+    1529711: 25419, # Knapphus Energi Rysteland
+    2604:    3262,  # MH24 Dragsund
+    3672:    6660,  # MH24 Fosnavåg
+    3668:    2965,  # MH24 Haugsbygda
+    99:      1239,  # St1 Express Hovdebygda
+    2594:     112,  # St1 Ulsteinvik
+    2590:    1384,  # St1 Vegsund
+    106:     1290,  # St1 Volda
+    98:       104,  # St1 Ørsta
+    1520542: 22526, # Storbilservice Emdal
+    1529779: 6095,  # Tanken Ellingsøy
+    1529744: 3183,  # Tanken Gursken
+    1418045: 28309, # Tanken Jensholmen Herøy
+    2601:    1092,  # Uno-X 7-Eleven Tinghuset
+    2597:      42,  # Uno-X Gåseid
+    2602:   25096,  # Uno-X Langevåg
+    2596:     886,  # Uno-X Truck Waagan
+    2595:      43,  # Uno-X Ulsteinvik
+    2599:      41,  # Uno-X Valderøya
+    110:    25008,  # Uno-X Volda
+    2600:    1093,  # Uno-X Ysteneset
+    7177:    3552,  # Uno-X Vallekrysset
+    103:       44,  # Uno-X Ørsta
+    3630:     992,  # YX Fosnavåg
+    109:     5692,  # YX Furene Volda
+    3635:     925,  # YX Larsnes
+    3654:     902,  # YX Sykkylven
+    3634:     942,  # YX Søvik
+}
+
 REGIONER = {
     'haugalandet':          STASJON_MAPPING_HAUGALANDET,
     'stavanger':            STASJON_MAPPING_STAVANGER,
@@ -305,6 +415,7 @@ REGIONER = {
     'forde':                STASJON_MAPPING_FØRDE,
     'bergenby':             STASJON_MAPPING_BERGENBY,
     'askoy_sotra_oygarden': STASJON_MAPPING_ASKOY_SOTRA_OYGARDEN,
+    'more_romsdal':         STASJON_MAPPING_MORE_ROMSDAL,
 }
 
 FUEL_NAVN = {1: 'diesel', 2: 'bensin'}
@@ -418,6 +529,11 @@ def kjør(prosent: float = 100, region: str | None = None):
             log.error(f'Ukjent region: {region}. Gyldige: {", ".join(REGIONER)}')
             return
         mapping = basis
+        if prosent < 100:
+            k = max(1, round(len(basis) * prosent / 100))
+            utvalg = random.sample(list(basis.keys()), k)
+            mapping = {vaar: basis[vaar] for vaar in utvalg}
+            log.info(f'Region {region} tilfeldig utvalg: {k}/{len(basis)} stasjoner ({prosent}%)')
         try:
             alle_stasjoner, dump_ts = _les_dump()
             log.info(f'Region {region}: {len(mapping)} stasjoner (dump fra {dump_ts})')
@@ -621,7 +737,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--prosent', type=float, default=100,
                         help='Prosent av stasjoner som skal sjekkes (f.eks. 20 = ~20%%)')
-    parser.add_argument('--region', choices=list(REGIONER), default=None,
+    parser.add_argument('--region', choices=list(REGIONER.keys()), default=None,
                         help='Kjør kun én region manuelt (haugalandet, stavanger)')
     args = parser.parse_args()
     kjør(prosent=args.prosent, region=args.region)

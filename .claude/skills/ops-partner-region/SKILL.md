@@ -1,12 +1,12 @@
 ---
 name: ops-partner-region
-description: Vis stasjoner i et partner1-distrikt (Haugalandet/Stavanger/Jæren/Bergen/Kristiansand/Førde/BergenBy/AskøySotraØygarden) og kjør manuell sync for distriktet på Pi.
+description: Vis stasjoner i et partner1-distrikt (Haugalandet/Stavanger/Jæren/Bergen/Kristiansand/Førde/BergenBy/AskøySotraØygarden/MøreRomsdal) og kjør manuell sync for distriktet på Pi.
 allowed-tools: Bash, Read
 ---
 
 Vis stasjonsliste for et distrikt og kjør partner1-sync for det distriktet på Pi.
 
-Argument: $ARGUMENTS (regionsnavn — Haugalandet, Stavanger, Jæren, Bergen, Kristiansand, Førde, BergenBy eller AskøySotraØygarden)
+Argument: $ARGUMENTS (regionsnavn — Haugalandet, Stavanger, Jæren, Bergen, Kristiansand, Førde, BergenBy, AskøySotraØygarden eller MøreRomsdal)
 
 ## Bakgrunn
 
@@ -145,33 +145,31 @@ Bbox-definisjoner (fra `routes_admin.py`):
 | 3091   | 194               | Circle K Randaberg |
 | 5661   | 2865              | Circle K Automat Hundvåg |
 
-## Manuell sync på Pi
+## Konfigurere prosent per region
 
-Hvis argument inneholder et prosenttall (f.eks. "Stavanger 20%"), parse ut prosenten og kjør et wrapper-script som patcher `STASJON_MAPPING` til bare region-stasjoner og kaller `kjør(prosent=N)`.
+Hver region i `REGIONER`-dict i `tools/drivstoffappen_sync.py` har et `(mapping, prosent)`-tuple. Sett prosent til `None` for 100 %, eller et tall for å begrense antall stasjoner:
 
-Eksempel — Stavanger 20%:
-
-```bash
-cat > /tmp/region_sync.py << 'EOF'
-import sys
-sys.path.insert(0, '/app')
-sys.path.insert(0, '/app/tools')
-import drivstoffappen_sync as s
-
-# Lim inn riktig stasjonsliste fra tabellen over
-REGION = { <vaar_id>: <drivstoffappen_id>, ... }
-
-s.STASJON_MAPPING = REGION
-s.kjør(prosent=20)  # bytt prosent etter argument
-EOF
-scp /tmp/region_sync.py raspberrypi:/tmp/region_sync.py
-ssh raspberrypi "docker cp /tmp/region_sync.py drivstoffpriser-drivstoffpriser-1:/tmp/region_sync.py && docker exec drivstoffpriser-drivstoffpriser-1 python3 /tmp/region_sync.py"
+```python
+REGIONER: dict[str, tuple[dict, float | None]] = {
+    'more_romsdal': (STASJON_MAPPING_MORE_ROMSDAL, 60),  # ~60% av stasjonene
+    'stavanger':    (STASJON_MAPPING_STAVANGER,    None), # alle stasjoner
+}
 ```
 
-Uten prosent — full sync for regionen:
+Utvalget er `random.sample` — eksakt N stasjoner, ikke per-stasjon-sjanse.
+
+## Manuell sync på Pi
+
+Full sync for regionen:
 
 ```bash
-ssh raspberrypi "docker exec drivstoffpriser-drivstoffpriser-1 python3 /app/tools/drivstoffappen_sync.py"
+ssh raspberrypi "docker exec drivstoffpriser-drivstoffpriser-1 python3 /app/tools/drivstoffappen_sync.py --region <regionsnøkkel>"
+```
+
+Overstyr prosent for én kjøring (uavhengig av konfigurert prosent):
+
+```bash
+ssh raspberrypi "docker exec drivstoffpriser-drivstoffpriser-1 python3 /app/tools/drivstoffappen_sync.py --region stavanger --prosent 20"
 ```
 
 Outputtet viser SKREVET / SKIP / AVVIST per stasjon.
@@ -356,5 +354,126 @@ Regionsnøkkel: `askoy_sotra_oygarden`. Dekker Askøy, Sotra (Fjell/Sund) og Øy
 - 1278 Brattholmen marina
 - 1942 Steinsland kai
 - 1295 Hjeltefjorden Drivstoff (matchet mot "Blommen Marine")
+
+### Møre og Romsdal (102 stasjoner)
+
+Regionsnøkkel: `more_romsdal`. Dekker Kristiansund, Molde/Romsdal og Ålesund/Sunnmøre.
+
+#### Kristiansund (11 stasjoner)
+
+| Vår ID  | Drivstoffappen-ID | Navn |
+|---------|-------------------|------|
+| 4411    | 1432              | Best Bremsnes (automat) |
+| 4430    | 2146              | Bunker Oil Kristiansund |
+| 4422    | 2179              | Circle K Truck Sødalen |
+| 4420    | 795               | Circle K Viadukten |
+| 4410    | 519               | Esso Express Løkkemyra |
+| 1529671 | 28407             | Haltbakk Express Frei |
+| 4415    | 1244              | St1 Autokrysset |
+| 4427    | 3258              | Uno-X Averøya |
+| 4418    | 37                | Uno-X Kongens plass |
+| 4426    | 2275              | Uno-X Løkkemyra |
+| 4428    | 25521             | Uno-X Truck Frei |
+
+#### Molde og Romsdal (30 stasjoner)
+
+| Vår ID  | Drivstoffappen-ID | Navn |
+|---------|-------------------|------|
+| 4417    | 2144              | Bunker Oil Batnfjorden |
+| 1529634 | 28564             | Bunker Oil Bud |
+| 9289    | 2143              | Bunker Oil Hjelset |
+| 1263472 | 25242             | Bunker Oil Hollingen |
+| 7249    | 2142              | Bunker Oil Malmefjorden |
+| 7240    | 3180              | Bunker Oil Nesjestranda |
+| 1529701 | 2140              | Bunker Oil Vestnes |
+| 4419    | 3884              | Circle K Automat Eide |
+| 7242    | 838               | Circle K Automat Julsundveien |
+| 7235    | 611               | Circle K Molde |
+| 5261    | 605               | Circle K Åndalsnes |
+| 1529724 | 21034             | Driv Elnesvågen |
+| 1181647 | 25520             | Driv Tornes |
+| 1163468 | 5673              | Esso Energi Malmefjorden |
+| 1529695 | 5677              | Esso Energi Årødalen |
+| 4425    | 576               | Esso Express Elnesvågen |
+| 5262    | 513               | Esso Øran |
+| 5253    | 25244             | SnarKjøp Mittet |
+| 7232    | 1242              | St1 Bolsønes |
+| 7233    | 1386              | St1 Vestnes |
+| 5260    | 1240              | St1 Åndalsnes |
+| 7237    | 22888             | Uno-X Årødalen |
+| 7234    | 129               | Uno-X 7-Eleven Reknes |
+| 7236    | 39                | Uno-X Moldegård |
+| 7247    | 867               | Uno-X Truck Straumen |
+| 7248    | 28588             | Uno-X Truck Veøy Molde |
+| 5256    | 28589             | Uno-X Truck Veøy Åndalsnes |
+| 1529696 | 28649             | YX Joker Eidsbygda |
+| 1529704 | 3168              | YX Joker Kleive |
+| 4424    | 2247              | YX Skjelvik |
+
+#### Ålesund og Sunnmøre (61 stasjoner)
+
+| Vår ID  | Drivstoffappen-ID | Navn |
+|---------|-------------------|------|
+| 7148    | 3492              | Best Eidet |
+| 3673    | 2129              | Bunker Oil Breivika |
+| 3663    | 2132              | Bunker Oil Ekornes |
+| 1529722 | 2123              | Bunker Oil Gjerdsvika |
+| 1529742 | 2103              | Bunker Oil Godøy |
+| 2606    | 2128              | Bunker Oil Hessa |
+| 2607    | 28658             | Bunker Oil Lerstad |
+| 2603    | 2126              | Bunker Oil Mauseidvågen |
+| 2605    | 2102              | Bunker Oil Nørvevika |
+| 1529730 | 2133              | Bunker Oil Skodje |
+| 1504329 | 2134              | Bunker Oil Stette |
+| 1529734 | 2121              | Bunker Oil Sæbø |
+| 1529721 | 2124              | Bunker Oil Tjørvåg |
+| 1381657 | 28520             | Bunker Oil Vartdal |
+| 1529720 | 2136              | Bunker Oil Vatne |
+| 1529702 | 2138              | Bunker Oil Vigra |
+| 7160    | 2030              | Circle K Automat Brattvåg |
+| 3629    | 3661              | Circle K Automat Flisnes |
+| 3633    | 2251              | Circle K Automat Fosnavåg |
+| 2593    | 748               | Circle K Automat Hatlane |
+| 3645    | 744               | Circle K Automat Sykkylven |
+| 2589    | 3659              | Circle K Automat Valderøy |
+| 7157    | 710               | Circle K Digerneset |
+| 2592    | 642               | Circle K Hareid |
+| 3647    | 723               | Circle K Moa |
+| 104     | 28237             | Circle K Truck Furene |
+| 101     | 831               | Circle K Volda |
+| 97      | 65                | Circle K Ørsta |
+| 1529660 | 28296             | Coop Folkestad Dalsfjord Bensin |
+| 102     | 25476             | Coop Lauvstad |
+| 1529778 | 25449             | Drivstoff Åsevika Rovde |
+| 3653    | 564               | Esso Spjelkavik |
+| 2586    | 595               | Esso Vigra |
+| 1529711 | 25419             | Knapphus Energi Rysteland |
+| 2604    | 3262              | MH24 Dragsund |
+| 3672    | 6660              | MH24 Fosnavåg |
+| 3668    | 2965              | MH24 Haugsbygda |
+| 99      | 1239              | St1 Express Hovdebygda |
+| 2594    | 112               | St1 Ulsteinvik |
+| 2590    | 1384              | St1 Vegsund |
+| 106     | 1290              | St1 Volda |
+| 98      | 104               | St1 Ørsta |
+| 1520542 | 22526             | Storbilservice Emdal |
+| 1529779 | 6095              | Tanken Ellingsøy |
+| 1529744 | 3183              | Tanken Gursken |
+| 1418045 | 28309             | Tanken Jensholmen Herøy |
+| 2601    | 1092              | Uno-X 7-Eleven Tinghuset |
+| 2597    | 42                | Uno-X Gåseid |
+| 2602    | 25096             | Uno-X Langevåg |
+| 2596    | 886               | Uno-X Truck Waagan |
+| 2595    | 43                | Uno-X Ulsteinvik |
+| 2599    | 41                | Uno-X Valderøya |
+| 110     | 25008             | Uno-X Volda |
+| 2600    | 1093              | Uno-X Ysteneset |
+| 7177    | 3552              | Uno-X Vallekrysset |
+| 103     | 44                | Uno-X Ørsta |
+| 3630    | 992               | YX Fosnavåg |
+| 109     | 5692              | YX Furene Volda |
+| 3635    | 925               | YX Larsnes |
+| 3654    | 902               | YX Sykkylven |
+| 3634    | 942               | YX Søvik |
 
 Oppgave: $ARGUMENTS
