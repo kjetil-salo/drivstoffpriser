@@ -1329,8 +1329,8 @@ def logg_leser_pos(device_id: str, lat: float, lon: float):
         return
     if sjekk_rate_limit('leser_pos', device_id, maks=1, vindu_sekunder=3600):
         return
-    lat_r = round(lat, 2)
-    lon_r = round(lon, 2)
+    lat_r = round(lat, 4)
+    lon_r = round(lon, 4)
     with get_conn() as conn:
         conn.execute(
             'INSERT INTO leser_posisjoner (device_id, lat, lon) VALUES (?, ?, ?)',

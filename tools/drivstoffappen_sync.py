@@ -65,7 +65,7 @@ STASJON_MAPPING = {
     32: 643,    # Circle K Haukås
     33: 644,    # Circle K Helleveien
     42: 49,     # Uno-x gullgruven (Åsane)
-    43: 121,    # Uno-X 7-Eleven Nyborg
+    # 43: 121,    # Uno-X 7-Eleven Nyborg — ute av drift, midlertidig fjernet fra sync
     45: 1222,   # St1 Isdalstø
     18: 1324,   # St1 Lone
     36: 2093,   # St1 Nygård
@@ -297,6 +297,49 @@ STASJON_MAPPING_KRISTIANSAND = {
     4292: 28592,   # YX Truck Veøy Kristiansand
 }
 
+STASJON_MAPPING_GRENLAND = {
+    507: 5483,     # Circle K Automat Borgeåsen
+    519: 26581,    # Circle K Automat Helgeroa
+    524: 2276,     # Circle K Automat Stridsklev
+    528: 762,      # Circle K Automat Telemarksveien
+    497: 747,      # Circle K Bratsberg
+    553: 2961,     # Circle K E18 Bamble
+    534: 381,      # Circle K Goberg
+    529: 832,      # Circle K Jorkjend
+    498: 830,      # Circle K Nylende
+    527: 834,      # Circle K Porsgrunn
+    502: 788,      # Circle K Skjelsvik
+    551: 678,      # Circle K Telemarksporten
+    542: 1471,     # Driv Bamble
+    536: 2948,     # Driv Heistad
+    3872: 28288,   # Driv Steinsholt
+    518: 397,      # Esso Brua
+    516: 1023,     # Esso Grasmyr
+    520: 526,      # Esso Myren
+    501: 11,       # Esso Rugtvedt
+    1529680: 28652, # Esso Skjelsvik
+    1511453: 28413, # Haslestad Energi Eidanger
+    545: 2032,     # Nilsen og Kokkersvold (Langangen)
+    1529713: 8705, # Rødmyr automat
+    500: 1321,     # St1 Lasses
+    521: 1332,     # St1 Myrland Auto
+    532: 1349,     # St1 Pors
+    533: 1171,     # St1 Truck Eidanger
+    522: 1535,     # Tanken Stathelle
+    499: 1098,     # Uno-X 7-Eleven Wattenberg
+    515: 292,      # Uno-X Bøleveien
+    537: 331,      # Uno-X Falkum
+    539: 25083,    # Uno-X Heistad
+    510: 281,      # Uno-X Herøya
+    514: 278,      # Uno-X Kjørbekk
+    547: 25123,    # Uno-X Menstad
+    535: 282,      # Uno-X Rafnes
+    538: 368,      # Uno-X Tollnes
+    512: 345,      # Uno-X Vallermyrene
+    511: 303,      # Uno-X Vestsiden
+    3839: 917,     # YX Siljan
+}
+
 STASJON_MAPPING_MORE_ROMSDAL = {
     # --- Kristiansund (11 stasjoner) ---
     4411:    1432,  # Best Bremsnes (automat)
@@ -411,6 +454,7 @@ REGIONER = {
     'haugalandet':          STASJON_MAPPING_HAUGALANDET,
     'stavanger':            STASJON_MAPPING_STAVANGER,
     'jaeren':               STASJON_MAPPING_JAEREN,
+    'grenland':             STASJON_MAPPING_GRENLAND,
     'kristiansand':         STASJON_MAPPING_KRISTIANSAND,
     'forde':                STASJON_MAPPING_FØRDE,
     'bergenby':             STASJON_MAPPING_BERGENBY,
@@ -684,29 +728,6 @@ def kjør(prosent: float = 100, region: str | None = None):
                     stats['feil'] += 1
 
     _logg_stats(stats)
-
-    emne = (
-        f"Partner1-sync {nå:%d.%m %H:%M} — "
-        f"{stats['priser_skrevet']} skrevet, "
-        f"{stats['hoppet_over']} skip, "
-        f"{stats['avvist_validering']} avvist"
-    )
-    kropp_linjer = [
-        f"Partner1-sync {nå:%Y-%m-%d %H:%M} UTC",
-        f"Stasjoner sjekket: {stats['stasjoner_sjekket']}",
-        f"Priser skrevet:    {stats['priser_skrevet']}",
-        f"Hoppet over:       {stats['hoppet_over']}  (vi hadde nyere)",
-        f"Avvist validering: {stats['avvist_validering']}",
-        f"Feil:              {stats['feil']}",
-        "",
-        "Detaljer:",
-    ]
-    if linjer:
-        kropp_linjer += linjer
-    else:
-        kropp_linjer.append("  (ingen endringer)")
-
-    _send_epost(emne, '\n'.join(kropp_linjer))
 
 
 def _logg_stats(stats: dict):

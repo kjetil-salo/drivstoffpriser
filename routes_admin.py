@@ -2946,6 +2946,12 @@ def admin_partner_sync():
     <span class="sync-status" id="status-jaeren"></span>
   </div>
   <div class="distrikt-rad">
+    <span class="distrikt-navn">Grenland</span>
+    <input class="prosent-input" id="prosent-grenland" type="number" min="1" max="100" placeholder="100">
+    <button class="sync-btn" id="btn-grenland" onclick="sync(\'grenland\', \'grenland\')">Sync</button>
+    <span class="sync-status" id="status-grenland"></span>
+  </div>
+  <div class="distrikt-rad">
     <span class="distrikt-navn">Kristiansand</span>
     <input class="prosent-input" id="prosent-kristiansand" type="number" min="1" max="100" placeholder="100">
     <button class="sync-btn" id="btn-kristiansand" onclick="sync(\'kristiansand\', \'kristiansand\')">Sync</button>
@@ -3026,7 +3032,7 @@ def admin_partner_sync_kjor():
     region = data.get('region')
     prosent = data.get('prosent', 100)
 
-    gyldige_regioner = {None, 'haugalandet', 'stavanger', 'jaeren', 'kristiansand', 'forde', 'bergenby', 'askoy_sotra_oygarden', 'more_romsdal'}
+    gyldige_regioner = {None, 'haugalandet', 'stavanger', 'jaeren', 'grenland', 'kristiansand', 'forde', 'bergenby', 'askoy_sotra_oygarden', 'more_romsdal'}
     if region not in gyldige_regioner:
         return jsonify({'error': 'Ugyldig region'}), 400
     try:
@@ -3218,7 +3224,7 @@ def admin_ocr_bilder():
             if not har_avvik:
                 continue
 
-        dato = (tidspunkt or '')[:16].replace('T', ' ')
+        dato = til_oslo(tidspunkt).strftime('%Y-%m-%d %H:%M') if tidspunkt else ''
         modell = ai.get('_modell', kilde or '?')
         confidence = ai.get('confidence', '?')
         kjede = ai.get('kjede', '')
@@ -3401,13 +3407,13 @@ L.tileLayer('https://{{s}}.tile.openstreetmap.org/{{z}}/{{x}}/{{y}}.png',{{
 
 const heatData = punkter.map(p => [p.lat, p.lon, p.antall / maks]);
 const heatLag = L.heatLayer(heatData, {{
-  radius: 18, blur: 12, maxZoom: 8, max: 1.0, minOpacity: 0.4,
+  radius: 10, blur: 6, maxZoom: 8, max: 1.0, minOpacity: 0.4,
   gradient: {{0.0:'#000080', 0.3:'#0080ff', 0.5:'#00ffff', 0.7:'#ffff00', 0.9:'#ff8000', 1.0:'#ff0000'}}
 }});
 
 const boblerLag = L.layerGroup();
 punkter.forEach(p => {{
-  const r = Math.max(8, Math.round(30 * Math.sqrt(p.antall / maks)));
+  const r = Math.max(5, Math.round(15 * Math.sqrt(p.antall / maks)));
   L.circleMarker([p.lat, p.lon], {{
     radius: r, color: '#4fc3f7', fillColor: '#4fc3f7',
     fillOpacity: 0.55, weight: 1, opacity: 0.8
