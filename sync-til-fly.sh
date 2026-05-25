@@ -6,7 +6,7 @@ set -euo pipefail
 
 FLY_URL="https://drivstoffpriser.fly.dev/api/sync-db"
 SYNC_KEY="${SYNC_KEY:-}"
-DB_PATH="/var/lib/docker/volumes/drivstoffpriser_drivstoff-data/_data/drivstoff.db"
+DB_PATH="/mnt/ssd/docker/volumes/drivstoffpriser_drivstoff-data/_data/drivstoff.db"
 TMP_BACKUP="/tmp/drivstoff-sync.db"
 
 if [ -z "$SYNC_KEY" ]; then

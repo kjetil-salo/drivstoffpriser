@@ -3,7 +3,7 @@
 # Kjøres som cron-jobb: 0 3 * * * /home/kjetil/drivstoffpriser/backup.sh
 set -e
 
-DB_PATH="/var/lib/docker/volumes/drivstoffpriser_drivstoff-data/_data/drivstoff.db"
+DB_PATH="/mnt/ssd/docker/volumes/drivstoffpriser_drivstoff-data/_data/drivstoff.db"
 BACKUP_DIR="/home/kjetil/backups/drivstoffpriser"
 DAGLIG_DIR="$BACKUP_DIR/daglig"
 UKENTLIG_DIR="$BACKUP_DIR/ukentlig"

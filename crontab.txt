@@ -1,0 +1,25 @@
+# Cron-oppsett for drivstoffpriser på Raspberry Pi
+#
+# Installer:
+#   kjetil-crontab:  crontab crontab-kjetil.txt
+#   root-crontab:    sudo crontab crontab-root.txt
+#
+# Logg-filer:
+#   /tmp/drivstoff-backup.log   — R2-backup
+#   /tmp/drivstoff-sync.log     — Fly.io-sync
+#   /tmp/drivstoffappen-sync.log — partner1-sync
+#   /tmp/vegkamera-ocr.log       — OCR/vegkamera
+
+# --- kjetil sin crontab ---
+# Daglig backup av DB til lokalt og Cloudflare R2, kl 03:00
+0 3 * * * python3 /home/kjetil/drivstoffpriser/cron-alarm.py "R2-backup" /home/kjetil/drivstoffpriser/backup.sh >> /tmp/drivstoff-backup.log 2>&1
+
+# --- root sin crontab ---
+# Sync DB til Fly.io hvert 4. time (failover-instans)
+0 */4 * * * SYNC_KEY="<sett inn SYNC_KEY>" python3 /home/kjetil/drivstoffpriser/cron-alarm.py "Fly.io-sync" /home/kjetil/drivstoffpriser/sync-til-fly.sh >> /tmp/drivstoff-sync.log 2>&1
+
+# Partner1-sync (Drivstoffappen) — hvert hele time 05–22, tilfeldig offset 0–20 min
+50 4-22 * * * sleep $(python3 -c "import random; print(random.randint(0,1200))"); docker exec drivstoffpriser-drivstoffpriser-1 python3 /app/tools/drivstoffappen_sync.py >> /tmp/drivstoffappen-sync.log 2>&1
+
+# OCR/vegkamera — hvert 30. min 05–23
+*/30 5-23 * * * docker exec drivstoffpriser-drivstoffpriser-1 python3 /app/tools/vegkamera_ocr.py >> /tmp/vegkamera-ocr.log 2>&1
