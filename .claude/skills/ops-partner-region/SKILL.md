@@ -1,12 +1,12 @@
 ---
 name: ops-partner-region
-description: Vis stasjoner i et partner1-distrikt (Haugalandet/Stavanger/Jæren/Bergen/Kristiansand/Førde/BergenBy/AskøySotraØygarden/MøreRomsdal) og kjør manuell sync for distriktet på Pi.
+description: Vis stasjoner i et partner1-distrikt (Haugalandet/Stavanger/Jæren/Grenland/Bergen/Kristiansand/Førde/BergenBy/AskøySotraØygarden/MøreRomsdal/Alver/Osterøy) og kjør manuell sync for distriktet på Pi.
 allowed-tools: Bash, Read
 ---
 
 Vis stasjonsliste for et distrikt og kjør partner1-sync for det distriktet på Pi.
 
-Argument: $ARGUMENTS (regionsnavn — Haugalandet, Stavanger, Jæren, Bergen, Kristiansand, Førde, BergenBy, AskøySotraØygarden eller MøreRomsdal)
+Argument: $ARGUMENTS (regionsnavn — Haugalandet, Stavanger, Jæren, Grenland, Bergen, Kristiansand, Førde, BergenBy, AskøySotraØygarden, MøreRomsdal, Alver eller Osterøy)
 
 ## Bakgrunn
 
@@ -17,6 +17,7 @@ Bbox-definisjoner (fra `routes_admin.py`):
 - **Haugalandet**: lat 59.08–59.65, lon 5.05–5.60
 - **Stavanger**: lat 58.75–59.15, lon 5.40–6.05
 - **Jæren**: lat 58.60–58.82, lon 5.35–5.72
+- **Grenland**: lat 58.95–59.40, lon 9.35–9.90
 - **Førde**: lat 61.40–61.55, lon 5.75–6.10
 
 ## Stasjonslister per region
@@ -208,6 +209,62 @@ Regler:
 - 4297 YX Truck Rosseland (samme DS-ID 25136 som Uno-X Rosseland — duplikat)
 - 1529712 Norsk Olje Barstølveien (usikker match til DS "Scania" ID 25344)
 - 4288 Preem Kristiansand (usikker match til DS "Kemtek Langemyr" ID 28624)
+
+### Grenland (40 stasjoner)
+
+Regionsnøkkel: `grenland`. Dekker Skien, Porsgrunn, Bamble og omegn. Bounding box: lat 58.95–59.40, lon 9.35–9.90.
+
+| Vår ID  | Drivstoffappen-ID | Navn |
+|---------|-------------------|------|
+| 497     | 747               | Circle K Bratsberg |
+| 498     | 830               | Circle K Nylende |
+| 499     | 1098              | Uno-X 7-Eleven Wattenberg |
+| 500     | 1321              | St1 Lasses |
+| 501     | 11                | Esso Rugtvedt |
+| 502     | 788               | Circle K Skjelsvik |
+| 507     | 5483              | Circle K Automat Borgeåsen |
+| 510     | 281               | Uno-X Herøya |
+| 511     | 303               | Uno-X Vestsiden |
+| 512     | 345               | Uno-X Vallermyrene |
+| 514     | 278               | Uno-X Kjørbekk |
+| 515     | 292               | Uno-X Bøleveien |
+| 516     | 1023              | Esso Grasmyr |
+| 518     | 397               | Esso Brua |
+| 519     | 26581             | Circle K Automat Helgeroa |
+| 520     | 526               | Esso Myren |
+| 521     | 1332              | St1 Myrland Auto |
+| 522     | 1535              | Tanken Stathelle |
+| 524     | 2276              | Circle K Automat Stridsklev |
+| 527     | 834               | Circle K Porsgrunn |
+| 528     | 762               | Circle K Automat Telemarksveien |
+| 529     | 832               | Circle K Jorkjend |
+| 532     | 1349              | St1 Pors |
+| 533     | 1171              | St1 Truck Eidanger |
+| 534     | 381               | Circle K Goberg |
+| 535     | 282               | Uno-X Rafnes |
+| 536     | 2948              | Driv Heistad |
+| 537     | 331               | Uno-X Falkum |
+| 538     | 368               | Uno-X Tollnes |
+| 539     | 25083             | Uno-X Heistad |
+| 542     | 1471              | Driv Bamble |
+| 545     | 2032              | Nilsen og Kokkersvold (Langangen i DS) |
+| 547     | 25123             | Uno-X Menstad |
+| 551     | 678               | Circle K Telemarksporten |
+| 553     | 2961              | Circle K E18 Bamble |
+| 1511453 | 28413             | Haslestad Energi Eidanger |
+| 1529680 | 28652             | Esso Skjelsvik |
+| 1529713 | 8705              | Rødmyr automat |
+| 3839    | 917               | YX Siljan |
+| 3872    | 28288             | Driv Steinsholt |
+
+**Ikke med:**
+- 494–496 Automat1 Porsgrunn/Skien — bruker eget system, ikke Drivstoffappen
+- 517 LPG Kragerø — ingen match (LPG-stasjon)
+- 541 VardeVed — ikke bensinstasjon
+- 548 Nor bunkring Langesund — maritimt bunker
+- 1529681 Feilplasert stasjon — duplikat/feil plassering
+- 1529693 BLM Transport Rødmyr — industriell transportstasjon
+- 3022 Driv Melum — ingen match (nærmeste 9.5 km unna)
 
 ### Jæren (9 stasjoner)
 
@@ -475,5 +532,47 @@ Regionsnøkkel: `more_romsdal`. Dekker Kristiansund, Molde/Romsdal og Ålesund/S
 | 3635    | 925               | YX Larsnes |
 | 3654    | 902               | YX Sykkylven |
 | 3634    | 942               | YX Søvik |
+
+### Alver (18 stasjoner — Holsnøy, Radøy, Alver, Austrheim)
+
+Bbox: lat 60.48–60.86, lon 4.85–5.48. Excl. Askøy (eget distrikt) og båt/marinastasjoner.
+
+| Vår ID   | Drivstoffappen-ID | Navn |
+|----------|-------------------|------|
+| 1        | 433               | Esso Frekhaug (BASE) |
+| 2        | 2190              | Circle K Automat Knarvik (BASE) |
+| 11       | 28414             | Haltbakk Express Ostereidet |
+| 15       | 3314              | Gabben |
+| 25       | 2872              | YX Eikangervåg |
+| 44       | 4133              | Fromreide |
+| 45       | 1222              | St1 Isdalstø (BASE) |
+| 46       | 3472              | St1 Eikanger |
+| 47       | 2870              | Oljelevrandøren Hundvin |
+| 84       | 2871              | Best Lindås |
+| 85       | 920               | YX Hosteland |
+| 88       | 922               | YX Manger |
+| 89       | 987               | YX Mastrevik |
+| 881639   | 9545              | Bunnpris Bøvågen |
+| 1285     | 919               | YX Rong |
+| 1390753  | 2850              | Oljleverandøren Sletta |
+| 1529678  | 25253             | Polar |
+| 9058     | 846               | Oljeleverandøren Hope |
+
+**Ikke med (båt/marin):** 91 Feste brygge, 1295 Hjeltefjorden Drivstoff, 7269 Hordasmia Isdalstø, 1529642 Kilstraumen Brygge BÅT
+**Ikke med (Askøy):** 1529682 Herdla
+**Ikke med (Bergen/Åsane — allerede i base):** 4 St1 Haukås Nyborg, 16 St1 Marikollen, 26 Oljeleverandøren Hylkje, 32 Circle K Haukås
+**Ikke med (Osterøy — eget distrikt):** 323716 Høyland Auto, 48 YX Osterøy, 10860 Bil og båtservice Hamre
+
+### Osterøy (5 stasjoner)
+
+Bbox: lat 60.46–60.67, lon 5.35–5.65
+
+| Vår ID   | Drivstoffappen-ID | Navn |
+|----------|-------------------|------|
+| 23       | 2867              | Circle K Automat Lonevåg |
+| 48       | 4038              | YX Osterøy |
+| 51       | 4040              | Oljeleverandøren Fotlandsvåg |
+| 10860    | 4676              | Bil og båtservice Hamre |
+| 323716   | 2848              | Høyland Auto (Hosanger) |
 
 Oppgave: $ARGUMENTS

@@ -450,6 +450,35 @@ STASJON_MAPPING_MORE_ROMSDAL = {
     3634:     942,  # YX Søvik
 }
 
+STASJON_MAPPING_ALVER = {
+    1: 433,          # Esso Frekhaug (BASE)
+    2: 2190,         # Circle K Automat Knarvik (BASE)
+    11: 28414,       # Haltbakk Express Ostereidet
+    15: 3314,        # Gabben
+    25: 2872,        # YX Eikangervåg
+    44: 4133,        # Fromreide
+    45: 1222,        # St1 Isdalstø (BASE)
+    46: 3472,        # St1 Eikanger
+    47: 2870,        # Oljelevrandøren Hundvin
+    84: 2871,        # Best Lindås
+    85: 920,         # YX Hosteland
+    88: 922,         # YX Manger
+    89: 987,         # YX Mastrevik
+    881639: 9545,    # Bunnpris Bøvågen
+    1285: 919,       # YX Rong
+    1390753: 2850,   # Oljleverandøren Sletta
+    1529678: 25253,  # Polar
+    9058: 846,       # Oljeleverandøren Hope
+}
+
+STASJON_MAPPING_OSTEROY = {
+    23: 2867,        # Circle K Automat Lonevåg
+    48: 4038,        # YX Osterøy
+    51: 4040,        # Oljeleverandøren Fotlandsvåg
+    10860: 4676,     # Bil og båtservice Hamre
+    323716: 2848,    # Høyland Auto (Hosanger)
+}
+
 REGIONER = {
     'haugalandet':          STASJON_MAPPING_HAUGALANDET,
     'stavanger':            STASJON_MAPPING_STAVANGER,
@@ -460,6 +489,8 @@ REGIONER = {
     'bergenby':             STASJON_MAPPING_BERGENBY,
     'askoy_sotra_oygarden': STASJON_MAPPING_ASKOY_SOTRA_OYGARDEN,
     'more_romsdal':         STASJON_MAPPING_MORE_ROMSDAL,
+    'alver':                STASJON_MAPPING_ALVER,
+    'osteroy':              STASJON_MAPPING_OSTEROY,
 }
 
 FUEL_NAVN = {1: 'diesel', 2: 'bensin'}

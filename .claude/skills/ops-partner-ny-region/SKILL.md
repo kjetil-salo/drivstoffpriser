@@ -135,11 +135,30 @@ REGIONER = {
 
 `argparse`-parameteren oppdateres automatisk siden den bruker `list(REGIONER)`.
 
-### 5. Oppdater ops-partner-region/SKILL.md
+### 5. Legg til i admin-HTML (routes_admin.py)
 
-Legg til ny seksjon med stasjonstabell (samme format som Bergen/Haugalandet/Stavanger).
+Legg til ny `distrikt-rad` i Partner 1-seksjonen i `routes_admin.py`, etter siste eksisterende region:
 
-### 6. Deploy
+```html
+  <div class="distrikt-rad">
+    <span class="distrikt-navn">Regionsnavn</span>
+    <input class="prosent-input" id="prosent-regionsnøkkel" type="number" min="1" max="100" placeholder="100">
+    <button class="sync-btn" id="btn-regionsnøkkel" onclick="sync(\'regionsnøkkel\', \'regionsnøkkel\')">Sync</button>
+    <span class="sync-status" id="status-regionsnøkkel"></span>
+  </div>
+```
+
+Oppdater også `gyldige_regioner`-settet (ca. 5 linjer under `def kjor_partner_sync`):
+
+```python
+gyldige_regioner = {None, ..., 'ny_region'}
+```
+
+### 6. Oppdater ops-partner-region/SKILL.md
+
+Legg til ny seksjon med stasjonstabell (samme format som Bergen/Haugalandet/Stavanger). Oppdater også antall i overskriften og legg til regionsnavnet i `description`-feltet øverst i filen.
+
+### 7. Deploy
 
 ```bash
 # Kjør ops-deploy for å publisere endringen til Pi
