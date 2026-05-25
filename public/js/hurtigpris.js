@@ -238,7 +238,10 @@ async function lagre() {
 
         const oppdatert = {
             ...valgtStasjon,
-            bensin, bensin98, diesel, diesel_avgiftsfri,
+            bensin: bensin ?? valgtStasjon.bensin,
+            bensin98: bensin98 ?? valgtStasjon.bensin98,
+            diesel: diesel ?? valgtStasjon.diesel,
+            diesel_avgiftsfri: diesel_avgiftsfri ?? valgtStasjon.diesel_avgiftsfri,
             bensin_tidspunkt: bensin != null ? naa : valgtStasjon.bensin_tidspunkt,
             diesel_tidspunkt: diesel != null ? naa : valgtStasjon.diesel_tidspunkt,
             bensin98_tidspunkt: bensin98 != null ? naa : valgtStasjon.bensin98_tidspunkt,

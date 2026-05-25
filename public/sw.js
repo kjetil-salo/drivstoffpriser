@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v137';
+const CACHE_VERSION = 'v140';
 const STATIC_CACHE = `drivstoff-static-${CACHE_VERSION}`;
 const DATA_CACHE = `drivstoff-data-${CACHE_VERSION}`;
 
@@ -37,6 +37,7 @@ const STATIC_ASSETS = [
   '/img/kjeder/tank.png',
   '/img/kjeder/tanken.png',
   '/img/kjeder/bunker-oil.svg',
+  '/img/kjeder/automat1.png',
 ];
 
 // ── Install: precache statiske ressurser ──────────

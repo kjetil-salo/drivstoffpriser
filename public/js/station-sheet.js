@@ -152,7 +152,21 @@ export function initSheet(onOppdatert) {
     editBekreftAlleBtn.addEventListener('click', lagreAlleStaged);
     lagHjulListe(hjulTimerEl, _HJUL_TIMER_VERDIER);
     lagHjulListe(hjulMinutterEl, _HJUL_MINUTT_VERDIER);
-    [hjulTimerEl, hjulMinutterEl].forEach(el => el?.addEventListener('scroll', oppdaterTidSidenAktiv, { passive: true }));
+    [hjulTimerEl, hjulMinutterEl].forEach(el => {
+        if (!el) return;
+        el.addEventListener('scroll', oppdaterTidSidenAktiv, { passive: true });
+        el.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            el.scrollBy({ top: e.deltaY > 0 ? _HJUL_ITEM_H : -_HJUL_ITEM_H, behavior: 'smooth' });
+        }, { passive: false });
+        el.addEventListener('click', (e) => {
+            const item = e.target.closest('.tid-hjul-item');
+            if (!item || item.classList.contains('tid-hjul-ghost')) return;
+            const items = Array.from(el.querySelectorAll('.tid-hjul-item:not(.tid-hjul-ghost)'));
+            const idx = items.indexOf(item);
+            if (idx >= 0) el.scrollTo({ top: idx * _HJUL_ITEM_H, behavior: 'smooth' });
+        });
+    });
     forslagBtnEl.addEventListener('click', åpneForslagModal);
     forslagAvbrytEl.addEventListener('click', lukkForslagModal);
     forslagBackdropEl.addEventListener('click', lukkForslagModal);
@@ -545,6 +559,8 @@ async function lagreAlleStaged() {
         btn.textContent = 'Feil!';
         setTimeout(() => { btn.disabled = false; btn.textContent = 'Bekreft'; }, 1500);
     } else {
+        _stagedPriser.clear();
+        Object.values(inputMap).forEach(i => i.classList.remove('pris-staged'));
         btn.textContent = 'Lagret!';
         setTimeout(() => { btn.disabled = false; btn.textContent = 'Bekreft'; visVisModus(); }, 1000);
     }
