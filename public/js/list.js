@@ -164,7 +164,7 @@ export function oppdaterKort(stasjon, onKlikk) {
     kort.replaceWith(nyttKort);
 }
 
-function finnBilligste(stasjoner, inn) {
+export function finnBilligste(stasjoner, inn) {
     const billigste = {};
     for (const type of ['bensin', 'bensin98', 'diesel', 'diesel_avgiftsfri']) {
         if (!inn[type]) continue;
@@ -181,7 +181,7 @@ function finnBilligste(stasjoner, inn) {
     return billigste;
 }
 
-function finnBilligsteId(stasjoner, inn, felt) {
+export function finnBilligsteId(stasjoner, inn, felt) {
     const primærType = felt && felt !== 'avstand'
         ? felt
         : ['bensin', 'diesel', 'bensin98', 'diesel_avgiftsfri'].find(t => inn[t]);
@@ -197,7 +197,7 @@ function finnBilligsteId(stasjoner, inn, felt) {
     return minIds;
 }
 
-function sorter(stasjoner, felt, billigsteIds) {
+export function sorter(stasjoner, felt, billigsteIds) {
     return [...stasjoner].sort((a, b) => {
         // Billigste øverst kun ved prissortering
         if (felt !== 'avstand') {
