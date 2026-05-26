@@ -5,13 +5,13 @@ i vår DB — kun hvis Drivstoffappens pris er nyere enn vår siste.
 Kjøres av cron: 0 5-23 * * *
 """
 
-import hashlib
 import json
 import logging
 import os
 import random
 import sqlite3
 import sys
+import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
 
@@ -40,9 +40,11 @@ logging.basicConfig(
 log = logging.getLogger('drivstoffappen_sync')
 
 BASE_URL = "https://api.drivstoffappen.no"
-CLIENT_ID = "com.raskebiler.drivstoff.appen.ios"
+CLIENT_ID = "com.drivstoff.appen.ios"
 USER_AGENT = "Drivstoffappen/3.5.4 (com.raskebiler.drivstoff.appen; build:689; iOS 26.4.2) Alamofire/5.12.0"
 REQUESTER_ID = "47C44FEA-48B3-4054-9282-D91DB913AD8C"
+BEARER_TOKEN = "eyJhbGciOiJIUzI1NiJ9.eyJhdXRoSWQiOiJIVm4yMktkamJhYXhydDRqeDByRGF2NVZ0YW4yIiwicmVxSWQiOiI0N0M0NEZFQS00OEIzLTQwNTQtOTI4Mi1EOTFEQjkxM0FEOEMiLCJhdXRoVHlwZSI6InVzZXIiLCJhdWQiOiJkcml2c3RvZmZhcHBlbiIsImlhdCI6MTc3MzkwMDkwN30.jAC1oAJ45gOybmSMniVgAbHat23HFFzYPNlVHdCtBzo"
+STATIC_API_KEY = "0afa1c404183c35622f380f78f2e5eec"
 RESEND_FROM = "Drivstoffprisene <noreply@ksalo.no>"
 VARSLE_TIL = "k@vikebo.com"
 
@@ -522,26 +524,20 @@ FORSINKELSE_SEK = 5 * 60       # ignorer priser yngre enn 5 min
 MAX_ALDER_SEK = 12 * 3600      # ignorer priser eldre enn 12 timer
 
 
-def _hent_token() -> str:
-    req = urllib.request.Request(f"{BASE_URL}/api/v1/authorization-sessions")
-    with urllib.request.urlopen(req, timeout=10) as resp:
-        return json.loads(resp.read())['token']
-
-
-def _utled_api_nøkkel(token: str) -> str:
-    b = bytearray(token, 'utf-8')
-    return hashlib.md5(b[1:] + b[:1]).hexdigest()
-
-
-def _hent_og_lagre_dump(api_key: str) -> list[dict]:
+def _hent_og_lagre_dump() -> list[dict]:
+    min_ts = (datetime.now(timezone.utc) - timedelta(seconds=MAX_ALDER_SEK)).strftime('%Y-%m-%dT%H:%M:%S+0000')
+    url = f"{BASE_URL}/api/v3/stations?includeDeleted=1&minUpdatedAt={urllib.parse.quote(min_ts)}"
     headers = {
-        'X-API-KEY': api_key,
-        'X-CLIENT-ID': CLIENT_ID,
-        'User-Agent': USER_AGENT,
+        'content-type': 'application/json',
+        'accept': '*/*',
+        'Authorization': f'Bearer {BEARER_TOKEN}',
         'X-Requester-Id': REQUESTER_ID,
         'Accept-Language': 'nb-NO;q=1.0, nn-NO;q=0.9',
+        'x-api-key': STATIC_API_KEY,
+        'User-Agent': USER_AGENT,
+        'x-client-id': CLIENT_ID,
     }
-    req = urllib.request.Request(f"{BASE_URL}/api/v1/stations", headers=headers)
+    req = urllib.request.Request(url, headers=headers)
     with urllib.request.urlopen(req, timeout=60) as resp:
         alle = json.loads(resp.read())
     with open(DUMP_PATH, 'w', encoding='utf-8') as f:
@@ -648,16 +644,7 @@ def kjør(prosent: float = 100, region: str | None = None):
             log.info(f'Tilfeldig utvalg: {k}/{len(STASJON_MAPPING)} stasjoner ({prosent}%)')
 
         try:
-            token = _hent_token()
-            api_key = _utled_api_nøkkel(token)
-        except Exception as e:
-            log.error(f'Auth feilet: {e}')
-            stats['feil'] += 1
-            _logg_stats(stats)
-            return
-
-        try:
-            alle_stasjoner = _hent_og_lagre_dump(api_key)
+            alle_stasjoner = _hent_og_lagre_dump()
         except Exception as e:
             log.error(f'Henting feilet: {e}')
             stats['feil'] += 1
