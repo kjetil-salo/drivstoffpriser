@@ -479,6 +479,29 @@ STASJON_MAPPING_OSTEROY = {
     323716: 2848,    # Høyland Auto (Hosanger)
 }
 
+STASJON_MAPPING_INDRE_OSTFOLD = {
+    1959: 1405,     # Automat 1 Askim
+    3743: 1416,     # Automat1 Rakkestad
+    69911: 4049,    # Best Degernes
+    1950: 799,      # Circle K Askim
+    1960: 1532,     # Circle K Automat Mysen
+    1961: 620,      # Circle K E18 Sekkelsten
+    3769: 704,      # Circle K Rakkestad
+    1985: 1438,     # Driv Fossum bro
+    1966: 467,      # Esso Express Høyendal
+    3753: 420,      # Esso Express Rakkestad
+    1952: 487,      # Esso Express Ramstadkrysset
+    1964: 501,      # St1 Bergerkrysset
+    1948: 505,      # St1 Momarken
+    1965: 1279,     # St1 Morenen
+    1976: 24508,    # Uno-X Askim
+    1986: 340,      # Uno-X Mysen
+    3762: 6621,     # YX Degernes (automat)
+    1944: 870,      # YX Skiptvet
+    1956: 890,      # YX Truck Mysen
+    3760: 1163,     # YX Truck Rakkestad
+}
+
 REGIONER = {
     'haugalandet':          STASJON_MAPPING_HAUGALANDET,
     'stavanger':            STASJON_MAPPING_STAVANGER,
@@ -491,6 +514,7 @@ REGIONER = {
     'more_romsdal':         STASJON_MAPPING_MORE_ROMSDAL,
     'alver':                STASJON_MAPPING_ALVER,
     'osteroy':              STASJON_MAPPING_OSTEROY,
+    'indre_ostfold':        STASJON_MAPPING_INDRE_OSTFOLD,
 }
 
 FUEL_NAVN = {1: 'diesel', 2: 'bensin'}

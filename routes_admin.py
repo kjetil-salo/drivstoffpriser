@@ -2993,6 +2993,12 @@ def admin_partner_sync():
     <button class="sync-btn" id="btn-osteroy" onclick="sync(\'osteroy\', \'osteroy\')">Sync</button>
     <span class="sync-status" id="status-osteroy"></span>
   </div>
+  <div class="distrikt-rad">
+    <span class="distrikt-navn">Indre Østfold</span>
+    <input class="prosent-input" id="prosent-indre_ostfold" type="number" min="1" max="100" placeholder="100">
+    <button class="sync-btn" id="btn-indre_ostfold" onclick="sync(\'indre_ostfold\', \'indre_ostfold\')">Sync</button>
+    <span class="sync-status" id="status-indre_ostfold"></span>
+  </div>
 </div>
 
 </div>
@@ -3044,7 +3050,7 @@ def admin_partner_sync_kjor():
     region = data.get('region')
     prosent = data.get('prosent', 100)
 
-    gyldige_regioner = {None, 'haugalandet', 'stavanger', 'jaeren', 'grenland', 'kristiansand', 'forde', 'bergenby', 'askoy_sotra_oygarden', 'more_romsdal', 'alver', 'osteroy'}
+    gyldige_regioner = {None, 'haugalandet', 'stavanger', 'jaeren', 'grenland', 'kristiansand', 'forde', 'bergenby', 'askoy_sotra_oygarden', 'more_romsdal', 'alver', 'osteroy', 'indre_ostfold'}
     if region not in gyldige_regioner:
         return jsonify({'error': 'Ugyldig region'}), 400
     try:

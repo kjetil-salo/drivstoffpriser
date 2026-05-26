@@ -3,7 +3,7 @@ import math
 import os
 import threading
 from contextlib import contextmanager
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 _oslo = ZoneInfo('Europe/Oslo')
@@ -805,16 +805,20 @@ def prognose_daglig() -> dict:
     """
     now = datetime.now(_oslo)
     current_hour = now.hour
+    oslo_midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    oslo_midnight_utc = oslo_midnight.astimezone(UTC).strftime('%Y-%m-%d %H:%M:%S')
+    hist_start_utc = (oslo_midnight - timedelta(days=32)).astimezone(UTC).strftime('%Y-%m-%d %H:%M:%S')
 
     with get_conn() as conn:
-        # Alle rader for siste 31 dager (unntatt i dag) – UTC-tidsstempler
+        # Alle rader for siste 31 dager (unntatt i dag) – grenser i Oslo-tid
         rader = conn.execute(
             "SELECT tidspunkt FROM priser "
-            "WHERE tidspunkt >= datetime('now', '-32 days') "
-            "AND date(tidspunkt) < date('now')"
+            "WHERE tidspunkt >= ? AND tidspunkt < ?",
+            (hist_start_utc, oslo_midnight_utc)
         ).fetchall()
         i_dag = conn.execute(
-            "SELECT COUNT(*) FROM priser WHERE date(tidspunkt) = date('now')"
+            "SELECT COUNT(*) FROM priser WHERE tidspunkt >= ?",
+            (oslo_midnight_utc,)
         ).fetchone()[0]
 
     # Bygg per-dag per-time dict (Oslo-tid)
@@ -854,7 +858,7 @@ def prognose_daglig() -> dict:
     }
 
     fraaksjon = avg_fraaksjon.get(current_hour)
-    prognose = round(i_dag / fraaksjon) if fraaksjon and fraaksjon > 0.01 else None
+    prognose = round(i_dag / fraaksjon) if fraaksjon and fraaksjon > 0.01 and current_hour >= 5 else None
 
     return {
         'i_dag': i_dag,
@@ -904,17 +908,21 @@ def prognose_daglig_brukere() -> dict:
     """Prognose for dagens antall unike bidragsytere (alle brukere inkl. Kjetil)."""
     now = datetime.now(_oslo)
     current_hour = now.hour
+    oslo_midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    oslo_midnight_utc = oslo_midnight.astimezone(UTC).strftime('%Y-%m-%d %H:%M:%S')
+    hist_start_utc = (oslo_midnight - timedelta(days=32)).astimezone(UTC).strftime('%Y-%m-%d %H:%M:%S')
 
     with get_conn() as conn:
         rader = conn.execute(
             "SELECT tidspunkt, bruker_id FROM priser "
             "WHERE bruker_id IS NOT NULL "
-            "AND tidspunkt >= datetime('now', '-32 days') "
-            "AND date(tidspunkt) < date('now')"
+            "AND tidspunkt >= ? AND tidspunkt < ?",
+            (hist_start_utc, oslo_midnight_utc)
         ).fetchall()
         i_dag_rader = conn.execute(
             "SELECT DISTINCT bruker_id FROM priser "
-            "WHERE bruker_id IS NOT NULL AND date(tidspunkt) = date('now')"
+            "WHERE bruker_id IS NOT NULL AND tidspunkt >= ?",
+            (oslo_midnight_utc,)
         ).fetchall()
 
     i_dag = len(i_dag_rader)
@@ -957,7 +965,7 @@ def prognose_daglig_brukere() -> dict:
         for h, v in fraaksjoner.items()
     }
     fraaksjon = avg_fraaksjon.get(current_hour)
-    prognose = round(i_dag / fraaksjon) if fraaksjon and fraaksjon > 0.01 else None
+    prognose = round(i_dag / fraaksjon) if fraaksjon and fraaksjon > 0.01 and current_hour >= 5 else None
 
     return {
         'i_dag': i_dag,
@@ -972,17 +980,21 @@ def prognose_daglig_enheter() -> dict:
     """Prognose for dagens antall unike enheter (device_id fra visninger)."""
     now = datetime.now(_oslo)
     current_hour = now.hour
+    oslo_midnight = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    oslo_midnight_utc = oslo_midnight.astimezone(UTC).strftime('%Y-%m-%d %H:%M:%S')
+    hist_start_utc = (oslo_midnight - timedelta(days=32)).astimezone(UTC).strftime('%Y-%m-%d %H:%M:%S')
 
     with get_conn() as conn:
         rader = conn.execute(
             "SELECT ts, device_id FROM visninger "
             "WHERE device_id != '' "
-            "AND ts >= datetime('now', '-32 days') "
-            "AND date(ts) < date('now')"
+            "AND ts >= ? AND ts < ?",
+            (hist_start_utc, oslo_midnight_utc)
         ).fetchall()
         i_dag = conn.execute(
             "SELECT COUNT(DISTINCT device_id) FROM visninger "
-            "WHERE device_id != '' AND date(ts) = date('now')"
+            "WHERE device_id != '' AND ts >= ?",
+            (oslo_midnight_utc,)
         ).fetchone()[0]
 
     # Kumulativ fraaksjon per time per dag (unike enheter)
@@ -1022,7 +1034,7 @@ def prognose_daglig_enheter() -> dict:
         for h, v in fraaksjoner.items()
     }
     fraaksjon = avg_fraaksjon.get(current_hour)
-    prognose = round(i_dag / fraaksjon) if fraaksjon and fraaksjon > 0.01 else None
+    prognose = round(i_dag / fraaksjon) if fraaksjon and fraaksjon > 0.01 and current_hour >= 5 else None
 
     return {
         'i_dag': i_dag,
