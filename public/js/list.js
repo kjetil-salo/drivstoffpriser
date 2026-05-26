@@ -182,21 +182,17 @@ function finnBilligste(stasjoner, inn) {
 }
 
 function finnBilligsteId(stasjoner, inn, felt) {
+    const primærType = felt && felt !== 'avstand'
+        ? felt
+        : ['bensin', 'diesel', 'bensin98', 'diesel_avgiftsfri'].find(t => inn[t]);
+    if (!primærType) return new Set();
     let minPris = Infinity;
     const minIds = new Set();
     for (const s of stasjoner) {
-        const priser = felt && felt !== 'avstand'
-            ? (inn[felt] ? [aktuellPris(s, felt)].filter(v => v != null) : [])
-            : [
-                inn.bensin              ? aktuellPris(s, 'bensin')              : null,
-                inn.bensin98            ? aktuellPris(s, 'bensin98')            : null,
-                inn.diesel              ? aktuellPris(s, 'diesel')              : null,
-                inn.diesel_avgiftsfri   ? aktuellPris(s, 'diesel_avgiftsfri')   : null,
-              ].filter(v => v != null);
-        if (!priser.length) continue;
-        const min = Math.min(...priser);
-        if (min < minPris) { minPris = min; minIds.clear(); minIds.add(s.id); }
-        else if (min === minPris) { minIds.add(s.id); }
+        const pris = aktuellPris(s, primærType);
+        if (pris == null) continue;
+        if (pris < minPris) { minPris = pris; minIds.clear(); minIds.add(s.id); }
+        else if (pris === minPris) { minIds.add(s.id); }
     }
     return minIds;
 }
