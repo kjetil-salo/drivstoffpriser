@@ -2,7 +2,7 @@
  * E2E-tester for stedssøk (search.js)
  * Dekker: input, debounce, resultater, keyboard-navigasjon, ESC, klikk utenfor
  */
-const { test, expect } = require('@playwright/test');
+import { test, expect } from '@playwright/test';
 
 const MOCK_STASJONER = [
     {

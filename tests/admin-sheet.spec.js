@@ -2,7 +2,7 @@
  * E2E-tester for admin-panel i stasjonskort (station-sheet.js)
  * Dekker: admin-knapp synlighet, kjede-endring, navn-endring, drivstofftyper
  */
-const { test, expect } = require('@playwright/test');
+import { test, expect } from '@playwright/test';
 
 const naa = new Date().toISOString().replace('T', ' ').slice(0, 19);
 

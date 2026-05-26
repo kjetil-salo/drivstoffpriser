@@ -2,7 +2,7 @@
  * E2E-tester for geolokasjon-flyt (location.js)
  * Dekker: vellykket posisjon, nektet tilgang, timeout, cachet posisjon
  */
-const { test, expect } = require('@playwright/test');
+import { test, expect } from '@playwright/test';
 
 const MOCK_STASJONER = [
     {

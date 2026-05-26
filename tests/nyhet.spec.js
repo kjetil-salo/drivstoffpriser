@@ -2,7 +2,7 @@
  * E2E-tester for nyhet/splash-funksjonalitet
  * Dekker: visning av nyhet, lukking, cookie-persistering, ingen nyhet
  */
-const { test, expect } = require('@playwright/test');
+import { test, expect } from '@playwright/test';
 
 const MOCK_STASJONER = [
     {

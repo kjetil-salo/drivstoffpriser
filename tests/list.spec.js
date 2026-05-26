@@ -2,7 +2,7 @@
  * E2E-tester for listevisning (list.js)
  * Dekker: sortering, "vis eldre"-filter, favoritter, tom liste
  */
-const { test, expect } = require('@playwright/test');
+import { test, expect } from '@playwright/test';
 
 const naa = new Date().toISOString().replace('T', ' ').slice(0, 19);
 const gammelt = '2020-01-01 00:00:00';
